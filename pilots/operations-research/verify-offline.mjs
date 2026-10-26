@@ -15,8 +15,9 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 const suites = [
   { name: 'reference-oracles', file: 'oracles.test.mjs', count: 4 },
   { name: 'glpk-contract', file: 'glpk-contract.test.mjs', count: 6 },
+  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 5, flags: ['--experimental-strip-types'] },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'verify-offline.mjs'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', '../../src/agent/subagents/pdf-evidence.ts', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {
@@ -35,10 +36,10 @@ function node(argumentsList) {
   return result.stdout;
 }
 
-for (const f of allFiles) node(['--check', join(baseDir, f)]);
+for (const f of allFiles) node([...(f.endsWith('.ts') ? ['--experimental-strip-types'] : []), '--check', join(baseDir, f)]);
 const receipts = [];
 for (const suite of suites) {
-  const output = node(['--test', join(baseDir, suite.file)]);
+  const output = node([...(suite.flags ?? []), '--test', join(baseDir, suite.file)]);
   const count = /(?:^|\n)# tests (\d+)/.exec(output);
   const pass = /(?:^|\n)# pass (\d+)/.exec(output);
   const fail = /(?:^|\n)# fail (\d+)/.exec(output);
