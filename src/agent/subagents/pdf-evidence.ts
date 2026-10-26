@@ -10,17 +10,26 @@ export interface PdfBriefAudit {
 }
 
 /**
- * The PDF tool emits explicit headings for pages that actually reached the
- * agent's text context. A request spec can include nonexistent pages or 'all',
- * so never infer observed pages from the requested spec.
- *
- * On a truncated extraction, the final page may be only partially visible:
- * exclude it from citation authority. The agent can re-extract that page.
+ * Use the PDF parser's structured page numbers, not headings read from the
+ * (untrusted) PDF text. The last partially-visible page is NOT authority.
+ * A forged "--- Page N ---" line in a PDF cannot produce a new page id.
  */
-export function observedExtractPages(output: string): number[] {
-	const matches = [...output.matchAll(/^--- Page ([1-9]\d*) ---[ \t]*$/gm)];
-	const pages = matches.map((m) => Number(m[1])).filter(Number.isSafeInteger);
-	if (/\[Output truncated at \d+ chars\s*[—-]/.test(output)) pages.pop();
+export function observedExtractPages(
+	sections: readonly { page: number; text: string }[],
+	visibleChars: number,
+): number[] {
+	if (!Number.isFinite(visibleChars) && visibleChars !== Infinity) return [];
+	if (visibleChars < 0) return [];
+	const pages: number[] = [];
+	let offset = 0;
+	for (const section of sections) {
+		if (!Number.isSafeInteger(section.page) || section.page < 1) return [];
+		const chunk = `--- Page ${section.page} ---\n${section.text}`;
+		const next = offset + (pages.length ? 1 : 0) + chunk.length;
+		if (next > visibleChars) break;
+		pages.push(section.page);
+		offset = next;
+	}
 	return [...new Set(pages)].sort((a, b) => a - b);
 }
 

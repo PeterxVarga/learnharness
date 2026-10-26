@@ -159,18 +159,23 @@ export function parsePageSpec(spec: string, total: number): number[] {
 }
 
 /** pdf_extract: text of the requested pages, `--- Page N ---` headed. */
-export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
+export async function pdfExtractDetailed(filePath: string, pageSpec: string): Promise<Array<{ page: number; text: string }>> {
 	const { doc } = await openDocument(filePath);
 	const pages = parsePageSpec(pageSpec, doc.numPages);
-	if (pages.length === 0) return "No pages selected — page spec matched nothing.";
-	const out: string[] = [];
+	const out: Array<{ page: number; text: string }> = [];
 	for (const i of pages) {
 		const page = await doc.getPage(i);
 		const content = await page.getTextContent();
-		out.push(`--- Page ${i} ---`);
-		out.push(itemsToText(content.items as unknown[]));
+		out.push({ page: i, text: itemsToText(content.items as unknown[]) });
 	}
-	return out.join("\n");
+	return out;
+}
+
+/** Backward-compatible textual extraction; page identities come from the parser, not these headings. */
+export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
+	const sections = await pdfExtractDetailed(filePath, pageSpec);
+	if (sections.length === 0) return "No pages selected — page spec matched nothing.";
+	return sections.map((section) => `--- Page ${section.page} ---\n${section.text}`).join("\n");
 }
 
 export interface PdfSearchHit {

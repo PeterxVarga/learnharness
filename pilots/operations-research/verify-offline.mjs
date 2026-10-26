@@ -15,7 +15,7 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 const suites = [
   { name: 'reference-oracles', file: 'oracles.test.mjs', count: 4 },
   { name: 'glpk-contract', file: 'glpk-contract.test.mjs', count: 6 },
-  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 5, flags: ['--experimental-strip-types'] },
+  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 6, flags: ['--experimental-strip-types'] },
 ];
 const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', '../../src/agent/subagents/pdf-evidence.ts', 'verify-offline.mjs'];
 

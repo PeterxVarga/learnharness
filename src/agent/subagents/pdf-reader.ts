@@ -7,7 +7,7 @@ import { piEngineFor, type PiEngine, type ThinkingLevel } from "../models.ts";
 import { providerEventObserver, type ProviderEventObserver } from "../provider-events.ts";
 import type { PdfResult, PdfToolInput } from "../../core/contracts.ts";
 import { getHeadless, type HeadlessApi } from "./headless.ts";
-import { pdfExtract, pdfInfo, pdfProbe, pdfSearch, type PdfSearchHit } from "./pdf-ops.ts";
+import { pdfExtractDetailed, pdfInfo, pdfProbe, pdfSearch, type PdfSearchHit } from "./pdf-ops.ts";
 import { observedExtractPages, auditPdfBrief, addObservedConsultationFooter } from "./pdf-evidence.ts";
 
 /**
@@ -138,12 +138,15 @@ async function pdfInfoText(pdfPath: string): Promise<string> {
 }
 
 /** pdf_extract's body: capped text extraction with the narrow-the-spec notice. */
-async function pdfExtractText(pdfPath: string, pages: string): Promise<string> {
-	const text = await pdfExtract(pdfPath, pages);
+async function pdfExtractText(pdfPath: string, pages: string): Promise<{ text: string; observedPages: number[] }> {
+	const sections = await pdfExtractDetailed(pdfPath, pages);
+	if (sections.length === 0) return { text: "No pages selected — page spec matched nothing.", observedPages: [] };
+	const text = sections.map((section) => `--- Page ${section.page} ---\n${section.text}`).join("\n");
+	const observedPages = observedExtractPages(sections, Math.min(text.length, EXTRACT_CAP));
 	if (text.length > EXTRACT_CAP) {
-		return `${text.slice(0, EXTRACT_CAP)}\n\n[Output truncated at ${EXTRACT_CAP} chars — narrow the page spec and extract in smaller batches.]`;
+		return { text: `${text.slice(0, EXTRACT_CAP)}\n\n[Output truncated at ${EXTRACT_CAP} chars — narrow the page spec and extract in smaller batches.]`, observedPages };
 	}
-	return text;
+	return { text, observedPages };
 }
 
 function toolText(toolCallId: string, toolName: string, value: string): ToolResultMessage {
@@ -263,8 +266,8 @@ export async function runPdfReaderAgent(
 						const spec = String(args.pages ?? "all");
 						opts.onActivity?.(`pdf_extract: ${spec}`);
 						const r = await pdfExtractText(pdfPath, spec);
-						toolResults.push(toolText(call.id, call.name, String(r)));
-						for (const p of observedExtractPages(r)) {
+						toolResults.push(toolText(call.id, call.name, r.text));
+						for (const p of r.observedPages) {
 							consulted.add(p);
 							read.add(p);
 						}
