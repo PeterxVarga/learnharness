@@ -183,3 +183,23 @@ The server endpoint:
 Eight adapter tests passed with Node 22.16.0 against a local reconstruction of the current GitHub GLPK serializer's first 73 lines, with 100 seeds checked for constraint and objective consistency; the adapter and test files were SHA matched on upload. The original full GitHub GLPK module was NOT rerun in this local test. The combined offline verifier expects **79 tests** (prior 71 plus 8). Its full exact-commit combined run and full Next.js build have NOT been certified. Independent SciPy/HiGHS cross-checks (200/200) refer to the prior R3 reference set only.
 
 **Next:** user-run full Fedora test and app build, then a genuine `glpsol` run on the generated safe model in an isolated filesystem. Until that result is observed, MathProg syntax/runtime compatibility is a hypothesis, not a fact. Keep the PR unmerged.
+
+## R5: native GLPK qualification gate (safe synthetic generated model only)
+
+R5 adds `qualify-glpsol-r5.mjs`, a **fail-closed executable qualification runner**, not a general MathProg interpreter and not a claim that GLPK has executed.
+
+```sh
+# Fedora: use a separately authorized/trusted installation of GNU GLPK first.
+# This command runs ONLY a generated bounded 3×3 transportation model:
+node pilots/operations-research/qualify-glpsol-r5.mjs --seed 42
+```
+
+The runner accepts a uint32 seed only; **never takes a learner .mod path, uploaded source, arbitrary binary path or shell argument**. It requires a regular, root-owned, non-world/group-writable `/usr/bin/glpsol`, records the binary SHA256, creates a 0700 temporary directory containing only its generated model, and invokes `glpsol` without a shell using `--math`, `--wglp`, `--write`, `--tmlim 5`, and `--memlim 64`. A 10-second outer process timeout also covers model translation. Output files are bounded to 128 KiB; machine-readable solution records must satisfy the existing LP constraints, claimed status must be optimal, and the objective must equal the independent bounded integer-oracle optimum. The run cleans up after itself. Binary provenance is rechecked before success.
+
+**Missing, untrusted or failing glpsol = explicit `GLPSOL_NOT_QUALIFIED:...` and nonzero status.** A PASS is reserved for actual native execution plus verification; fake/mocked GLPK text is never counted as runtime qualification.
+
+This is a narrow native qualification of **trusted synthetic model-generation**, not an OS security sandbox for arbitrary MathProg, real student models, or external data/files. Use an isolated OS account/container for untrusted input, which is still blocked. Do not enable on the main UI automatically.
+
+**Validation:** 7/7 R5 preflight/fail-closed tests passed on Node 22.16.0; the tested source is byte-identical to its GitHub blob. Separately, the 34 R3/R4 tests passed on exact GitHub source files including the full GLPK contract parser. Local GLPK binary unavailable, so there is NO runtime PASS and no real MathProg syntax certification. Offline verifier now expects **86/86 tests**, but combined exact-commit suite, full Next.js build, and main practice-agent integration remain unverified.
+
+The project remains a single **draft PR**; `main` is unchanged.
