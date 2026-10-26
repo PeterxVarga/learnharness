@@ -3,6 +3,7 @@
  * The teacher may explain an error, but this route alone determines 0/1 points.
  */
 import { gradeTransportExam, makeTransportTask, publicTransportTask } from "../../../../pilots/operations-research/transport-exam-r3.mjs";
+import { gradeExpandedMathProg } from "../../../../pilots/operations-research/mathprog-expanded-r6.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,7 +67,10 @@ export async function POST(request: Request): Promise<Response> {
   if (seed === null) return json({ error: "invalid_seed" }, 400);
   const answer = data.answer;
   if (!answer || typeof answer !== "object" || Array.isArray(answer)) return json({ error: "invalid_answer" }, 400);
-  const grade = gradeTransportExam(makeTransportTask(seed), answer);
+  const submitted = answer as Record<string, unknown>;
+  const grade = Object.prototype.hasOwnProperty.call(submitted, "mathprog")
+    ? gradeExpandedMathProg(seed, submitted)
+    : gradeTransportExam(makeTransportTask(seed), submitted);
   // score is formative, not a supervised exam attestation; hintsUsed is self-reported.
   return json({ schema: "learnharness.transport-grade.r4", taskId: `synthetic-transport-r3-${seed}`,
     ...grade, assessmentScope: "self_reported_practice_not_proctored" });
