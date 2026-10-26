@@ -20,8 +20,9 @@ const suites = [
   { name: 'exam-all-or-nothing', file: 'exam-binary.test.mjs', count: 12 },
   { name: 'r3-transport-exam', file: 'transport-exam-r3.test.mjs', count: 12 },
   { name: 'r3-transport-cli', file: 'transport-cli-r3.test.mjs', count: 5 },
+  { name: 'r4-next-api-transport', file: 'transport-api-r4.test.mjs', count: 9, flags: ['--experimental-strip-types'] },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {
