@@ -15,10 +15,11 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 const suites = [
   { name: 'reference-oracles', file: 'oracles.test.mjs', count: 4 },
   { name: 'glpk-contract', file: 'glpk-contract.test.mjs', count: 6 },
-  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 6, flags: ['--experimental-strip-types'] },
+  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 11, flags: ['--experimental-strip-types'] },
   { name: 'hu-course-optin', file: '../../src/agent/courses/operations-research-hu.test.ts', count: 12, flags: ['--experimental-strip-types'] },
+  { name: 'exam-all-or-nothing', file: 'exam-binary.test.mjs', count: 12 },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {

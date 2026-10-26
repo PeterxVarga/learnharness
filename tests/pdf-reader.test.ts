@@ -272,3 +272,17 @@ describe("pdf-reader strict provenance regression (faux engine)", () => {
 		assert.deepEqual(result.pagesConsulted, [1]);
 	});
 });
+
+
+describe("pdf-reader bounded retry fail-closed regressions", () => {
+	it("never delivers a rejected citation when the iteration budget expires", async () => {
+		const engine = fauxEngine([
+			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1" }, { id: "extract-budget" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("Invented source (p. 99).")]),
+		]);
+		const result = await runPdfReaderAgent({ path: FIXTURE, question: "what happened?" }, { engine, maxIterations: 2 });
+		assert.match(result.brief, /^PDF failed: iteration limit/);
+		assert.doesNotMatch(result.brief, /Invented source/);
+		assert.deepEqual(result.pagesConsulted, [1]);
+	});
+});

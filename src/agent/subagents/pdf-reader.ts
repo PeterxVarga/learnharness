@@ -346,11 +346,11 @@ export async function runPdfReaderAgent(
 		return { path: pdfPath, question: input.question, brief: `PDF failed: the reader crashed — ${msg}`, pagesRead: [...read].sort((a, b) => a - b), pagesConsulted: [...consulted].sort((a, b) => a - b) };
 	}
 
-	// Iteration limit: deliver whatever was honestly consulted (never invention).
+	// Exhausting the budget never bypasses citation validation; an unaccepted draft is NOT a brief.
 	return {
 		path: pdfPath,
 		question: input.question,
-		brief: finalText || `PDF failed: iteration limit (${maxIterations}) reached without a brief.`,
+		brief: `PDF failed: iteration limit (${maxIterations}) reached without an audited brief.`,
 		pagesRead: [...read].sort((a, b) => a - b),
 		pagesConsulted: [...consulted].sort((a, b) => a - b),
 	};
