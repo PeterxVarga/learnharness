@@ -69,3 +69,13 @@ A real GLPK execution adapter is **deliberately not wired up**. GNU MathProg sup
 After baseline, add a separate allowlisted GLPK/MathProg adapter that accepts explicit user-approved synthetic file paths only. Execute `glpsol` without a shell, with fixed time/memory/output limits, and capture statuses: optimal, infeasible, unbounded, error. Test failure modes before allowing an AI to use it. Never grant arbitrary shell access to the teacher.
 
 Keep real student materials and private exam examples out of this public repo.
+
+## Without GitHub Actions / Remote Desktop
+
+Run only the dependency-free mathematical tests using Node.js:
+
+```sh
+node pilots/operations-research/verify-offline.mjs
+```
+
+This command runs 10 tests and produces a machine-readable JSON receipt with source hashes. It can be run on an independent developer computer or offline runner; no GitHub Actions credits, remote desktop, provider API key or `npm install` needed. It does **not** certify the full Next.js app, GLPK runtime, PDF grounding or Fedora installation. The 10/10 validation was performed with Node 22.16.0; wider Node compatibility is unverified.
