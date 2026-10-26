@@ -78,7 +78,7 @@ Run only the dependency-free mathematical tests using Node.js:
 node pilots/operations-research/verify-offline.mjs
 ```
 
-This command runs 10 tests and produces a machine-readable JSON receipt with source hashes. It can be run on an independent developer computer or offline runner; no GitHub Actions credits, remote desktop, provider API key or `npm install` needed. It does **not** certify the full Next.js app, GLPK runtime, PDF grounding or Fedora installation. The 10/10 validation was performed with Node 22.16.0; wider Node compatibility is unverified.
+This command runs 28 tests (4 reference, 6 GLPK contract, 6 PDF provenance, 12 course opt-in) and produces a machine-readable JSON receipt with source hashes. It can be run on an independent developer computer or offline runner; no GitHub Actions credits, remote desktop, provider API key or `npm install` needed. It does **not** certify the full Next.js app, GLPK runtime, PDF grounding or Fedora installation. The 16 earlier pilot tests were verified with Node 22.16.0; the 12 course tests were checked separately. A fresh full 28/28 offline receipt and upstream integration build are still required for this exact commit.
 
 ## PDF source-provenance R1 (source boundary, not factual accuracy)
 
