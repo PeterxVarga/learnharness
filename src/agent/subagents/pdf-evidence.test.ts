@@ -22,6 +22,6 @@ describe('PDF provenance gate', () => {
 		assert.equal(auditPdfBrief('Claim (p. 1)', []).ok, false);
 	});
 	it('replaces a fabricated Pages consulted footer with observed pages', () => {
-		assert.equal(addObservedConsultationFooter('Correct (p. 1).\nPages onsulted: 1, 999', [1]), 'Correct (p. 1).\n\nPages consulted: 1');
+		assert.equal(addObservedConsultationFooter('Correct (p. 1).\nPages consulted: 1, 999', [1]), 'Correct (p. 1).\n\nPages consulted: 1');
 	});
 });
