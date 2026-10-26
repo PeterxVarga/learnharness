@@ -18,8 +18,10 @@ const suites = [
   { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 11, flags: ['--experimental-strip-types'] },
   { name: 'hu-course-optin', file: '../../src/agent/courses/operations-research-hu.test.ts', count: 12, flags: ['--experimental-strip-types'] },
   { name: 'exam-all-or-nothing', file: 'exam-binary.test.mjs', count: 12 },
+  { name: 'r3-transport-exam', file: 'transport-exam-r3.test.mjs', count: 12 },
+  { name: 'r3-transport-cli', file: 'transport-cli-r3.test.mjs', count: 5 },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {

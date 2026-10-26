@@ -122,3 +122,42 @@ PDF citations now parse page ranges/lists and Hungarian `(1. oldal)` / `(1. o.)`
 Offline suite expectation at this commit: **45** tests (4 reference, 6 GLPK contract, 11 PDF citation, 12 opt-in course, 12 binary exam). Of these, the **new** 11 PDF + 12 binary tests passed on Node 22.16.0 prior to committing, with file byte identity checked using Git blob hashes. The **full exact-commit 45/45**, upstream typecheck/lint/build, live PDF reading, Fedora and real GLPK runtime are NOT yet qualified.
 
 Binary scoring must never be confused with the broader educational goal: use helpful, specific feedback during teaching, but do not turn partial work into awarded exam points. Never promise this synthetic checker can grade original university models.
+
+## R3: complete offline 3×3 synthetic transport practice
+
+**Usable standalone flow, no Actions / Remote Desktop / AI token:**
+
+```sh
+# Show a Hungarian exam-like challenge. Do NOT print the answer.
+node pilots/operations-research/transport-cli-r3.mjs new --seed 42
+
+# JSON form of the same fixed challenge:
+node pilots/operations-research/transport-cli-r3.mjs new --seed 42 --json
+
+# Submit a locally created response file, full point or zero:
+node pilots/operations-research/transport-cli-r3.mjs grade --seed 42 --answer ./answer.json
+```
+
+The response is a data-only JSON object with shape:
+```json
+{
+  "model": {
+    "sense": "min",
+    "nonnegative": true,
+    "supply": [0, 0, 0],
+    "demand": [0, 0, 0],
+    "costs": [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+    "capacities": [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+  },
+  "allocation": [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+  "reportedObjective": 0,
+  "hintsUsed": false
+}
+```
+Replace all zeros with your task's actual model data and independently derived solution; the placeholder is intentionally **not** a correct answer. Model and solution must both be exact. No partial marks. Error codes explain failure in practice but do not award points.
+
+R3's oracle enumerates all feasible **integer** flows for the bounded 3×3 synthetic transport subdomain. In this network-flow domain, integer supplies/demands/capacities permit an integral LP optimum. It verifies route constraints, conservation, objective, alternative optima, and 0/1 grading. It does **not** parse student MathProg, prove general linear programs, or handle arbitrary precision/unbounded models. The model field is a restricted **normalized JSON contract**: mathematically equivalent but differently represented MathProg expressions are not evaluated. User self-declared solver status/points are ignored.
+
+Validation: **17/17 new Node.js tests** including true CLI subprocess new → answer-file → grade; 30,000 generated seeds yielded feasible tasks; an independent SciPy/HiGHS LP check matched **200/200** seeded optima. This is mathematical/subsystem evidence, not a LearnHarness GUI/agent integration test. The full offline verifier now expects **62 tests** total, but its exact-commit combined run, upstream npm tests, model-provider tutoring, real PDF grounding, and native GLPK/MathProg remain unverified. R3 is standalone and opt-in; the main branch remains unchanged.
+
+**Privacy:** synthetic public data only, no lecture PDFs or original university exam tasks. The CLI reads only the explicitly named local answer file (regular, <= 64 KiB). It never executes a learner `.mod` file or invokes an external provider. Use an isolated environment if processing files you do not trust.
