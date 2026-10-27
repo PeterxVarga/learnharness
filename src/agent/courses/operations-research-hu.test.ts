@@ -19,7 +19,7 @@ describe("HU course explicit opt-in and prerequisite graph",()=>{
 
 describe("R12 opted-in native Practice coaching stays bounded",()=>{
  it("activates when and only when the first user message explicitly selects the course",()=>{
-  const s=practiceCourseContextForMessages([{role:"custom",customType:"graph-context",content:""},user(COURSE_ACTIVATION+"\nIndítsd a gyakorlást")]);
+  const s=practiceCourseContextForMessages([{role:"custom",content:""},user(COURSE_ACTIVATION+"\nIndítsd a gyakorlást")]);
   assert.ok(s);assert.match(s,/Hungarian operations research practice/);
  });
  it("leaves generic Practice and science topics unchanged",()=>{

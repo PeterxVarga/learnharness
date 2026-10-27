@@ -23,12 +23,12 @@ export function auditPdfBrief(brief: string, pagesConsulted: readonly number[]):
   if (typeof brief !== 'string' || brief.length>200_000) return reject('invalid PDF brief');
   const groups=[...brief.matchAll(/\(([^()\r\n]{1,240})\)/g)];
   for (const m of groups) {
-    const inner=m[1].trim();
+    const inner=(m[1] ?? '').trim();
     const eng=/^pp?\.\s*(.*)$/i.exec(inner);
     const hu=/^([1-9]\d*)\.\s*(?:oldal|o\.)$/i.exec(inner);
     if (hu) { cited.add(Number(hu[1])); continue; }
     if (eng) {
-      const parts=eng[1].split(/\s*[,;]\s*/);
+      const parts=(eng[1] ?? '').split(/\s*[,;]\s*/);
       if (!parts.length) return reject('invalid page reference');
       for (const part of parts) {
         const token=part.trim().replace(/^pp?\.\s*/i,'');
