@@ -1297,7 +1297,14 @@ export function Chat({
 					{/* Practice (owner, 2026-10-04): the coverage ring hides —
 				    practice never extracts, so an ever-filling ring with no
 				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
+					{kind === "practice" && (
+            <a data-testid="transport-exam-link"
+               href={`/pilot/transport?chatId=${encodeURIComponent(chatId)}`}
+               className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+              Szállítási vizsgagyakorló
+            </a>
+          )}
+          {kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
 					{/* Practice sessions: no phase arc — a quiet Practice tag
 					    instead of the phase chip. */}
 					{kind === "practice" ? (
