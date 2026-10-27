@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { coachingFeedback } from "../../../pilots/operations-research/feedback-r11.mjs";
 
 type Task = { id: string; supply: number[]; demand: number[]; costs: number[][]; capacities: number[][] };
 type Grade = { taskId: string; points: 0 | 1 | null; maxPoints: 1; correct: boolean | null; errors: string[]; status?: string; id?: string };
@@ -149,6 +150,12 @@ export default function TransportPilotPage(){
     </section>}
     {grade&&<section role="status" aria-live="polite" className="space-y-2 rounded-xl border p-5"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.correct===null?'A résznyelven kívüli modellt nem pontozzuk':grade.correct?'TELJESEN HELYES':'NEM TELJESEN HELYES'}</h2>
       {grade.errors.length>0&&<><p>Tanulási hibajelzések (nem részpontok):</p><ul className="list-disc pl-5 text-sm">{grade.errors.map(code=><li key={code}>{errorsHu[code]??(code.startsWith('source_')?'A MathProg-modell nem felel meg a támogatott szerződésnek.':code)}</li>)}</ul></>}
+    </section>}
+    {grade&&<section data-testid="transport-feedback-r11" aria-label="Következő javítási lépés" className="space-y-2 rounded-xl border p-4">
+      <h2 className="font-semibold">Következő lépés: {coachingFeedback(grade).title}</h2>
+      <p className="text-sm">{coachingFeedback(grade).step}</p>
+      {coachingFeedback(grade).kind==="repair"&&<button className="rounded border px-3 py-2 text-sm" type="button" onClick={()=>setGrade(null)}>Javítom és újra beadom ugyanazt a feladatot</button>}
+      <p className="text-xs text-neutral-500">A tanulási tanács nem módosítja a szerveroldali 0/1 pontszámot, és nem mutatja meg a megoldókulcsot.</p>
     </section>}
     {grade&&<section className="flex flex-wrap gap-3 rounded-xl border p-4">
       {linkedChat&&<Link className="text-sm underline" href={`/chat/${encodeURIComponent(linkedChat)}?prompt=${encodeURIComponent("Kérem az előző, szerver által ellenőrzött szállítási vizsgakísérletem hibáinak célzott magyar magyarázatát. A pontszámot ne módosítsd, és következő feladatot csak külön kérésemre adj.")}`}>Hibajavítás a tanítóval</Link>}
