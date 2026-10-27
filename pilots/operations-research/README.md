@@ -227,3 +227,17 @@ Supported equivalences include ordering of declarations/objective multiplication
 The repository's offline checker now expects **147 tests** (R6 118 + 18 + 11). `main` remains unchanged; PR #1 stays DRAFT. Do not include any private original university exam files in this fork.
 
 **Remaining R7 acceptance gates:** run full 147 offline verifier on the pinned GitHub tree, run native GLPK on a trusted generated model and separate trusted data, and qualify Next.js build/Fedora browser + post-score teaching handoff. Only then can the application be described as end-to-end exam-ready.
+
+## R8: exact-commit qualification gate (still BLOCKED until Fedora native proof)
+
+**R8 adds a reproducible gate, not a fake release PASS.** `qualify-r8.mjs` only returns PASS when all mandatory checks run successfully on a clean checkout at exact R7 SHA `24dcfccf412544ecd3b65d4cba0fb8116a699186`: (1) pinned git HEAD and worktree, (2) full existing 147-case offline verifier with 14 suites and source SHA-256 hashes, (3) real npm ci, npm test, npm run typecheck, npm run build, and (4) **actual trusted native /usr/bin/glpsol**, with its machine-readable result matching the independent R3 transport oracle. Skipped gates always remain BLOCKED; failures are explicit. The gate writes private 0600 per-step logs and an auditable JSON receipt outside the repo, with bounded subprocess execution and **no forwarded model-provider API tokens**.
+
+Run a one-shot pinned clone on authorized Fedora, from the downloadable `qualify-r8-fedora.sh`:
+```sh
+bash qualify-r8-fedora.sh
+```
+The default clones into a fresh `~/Downloads/learnharness-r8-*` directory (does not touch existing branch/worktree), then performs all tests/build/native GLPK. `--offline-only` performs only the 147-case offline suite and **cannot** return a full R8 PASS. No sudo, user-supplied MathProg, GitHub Actions, provider calls, force push or merge. There is no automatic package installation of glpsol; missing or untrusted glpsol remains BLOCKED.
+
+The existing selected 102/102 R3–R7 tests were rerun successfully on Node.js 22.16.0, and 200 synthetic indexed tasks independently agreed with SciPy/HiGHS 200/200. The new R8 release-gate unit suite passed **10/10** plus a real negative test on an intentionally wrong local Git commit. The complete 147-case verifier, npm install/tests/typecheck/build, Fedora browser smoke, and native glpsol execution **have NOT been run successfully in the model environment**: the Fedora remote device is offline and local container has no network Git clone or glpsol. The pilot remains **DRAFT and unmerged**.
+
+R8 gate source is purely qualification tooling; no application or scoring logic changes. Adaptive tutor/practice `problem`/`conclude` result persistence remains open. This gate is not an OS sandbox for untrusted MathProg: only the earlier R5-generated synthetic model may reach the native solver.
