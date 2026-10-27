@@ -55,16 +55,17 @@ export default function TransportPilotPage(){
   const [grade,setGrade]=useState<Grade|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
   const [linkError,setLinkError]=useState("");
+  const [bindingState,setBindingState]=useState<"checking"|"ready"|"failed"|"none">("checking");
   const pending=useRef<{fingerprint:string;attemptId:string}|null>(null);
   useEffect(()=>{
     const chatId=new URLSearchParams(window.location.search).get("chatId");
-    if(!chatId)return;
-    if(!/^chat_[a-z0-9]+_[0-9a-f]{8}$/.test(chatId)){setLinkError("Hibás chat-azonosító.");return;}
+    if(!chatId){setBindingState("none");return;}
+    if(!/^chat_[a-z0-9]+_[0-9a-f]{8}$/.test(chatId)){setLinkError("Hibás chat-azonosító.");setBindingState("failed");return;}
     let disposed=false;
     fetch(`/api/pilot/transport/attempts?chatId=${encodeURIComponent(chatId)}`,{cache:"no-store"})
       .then(async response=>{const data=await response.json();if(!response.ok)throw new Error("Nem található ehhez érvényes gyakorlási munkamenet.");return data;})
-      .then(data=>{if(!disposed){setLinkedChat(chatId);setHistory(data.attempts??[]);}})
-      .catch(e=>{if(!disposed)setLinkError(e instanceof Error?e.message:"Nem elérhető a munkamenet.");});
+      .then(data=>{if(!disposed){setLinkedChat(chatId);setHistory(data.attempts??[]);setBindingState("ready");}})
+      .catch(e=>{if(!disposed){setLinkError(e instanceof Error?e.message:"Nem elérhető a munkamenet.");setBindingState("failed");}});
     return ()=>{disposed=true;};
   },[]);
 
@@ -82,6 +83,7 @@ export default function TransportPilotPage(){
   }
   async function check(){
     if(!task||activeSeed===null)return;
+    if(bindingState!=="none" && bindingState!=="ready"){setError("A munkamenet kapcsolata nem igazolt; a beadás nem indulhat.");return;}
     setBusy(true);setError("");setGrade(null);
     try{
       const submitted:unknown=mode==="json"?JSON.parse(answer):{
@@ -143,7 +145,7 @@ export default function TransportPilotPage(){
         <textarea id="solution" spellCheck={false} className="h-80 w-full rounded border bg-transparent p-3 font-mono text-xs" value={answer} onChange={e=>{setAnswer(e.target.value);setGrade(null);}} />
       </>}
       <p className="text-xs text-neutral-500">{linkedChat?"A szerver ellenőrzött értékelést és megoldáshasht tárol; a teljes MathProg-szöveget nem.":"Önálló módban nincs tartós napló; practice chatből nyisd meg a gyakorlót a kapcsoláshoz."} A hintsUsed önbevallás, nem felügyelt vizsgabizonyíték.</p>
-      <button disabled={busy} onClick={check} className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-black">Teljes megoldás ellenőrzése</button>
+      <button disabled={busy || (bindingState!=="none" && bindingState!=="ready")} onClick={check} className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-black">Teljes megoldás ellenőrzése</button>
     </section>}
     {grade&&<section role="status" aria-live="polite" className="space-y-2 rounded-xl border p-5"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.correct===null?'A résznyelven kívüli modellt nem pontozzuk':grade.correct?'TELJESEN HELYES':'NEM TELJESEN HELYES'}</h2>
       {grade.errors.length>0&&<><p>Tanulási hibajelzések (nem részpontok):</p><ul className="list-disc pl-5 text-sm">{grade.errors.map(code=><li key={code}>{errorsHu[code]??(code.startsWith('source_')?'A MathProg-modell nem felel meg a támogatott szerződésnek.':code)}</li>)}</ul></>}
