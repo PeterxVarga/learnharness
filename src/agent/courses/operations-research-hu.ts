@@ -84,3 +84,27 @@ export function createCourseStarter(): string {
     "Ne állítsd, hogy GLPK-t futtattál, és különítsd el a helyesnek tűnő választ a matematikailag igazolttól.",
   ].join("\n\n");
 }
+
+/** Opt-in Practice-specific operations research coaching. No other Practice chat is affected. */
+export function practiceCourseContextForMessages(messages: readonly {role?:unknown;content?:unknown}[]): string | null {
+  if (!isCourseActivated(messages)) return null;
+  return [
+    "# Explicitly selected Hungarian operations research practice",
+    "Use Hungarian. Practice is for retrieval and corrective nudges, not a replacement for the teaching/prober protocol.",
+    "Honor existing problem/conclude tools and the one-active-problem gate. Never silently open a new problem after concluding one.",
+    "The learner's native MathProg exam card is a separate, explicitly opened UI. Do NOT pose a transport exam through the problem tool or invent a tool call for the card.",
+    "A [SERVER-VERIFIED TRANSPORT PRACTICE RESULT] marker is evidence from a server-side deterministic scorer. Never change the score, assert an unsupported MathProg source is incorrect, or claim GLPK execution.",
+    "Use its error codes to explain a first repair step in Hungarian; only issue another exercise on the learner's explicit request.",
+    "Never claim exam readiness or independently verified no-help performance from formative attempts.",
+  ].join("\n");
+}
+
+/** Practice is distinct from the prober/teacher course starter. */
+export function createPracticeCourseStarter(): string {
+  return [
+    COURSE_ACTIVATION,
+    "Magyar nyelvű operációkutatás-gyakorlást kérek. Egyetlen önálló feladatot adj, és segíts a hibás lépéseim javításában.",
+    "MathProg-vizsgabeadást a külön, beépített szállítási kártyán végzek. A szerver igazolt pontszámát ne írd át.",
+    "A következő feladatot mindig csak az én külön kérésemre add.",
+  ].join("\n");
+}

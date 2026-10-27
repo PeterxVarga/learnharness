@@ -8,11 +8,11 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 export const EXPECTED_SUITES=Object.freeze({
- 'reference-oracles':4,'glpk-contract':6,'pdf-provenance':11,'hu-course-optin':12,
+ 'reference-oracles':4,'glpk-contract':6,'pdf-provenance':11,'hu-course-optin':17,
  'exam-all-or-nothing':12,'r3-transport-exam':12,'r3-transport-cli':5,
  'r4-next-api-transport':9,'r4-mathprog-generation':8,'r5-native-glpsol-preflight':7,
  'r6-expanded-mathprog':23,'r6-mathprog-http':9,'r7-indexed-mathprog':18,
- 'r7-indexed-mathprog-http':11,'r9-authoritative-attempts':15,'r11-formative-feedback':17,
+ 'r7-indexed-mathprog-http':11,'r9-authoritative-attempts':15,'r11-formative-feedback':17,'r12-native-practice':12,
 });
 export const EXPECTED_TESTS=Object.values(EXPECTED_SUITES).reduce((x,y)=>x+y,0);
 export const REQUIRED_STEPS=Object.freeze(['git_pin','git_tree','offline','r10_selftests','npm_ci','npm_test','typecheck','next_build','native_glpsol']);

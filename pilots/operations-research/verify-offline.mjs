@@ -16,7 +16,7 @@ const suites = [
   { name: 'reference-oracles', file: 'oracles.test.mjs', count: 4 },
   { name: 'glpk-contract', file: 'glpk-contract.test.mjs', count: 6 },
   { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 11, flags: ['--experimental-strip-types'] },
-  { name: 'hu-course-optin', file: '../../src/agent/courses/operations-research-hu.test.ts', count: 12, flags: ['--experimental-strip-types'] },
+  { name: 'hu-course-optin', file: '../../src/agent/courses/operations-research-hu.test.ts', count: 17, flags: ['--experimental-strip-types'] },
   { name: 'exam-all-or-nothing', file: 'exam-binary.test.mjs', count: 12 },
   { name: 'r3-transport-exam', file: 'transport-exam-r3.test.mjs', count: 12 },
   { name: 'r3-transport-cli', file: 'transport-cli-r3.test.mjs', count: 5 },
@@ -29,8 +29,10 @@ const suites = [
   { name: 'r7-indexed-mathprog-http', file: 'mathprog-indexed-api-r7.test.mjs', count: 11, flags: ['--experimental-strip-types'] },
   { name: 'r9-authoritative-attempts', file: 'attempt-service-r9.test.mjs', count: 15 },
   { name: 'r11-formative-feedback', file: 'feedback-r11.test.mjs', count: 17 },
+  { name: 'r12-native-practice', file: 'native-integration-r12.test.mjs', count: 12 },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'native-integration-r12.test.mjs', '../../src/agent/courses/operations-research-hu.test.ts', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {
@@ -62,7 +64,7 @@ for (const suite of suites) {
   assert.equal(Number(fail[1]), 0, `Tests failed: ${suite.name}`);
   receipts.push({ name: suite.name, passed: suite.count });
 }
-const hashes = Object.fromEntries(allFiles.filter((f) => f !== 'verify-offline.mjs').map((f) => [
+const hashes = Object.fromEntries([...allFiles, ...hashOnlyFiles].filter((f) => f !== 'verify-offline.mjs').map((f) => [
   f,
   createHash('sha256').update(readFileSync(join(baseDir, f))).digest('hex'),
 ]));

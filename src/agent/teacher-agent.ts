@@ -6,7 +6,7 @@ import type { Usage } from "@earendil-works/pi-ai";
 import { PATHS } from "../../config.ts";
 import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
 import { effectivePromptSegments } from "./prompt-segments.ts";
-import { courseContextForMessages } from "./courses/operations-research-hu.ts";
+import { courseContextForMessages, practiceCourseContextForMessages } from "./courses/operations-research-hu.ts";
 import {
 	askUserQuestionTool,
 	createProberTools,
@@ -187,7 +187,9 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		: composedInstructions[kind]!;
 	// The opt-in marker in the FIRST learner message persists across prober -> teacher.
 	// Practice mode remains untouched, as does every unrelated chat.
-	const courseContext = kind === "practice" ? null : courseContextForMessages(opts.messages ?? []);
+	const courseContext = kind === "practice"
+		? practiceCourseContextForMessages(opts.messages ?? [])
+		: courseContextForMessages(opts.messages ?? []);
 	const systemPrompt = courseContext ? baselinePrompt + "\n\n---\n\n" + courseContext : baselinePrompt;
 	// Debug recorder (owner, 2026-10-04): raw provider events when
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
