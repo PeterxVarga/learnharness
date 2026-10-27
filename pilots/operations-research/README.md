@@ -253,3 +253,5 @@ The UI can return to the linked chat with a prefilled, user-sendable Hungarian r
 **Evidence:** 15/15 NEW deterministic transition/negative tests passed locally on Node 22.16.0 against the exact R9 service Git blob, including duplicates, wrong chat, false scores, modified answer reuse, growth cap, and stripping raw model source. The source was checked byte-for-byte by Git blob SHA. Existing R3–R7 selected 102 tests previously passed; those earlier results are not an R9 app acceptance run.
 
 **Not yet proved:** full 162-test offline verifier, Next.js build/typecheck/browser session, turn-protocol roundtrip under real model provider, native `glpsol`. The existing R8 runner still pins the earlier R7 commit, so it is NOT valid as a proof of an R9 build unless an explicit commit-aware qualification is used. **Keep the PR draft and do not merge.**
+
+R9 practice system prompt now explicitly treats server exam markers as immutable formative records: no AI regrading, no false attribution of learner independence, no override of normal problem/conclude pause/gating, feedback in Hungarian only on request.
