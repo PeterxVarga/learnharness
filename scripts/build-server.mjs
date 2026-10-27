@@ -39,16 +39,6 @@ if (exists(path.join(ROOT, "public"))) {
 	copyTree(path.join(ROOT, "public"), path.join(STANDALONE, "public"));
 }
 
-// Pi SDK is import-only. Its ESM public-export bridge must sit beside the
-// standalone server.js so module lookup resolves THIS payload's dependencies.
-// This copies only repository-owned source (no keys or files from data/).
-const sdkBridge = path.join(ROOT, "subscription-sdk.mjs");
-if (!exists(sdkBridge)) {
-	console.error("[build-server] missing Pi subscription ESM bridge.");
-	process.exit(1);
-}
-fs.copyFileSync(sdkBridge, path.join(STANDALONE, "subscription-sdk.mjs"));
-
 // 2) Safety: the repo's real data/ must NEVER ride along in the bundle.
 const leakedData = path.join(STANDALONE, "data");
 if (exists(leakedData)) {
@@ -98,5 +88,18 @@ for (const asset of [
 		process.exit(1);
 	}
 }
+
+// Stage only AFTER every fail-closed secret/data/prompt check has passed.
+// A missing bridge must fail an otherwise valid package; untrusted fixtures
+// with leaked credentials must be rejected for the actual secret violation.
+// Pi SDK is import-only. Its ESM public-export bridge must sit beside the
+// standalone server.js so module lookup resolves THIS payload's dependencies.
+// This copies only repository-owned source (no keys or files from data/).
+const sdkBridge = path.join(ROOT, "subscription-sdk.mjs");
+if (!exists(sdkBridge)) {
+	console.error("[build-server] missing Pi subscription ESM bridge.");
+	process.exit(1);
+}
+fs.copyFileSync(sdkBridge, path.join(STANDALONE, "subscription-sdk.mjs"));
 
 console.log("[build-server] server payload ready:", STANDALONE);

@@ -9,6 +9,7 @@ import { describe, it } from "node:test";
 const source = fs.readFileSync(new URL("../scripts/build-server.mjs", import.meta.url), "utf8");
 const STANDALONE = path.join(".next", "standalone");
 const PROMPT = path.join("src", "agent", "system-prompt.md");
+const SDK_BRIDGE = fs.readFileSync(new URL("../subscription-sdk.mjs", import.meta.url), "utf8");
 
 function withPayload(test: (fixture: {
 	root: string;
@@ -23,6 +24,7 @@ function withPayload(test: (fixture: {
 	};
 	try {
 		write(path.join("scripts", "build-server.mjs"), source);
+		write("subscription-sdk.mjs", SDK_BRIDGE);
 		write(path.join(STANDALONE, "server.js"));
 		write(path.join(".next", "static", "runtime.js"));
 		write(path.join("public", "asset.txt"));
@@ -65,12 +67,23 @@ describe("desktop standalone payload", () => {
 	});
 
 	it("accepts a clean payload and is idempotent", () => {
-		withPayload(({ run }) => {
+		withPayload(({ root, run }) => {
 			for (let i = 0; i < 2; i++) {
 				const result = run();
 				assert.equal(result.status, 0, String(result.stderr));
 				assert.match(String(result.stdout), /server payload ready/);
+				assert.equal(fs.readFileSync(path.join(root, STANDALONE, "subscription-sdk.mjs"), "utf8"), SDK_BRIDGE);
 			}
+		});
+	});
+
+	it("rejects missing Pi SDK ESM bridge in an otherwise clean payload", () => {
+		withPayload(({ root, run }) => {
+			fs.rmSync(path.join(root, "subscription-sdk.mjs"));
+			const result = run();
+			assert.equal(result.status, 1);
+			assert.match(String(result.stderr), /missing Pi subscription ESM bridge/);
+			assert.equal(fs.existsSync(path.join(root, STANDALONE, "subscription-sdk.mjs")), false);
 		});
 	});
 
