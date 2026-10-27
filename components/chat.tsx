@@ -54,6 +54,7 @@ import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
 import { TransportExam } from "@/components/transport-exam";
+import { GusekExam } from "@/components/gusek-exam";
 import { createPracticeCourseStarter } from "@/src/agent/courses/operations-research-hu";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
@@ -247,6 +248,7 @@ export function Chat({
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 	const sourceTextParts = useMemo(() => firstSourceTextParts(messages), [messages]);
 	const [transportExamOpen, setTransportExamOpen] = useState(false);
+	const [gusekExamOpen,setGusekExamOpen] = useState(false);
 
 	// The reattach settled terminal → the sync-and-continue seam (below).
 	setReattachSettled(() => reattachSettledRef.current());
@@ -1309,10 +1311,19 @@ export function Chat({
             </button>
           )}
           {kind === "practice" && (
+            <button type="button" data-testid="gusek-exam-link-r13"
+              disabled={Boolean(activeProblem) || busy || compacting}
+              aria-expanded={gusekExamOpen}
+              onClick={() => { setTransportExamOpen(false); setGusekExamOpen(open=>!open); }}
+              className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
+              {gusekExamOpen ? "GUSEK gyakorló bezárása" : "GUSEK (.mod) vizsgagyakorló"}
+            </button>
+          )}
+          {kind === "practice" && (
             <button type="button" data-testid="transport-exam-link"
               disabled={Boolean(activeProblem) || busy || compacting}
               aria-expanded={transportExamOpen}
-              onClick={() => setTransportExamOpen(open => !open)}
+              onClick={() => { setGusekExamOpen(false); setTransportExamOpen(open => !open); }}
               className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
               {transportExamOpen ? "Vizsgagyakorló bezárása" : "Szállítási vizsgagyakorló"}
             </button>
@@ -1335,6 +1346,20 @@ export function Chat({
 					)}
 				</TopBar>
 
+        {kind === "practice" && gusekExamOpen && (
+          <section data-testid="native-gusek-exam-r13" aria-label="GUSEK vizsgagyakorló" className="absolute inset-0 z-30 overflow-y-auto bg-background">
+            <div className="sticky top-0 z-10 border-b bg-background px-5 py-3">
+              <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => {setGusekExamOpen(false);void syncFromServer();}}>Vissza a Practice beszélgetéshez</button>
+            </div>
+            <GusekExam chatId={chatId} embedded onRequestCoaching={() => {
+              setGusekExamOpen(false);
+              void (async () => {
+                await syncFromServer();
+                await send({ type: "text", text: "Kérem az utolsó szerver által ellenőrzött GUSEK-vizsgakísérletem hibájának célzott magyar magyarázatát. A pontszámot ne módosítsd; új feladatot csak kérésemre adj." });
+              })();
+            }} />
+          </section>
+        )}
 				{kind === "practice" && transportExamOpen && (
           <section data-testid="native-transport-exam-r12" aria-label="Operációkutatás – vizsgagyakorló" className="absolute inset-0 z-30 overflow-y-auto bg-background">
             <div className="sticky top-0 z-10 border-b bg-background px-5 py-3">

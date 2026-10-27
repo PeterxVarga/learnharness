@@ -30,9 +30,11 @@ const suites = [
   { name: 'r9-authoritative-attempts', file: 'attempt-service-r9.test.mjs', count: 15 },
   { name: 'r11-formative-feedback', file: 'feedback-r11.test.mjs', count: 17 },
   { name: 'r12-native-practice', file: 'native-integration-r12.test.mjs', count: 12 },
+  { name: 'r13-gusek-model', file: 'gusek-r13.test.mjs', count: 22 },
+  { name: 'r13-gusek-http', file: 'gusek-http-r13.test.mjs', count: 6, flags: ['--experimental-strip-types'] },
 ];
-const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts'];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'native-integration-r12.test.mjs', '../../src/agent/courses/operations-research-hu.test.ts', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts','../../components/gusek-exam.tsx','../../app/pilot/gusek/page.tsx'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'native-integration-r12.test.mjs', 'gusek-model-r13.mjs','gusek-exam-r13.mjs','gusek-r13.test.mjs','gusek-http-r13.test.mjs', '../../app/api/pilot/gusek/route.ts', '../../src/agent/courses/operations-research-hu.test.ts', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {
