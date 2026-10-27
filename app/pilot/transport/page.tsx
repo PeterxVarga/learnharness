@@ -25,7 +25,7 @@ const template = [
   "# Írd meg: var x00 ... var x22 (alsó és felső korláttal),",
   "# minimize total: ..., hat supply/demand s.t. egyenlőség,",
   "# végül solve; és end; (minden utasítás végén pontosvessző).",
-  "# set / param / sum / indexelt x[i,j] egyelőre nem értékelhető.",
+  "# Az indexelt set / param / sum / x[i,j] felíráshoz az R7 módot válaszd.",
   "",
 ].join("\n");
 const errorsHu: Record<string,string> = {

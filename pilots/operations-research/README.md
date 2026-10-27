@@ -255,3 +255,19 @@ The UI can return to the linked chat with a prefilled, user-sendable Hungarian r
 **Not yet proved:** full 162-test offline verifier, Next.js build/typecheck/browser session, turn-protocol roundtrip under real model provider, native `glpsol`. The existing R8 runner still pins the earlier R7 commit, so it is NOT valid as a proof of an R9 build unless an explicit commit-aware qualification is used. **Keep the PR draft and do not merge.**
 
 R9 practice system prompt now explicitly treats server exam markers as immutable formative records: no AI regrading, no false attribution of learner independence, no override of normal problem/conclude pause/gating, feedback in Hungarian only on request.
+
+## R10 – Exact SHA-driven whole-app qualification gate and practice sidebar isolation
+
+R10 adds `qualify-release-r10.mjs`, `qualify-release-r10.test.mjs` and an explicit SHA-driven Fedora helper. The previous R8 runner pinned to R7 SHA cannot certify R9/R10: **do not use it for current release qualification**. R10 requires `--expected-head` to specify the precise 40-hex Git commit under test. It rejects dirty/unpinned source and fake or incomplete offline receipts. It checks the **fifteen named suites totaling 162 tests**, validates source hashes, runs its **12 own gate self-tests**, and conditionally runs `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, and the R5 native GLPK qualifier against trusted generated inputs only. Missing evidence is `BLOCKED` or `FAIL`, **never PASS**. It never executes learner-authored MathProg.
+
+Fedora execution (after obtaining an exact reviewed R10 commit SHA, not a floating branch):
+```bash
+bash scripts/qualify-release-r10-fedora.sh <EXACT_40_HEX_COMMIT>
+# Or only the 162 dependency-free offline tests + self-tests:
+bash scripts/qualify-release-r10-fedora.sh <EXACT_40_HEX_COMMIT> --offline-only
+```
+The helper clones into a new private Downloads directory and checks out the specified immutable commit, without changing any existing local worktree. Full mode requires a trusted local glpsol installation but never installs anything automatically, opens outbound sending lanes or calls AI providers.
+
+The practice chat list projection no longer copies the entire `transportAttempts` history into list results; the authoritative receipts still persist in their correct chat record and remain retrievable via the dedicated practice-attempt endpoint. The R6 editor's misleading comment about indexed MathProg is updated to point to the R7 mode.
+
+**Evidence:** R3–R9's selected 117 cases plus the new R10 release-gate 12 cases passed in one local Node 22.16 run: **129/129 PASS**. The test and qualifier Git blobs were byte-checked against locally executed files. The combined legacy 162 offline tests have NOT been run from an exact, full source checkout; Next.js build, Fedora browser, live AI remediation and native glpsol remain **NOT QUALIFIED**. The new explicit-pin runner has only been tested for rejecting false evidence, not yet run to a complete PASS on Fedora. No private exam material is committed. This remains a DRAFT PR; `main` is unchanged.
