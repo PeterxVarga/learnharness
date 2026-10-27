@@ -4,13 +4,21 @@ import Link from "next/link";
 
 type Task = { id: string; supply: number[]; demand: number[]; costs: number[][]; capacities: number[][] };
 type Grade = { taskId: string; points: 0 | 1 | null; maxPoints: 1; correct: boolean | null; errors: string[] };
-type Mode = "mathprog" | "json";
+type Mode = "mathprog" | "indexed" | "json";
 const blankMatrix = "[[0,0,0],[0,0,0],[0,0,0]]";
 const emptyJson = JSON.stringify({
   model: {sense: "min", nonnegative: true, supply: [0,0,0], demand: [0,0,0],
     costs: [[0,0,0],[0,0,0],[0,0,0]], capacities: [[0,0,0],[0,0,0],[0,0,0]]},
   allocation: [[0,0,0],[0,0,0],[0,0,0]], reportedObjective: 0, hintsUsed: false,
 }, null, 2);
+const indexedTemplate = [
+  "# R7 – indexelt MathProg modell. A paraméterek adatait a feladat alapján az ellenőrző biztosítja.",
+  "# Deklaráld az I, J halmazokat, supply, demand, cost és cap paramétereket,",
+  "# x{i in I,j in J} nemnegatív változókat útvonal-felső korláttal,",
+  "# az összegzett célfüggvényt és a két indexelt mérlegegyenletet.",
+  "# A teljes modell végére solve; end; kerül. NINCS előre kitöltött megoldás.",
+  "",
+].join("\n");
 const template = [
   "# Csak a 3×3-as, teljesen kifejtett MathProg-résznyelv támogatott.",
   "# Írd meg: var x00 ... var x22 (alsó és felső korláttal),",
@@ -53,7 +61,7 @@ export default function TransportPilotPage(){
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"A feladat nem elérhető.");
       setTask(data.task as Task);setActiveSeed(seed);setAnswer(emptyJson);
-      setMathprog(template);setAllocation(blankMatrix);setObjective("");setHintsUsed(false);
+      setMathprog(mode==="indexed"?indexedTemplate:template);setAllocation(blankMatrix);setObjective("");setHintsUsed(false);
     }catch(e){setError(e instanceof Error?e.message:"Hiba történt.");}
     finally{setBusy(false);}
   }
@@ -62,9 +70,10 @@ export default function TransportPilotPage(){
     setBusy(true);setError("");setGrade(null);
     try{
       const submitted:unknown=mode==="json"?JSON.parse(answer):{
-        mathprog,allocation:JSON.parse(allocation),reportedObjective:Number(objective),hintsUsed,
+        mathprog,mathprogDialect:mode==="indexed"?"indexed":"expanded",
+        allocation:JSON.parse(allocation),reportedObjective:Number(objective),hintsUsed,
       };
-      if(mode==="mathprog" && (!objective.trim()||!Number.isFinite(Number(objective))))throw new Error("Adj meg egy véges, kiszámított minimumköltséget.");
+      if(mode!=="json" && (!objective.trim()||!Number.isFinite(Number(objective))))throw new Error("Adj meg egy véges, kiszámított minimumköltséget.");
       const res=await fetch("/api/pilot/transport",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({seed:activeSeed,answer:submitted}),cache:"no-store",
@@ -77,8 +86,8 @@ export default function TransportPilotPage(){
     finally{setBusy(false);}
   }
   return <main className="mx-auto max-w-4xl space-y-6 px-5 py-10">
-    <header className="space-y-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · R6 kísérleti vizsgagyakorló</p><h1 className="text-3xl font-semibold">Szállítási vizsgafeladat</h1>
-      <p className="text-sm text-neutral-500">Teljesen helyes megoldás: 1 pont. Bármi más: 0 pont. Szintetikus feladatok; a javítást nem AI végzi.</p>
+    <header className="space-y-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · R7 kísérleti vizsgagyakorló</p><h1 className="text-3xl font-semibold">Szállítási vizsgafeladat</h1>
+      <p className="text-sm text-neutral-500">Teljes megoldás: 1 pont. Bizonyítottan hibás: 0 pont. Nem támogatott MathProg-alak: nem értékelhető. A javítást nem AI végzi.</p>
       <Link className="text-sm underline" href="/chat/new?mode=practice">LearnHarness adaptív gyakorlási munkamenet</Link>
     </header>
     <section className="flex flex-wrap items-end gap-3 rounded-xl border p-5">
@@ -94,13 +103,14 @@ export default function TransportPilotPage(){
     </section>}
     {task&&<section className="space-y-4 rounded-xl border p-5">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Beadási formátum">
-        <button className={`rounded border px-3 py-2 text-sm ${mode==='mathprog'?'font-semibold underline':''}`} onClick={()=>{setMode('mathprog');setGrade(null);}}>MathProg-szöveg</button>
+        <button className={`rounded border px-3 py-2 text-sm ${mode==='mathprog'?'font-semibold underline':''}`} onClick={()=>{setMode('mathprog');setMathprog(template);setGrade(null);}}>MathProg-szöveg</button>
+        <button className={`rounded border px-3 py-2 text-sm ${mode==='indexed'?'font-semibold underline':''}`} onClick={()=>{setMode('indexed');setMathprog(indexedTemplate);setGrade(null);}}>Indexelt MathProg (R7)</button>
         <button className={`rounded border px-3 py-2 text-sm ${mode==='json'?'font-semibold underline':''}`} onClick={()=>{setMode('json');setGrade(null);}}>Strukturált JSON</button>
       </div>
-      {mode==='mathprog'?<>
+      {mode!=='json'?<>
         <label htmlFor="mathprog-source" className="block font-semibold">MathProg-modell</label>
         <textarea id="mathprog-source" spellCheck={false} className="h-80 w-full rounded border bg-transparent p-3 font-mono text-xs" value={mathprog} onChange={e=>{setMathprog(e.target.value);setGrade(null);}} />
-        <p className="text-xs text-neutral-500">Ez egy végrehajtás nélküli, korlátozott MathProg-ellenőrző: x00–x22 skalár változók, kifejtett lineáris célfüggvény, 6 egyenlet, solve; end;. A set/param/sum és indexelt változók még nem támogatottak.</p>
+        <p className="text-xs text-neutral-500">A feladatot az ellenőrző nem futtatja. A kifejtett R6 mód x00–x22 változókat kér; az R7 mód kizárólag az I/J és supply/demand/cost/cap paraméterekkel felírt indexelt résznyelvet ismeri fel. Más, akár helyes MathProg-modell nem értékelhető.</p>
         <label htmlFor="transport-flow" className="block font-semibold">Szállítási terv – 3×3-as JSON-tömb</label>
         <textarea id="transport-flow" spellCheck={false} className="h-28 w-full rounded border bg-transparent p-3 font-mono text-xs" value={allocation} onChange={e=>{setAllocation(e.target.value);setGrade(null);}} />
         <label htmlFor="objective" className="block font-semibold">Kiszámított minimumköltség</label>

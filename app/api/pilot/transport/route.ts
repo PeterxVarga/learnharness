@@ -4,6 +4,7 @@
  */
 import { gradeTransportExam, makeTransportTask, publicTransportTask } from "../../../../pilots/operations-research/transport-exam-r3.mjs";
 import { gradeExpandedMathProg } from "../../../../pilots/operations-research/mathprog-expanded-r6.mjs";
+import { gradeIndexedMathProg } from "../../../../pilots/operations-research/mathprog-indexed-r7.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,9 +69,17 @@ export async function POST(request: Request): Promise<Response> {
   const answer = data.answer;
   if (!answer || typeof answer !== "object" || Array.isArray(answer)) return json({ error: "invalid_answer" }, 400);
   const submitted = answer as Record<string, unknown>;
-  const grade = Object.prototype.hasOwnProperty.call(submitted, "mathprog")
-    ? gradeExpandedMathProg(seed, submitted)
-    : gradeTransportExam(makeTransportTask(seed), submitted);
+  const hasSource = Object.prototype.hasOwnProperty.call(submitted, "mathprog");
+  const code = typeof submitted.mathprog === "string" ? submitted.mathprog.replace(/#[^\r\n]*/g, "") : "";
+  const indexed = submitted.mathprogDialect === "indexed" ||
+    (submitted.mathprogDialect === undefined && (/\bvar\s+x\s*\{/.test(code) || /\bminimize\s+\w+\s*:\s*sum\s*\{/.test(code)));
+  const grade = !hasSource
+    ? gradeTransportExam(makeTransportTask(seed), submitted)
+    : indexed ? gradeIndexedMathProg(seed, submitted)
+    : submitted.mathprogDialect === undefined || submitted.mathprogDialect === "expanded"
+      ? gradeExpandedMathProg(seed, submitted)
+      : { status: "UNASSESSABLE", points: null, maxPoints: 1, correct: null,
+          errors: ["unsupported_mathprog_dialect"], verifiedBy: "unsupported_source_dialect" };
   // score is formative, not a supervised exam attestation; hintsUsed is self-reported.
   return json({ schema: "learnharness.transport-grade.r4", taskId: `synthetic-transport-r3-${seed}`,
     ...grade, assessmentScope: "self_reported_practice_not_proctored" });

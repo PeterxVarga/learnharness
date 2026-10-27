@@ -25,8 +25,10 @@ const suites = [
   { name: 'r5-native-glpsol-preflight', file: 'qualify-glpsol-r5.test.mjs', count: 7 },
   { name: 'r6-expanded-mathprog', file: 'mathprog-expanded-r6.test.mjs', count: 23 },
   { name: 'r6-mathprog-http', file: 'mathprog-api-r6.test.mjs', count: 9, flags: ['--experimental-strip-types'] },
+  { name: 'r7-indexed-mathprog', file: 'mathprog-indexed-r7.test.mjs', count: 18 },
+  { name: 'r7-indexed-mathprog-http', file: 'mathprog-indexed-api-r7.test.mjs', count: 11, flags: ['--experimental-strip-types'] },
 ];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {
