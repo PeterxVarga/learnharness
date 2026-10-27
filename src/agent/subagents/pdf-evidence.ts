@@ -53,6 +53,14 @@ export function auditPdfBrief(brief: string, pagesConsulted: readonly number[]):
   return {ok:true,issue:null,citedPages};
 }
 export function addObservedConsultationFooter(brief:string,pagesConsulted: readonly number[]):string {
-  const withoutClaim=brief.replace(/^\s*Pages consulted:[^\n]*$/gim,'').trim();
-  return `${withoutClaim}\n\nPages consulted: ${[...new Set(pagesConsulted)].sort((a,b)=>a-b).join(', ')}`;
+  // The model's claimed page list is NEVER authority; it is always replaced
+  // with the pages actually consulted by tools. Models may put their claim
+  // on its own line or inline at the end of the final answer.
+  const verified = `Pages consulted: ${[...new Set(pagesConsulted)].sort((a,b)=>a-b).join(', ')}`;
+  const noStandaloneClaims = brief.replace(/^\s*Pages consulted:[^\r\n]*$/gim, '').trim();
+  const inlineClaim = /[ \t]+Pages consulted:[^\r\n]*$/i;
+  if (inlineClaim.test(noStandaloneClaims)) {
+    return noStandaloneClaims.replace(inlineClaim, ` ${verified}`);
+  }
+  return noStandaloneClaims ? `${noStandaloneClaims}\n\n${verified}` : verified;
 }

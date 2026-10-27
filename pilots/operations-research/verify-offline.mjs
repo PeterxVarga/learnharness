@@ -15,7 +15,7 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 const suites = [
   { name: 'reference-oracles', file: 'oracles.test.mjs', count: 4 },
   { name: 'glpk-contract', file: 'glpk-contract.test.mjs', count: 6 },
-  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 11, flags: ['--experimental-strip-types'] },
+  { name: 'pdf-provenance', file: '../../src/agent/subagents/pdf-evidence.test.ts', count: 15, flags: ['--experimental-strip-types'] },
   { name: 'hu-course-optin', file: '../../src/agent/courses/operations-research-hu.test.ts', count: 17, flags: ['--experimental-strip-types'] },
   { name: 'exam-all-or-nothing', file: 'exam-binary.test.mjs', count: 12 },
   { name: 'r3-transport-exam', file: 'transport-exam-r3.test.mjs', count: 12 },
