@@ -19,7 +19,7 @@ describe("HU course explicit opt-in and prerequisite graph",()=>{
 
 describe("R12 opted-in native Practice coaching stays bounded",()=>{
  it("activates when and only when the first user message explicitly selects the course",()=>{
-  const s=practiceCourseContextForMessages([{role:"custom",customType:"graph-context",content:""},user(COURSE_ACTIVATION+"\\nIndítsd a gyakorlást")]);
+  const s=practiceCourseContextForMessages([{role:"custom",customType:"graph-context",content:""},user(COURSE_ACTIVATION+"\nIndítsd a gyakorlást")]);
   assert.ok(s);assert.match(s,/Hungarian operations research practice/);
  });
  it("leaves generic Practice and science topics unchanged",()=>{
@@ -32,7 +32,7 @@ describe("R12 opted-in native Practice coaching stays bounded",()=>{
  });
  it("preserves problem/conclude while refusing to fabricate GLPK or grades",()=>{
   const s=practiceCourseContextForMessages([user(COURSE_ACTIVATION)]);
-  assert.ok(s);assert.match(s,/problem\\/conclude/);assert.match(s,/Never change the score/);
+  assert.ok(s);assert.match(s,/problem\/conclude/);assert.match(s,/Never change the score/);
   assert.match(s,/Never silently open a new problem/);assert.match(s,/claim GLPK execution/);
  });
 });
@@ -40,7 +40,7 @@ describe("R12 opted-in native Practice coaching stays bounded",()=>{
 describe("R12 Practice starter",()=>{
  it("activates the correct opt-in while requesting practice, not a phantom teaching lesson",()=>{
   const s=createPracticeCourseStarter();
-  assert.equal(s.split("\\n")[0],COURSE_ACTIVATION);
+  assert.equal(s.split("\n")[0],COURSE_ACTIVATION);
   assert.match(s,/gyakorlást kérek/);
   assert.match(s,/szerver igazolt pontszámát/);
   assert.equal(isCourseActivated([user(s)]),true);
