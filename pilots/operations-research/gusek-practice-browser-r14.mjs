@@ -176,7 +176,7 @@ try{
    return !!editor&&editor.value===expected;
   },{timeout:15000},originalTablet);
   assert.equal(await page.$eval('[data-testid="gusek-free-model-r14"]',el=>el.value),originalTablet);
-  assert.equal(await page.$('[data-testid="gusek-transfer-solution-r14"]')!==null,true);
+  assert.equal(await page.$('[data-testid="gusek-free-result-r14"]'),null);
   const mode=await page.$eval('[data-testid="gusek-mode-free-r14"]',el=>el.getAttribute('aria-pressed'));
   assert.equal(mode,'true');
  });
