@@ -561,3 +561,46 @@ registry, so the CodeMirror package and package-lock are not changed
 without reproducible dependency resolution; no runtime CDN injection.
 The user explicitly requested ONE FINAL Fedora verification only.
 The stacked PR stays DRAFT / NO MERGE.
+
+## R14Y — Shared GMPL editor and final-only browser acceptance
+
+This code batch addresses the main usability gap in the Workbench
+without installing unresolved dependencies.
+
+- **Shared GMPL editor**: `components/gusek-gmpl-editor.tsx` is used by
+  both Practice and free Workbench for `.mod` and `.dat`. Supports
+  line-number gutter, Ctrl+F literal case-insensitive find and replace,
+  Tab/Shift+Tab indentation, Ctrl+/ comment toggle, Enter indent,
+  bounded keyword suggestions, line-offset navigation, and an
+  optional color-highlighted syntax preview.
+- **Pure source editing functions**: `src/features/gusek/gmpl-editor-core.mjs`
+  isolates tokenization, offsets, search, completion and
+  keyboard-edit transformations with deterministic byte- and
+  source-length limits. Neither the lexer nor its suggestions
+  certify valid GNU MathProg or mathematical correctness.
+- **Final browser acceptance artifact**:
+  `pilots/operations-research/gusek-workbench-browser-r14.mjs` covers
+  entry, file tabs, actual browser editing, search, IndexedDB reload,
+  free-mode score isolation, Practice reopening and mode-switch
+  persistence. It is intended to run exactly once as part of the
+  final Fedora release candidate check, against a running local
+  Next server and an explicitly supplied Chromium binary.
+- **Unit test coverage**: the 16-case `gmpl-editor-r14.test.mjs`
+  has passed 16/16 via isolated JS execution. It is now imported
+  into the full npm test suite. The offline release gate contract
+  becomes **382 expected cases / 30 suites**, npm full expected **2738**.
+  The exact final Fedora/Next/browser PASS remains **unverified**.
+
+This is **not CodeMirror 6 yet**: the editable control uses an accessible
+native textarea with a separate syntax-highlighted preview, not an
+inline CodeMirror parser/editor. CodeMirror's official core is modular
+and its language features require reproducible npm dependencies.
+Package resolution is unavailable in the current execution container,
+so no dependency or lockfile was fabricated. Adopt the direct
+CodeMirror packages once npm registry access allows a real lock update;
+retain these tested GMPL transformations as the integration layer.
+
+No intermediate user-run Fedora test is needed. The older R14
+qualification scripts are pinned to obsolete SHAs and must not be used
+as final evidence. The R14 PR remains DRAFT / NO MERGE, with the
+single comprehensive Fedora qualification still outstanding.
