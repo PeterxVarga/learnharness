@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import {GusekExam} from './gusek-exam';
 import {GmplEditor} from './gusek-gmpl-editor';
-import {readFreeWorkspaceDraft,saveFreeWorkspaceDraft} from '@/src/features/gusek/browser-drafts';
+import {readFreeWorkspaceDraft,saveFreeWorkspaceDraft,listNamedGusekProjects,saveNamedGusekProject,loadNamedGusekProject,deleteNamedGusekProject} from '@/src/features/gusek/browser-drafts';
 import {DEFAULT_MODEL,DEFAULT_DATA,validateWorkbenchFile,glpkDiagnosticLine,lineOffset,sameRunInputs} from '@/src/features/gusek/workspace-files.mjs';
 
 type FileName='model.mod'|'data.dat';
@@ -46,6 +46,10 @@ function FreeWorkspace(){
  const [cancelling,setCancelling]=useState(false);
  const [runReceipt,setRunReceipt]=useState<RunReceipt|null>(null);
  const [message,setMessage]=useState('');
+ const [projectName,setProjectName]=useState('');
+ const [projectId,setProjectId]=useState('');
+ const [projects,setProjects]=useState<Array<{id:string;name:string;createdAt:number}>>([]);
+ const [projectBusy,setProjectBusy]=useState(false);
  const fileInput=useRef<HTMLInputElement|null>(null);
  const saveRevision=useRef(0);
  const modelEditor=useRef<HTMLTextAreaElement|null>(null);
@@ -82,6 +86,45 @@ function FreeWorkspace(){
    .catch(()=>{if(live)setNativeAvailable(false);});
   return()=>{live=false;};
  },[]);
+ useEffect(()=>{
+  let live=true;
+  void listNamedGusekProjects().then(items=>{if(live)setProjects(items);}).catch(()=>{});
+  return()=>{live=false;};
+ },[]);
+ async function saveProjectSnapshot(){
+  if(projectBusy||!projectName.trim())return;
+  setProjectBusy(true);
+  try{
+   const created=await saveNamedGusekProject(projectName,model,data);
+   setProjects(await listNamedGusekProjects());
+   setProjectId(created.id);setProjectName('');
+   setMessage('Projektpillanatkép elmentve helyben: '+created.name);
+  }catch(e){setMessage(e instanceof Error?e.message:'Nem sikerült menteni a projektet.');}
+  finally{setProjectBusy(false);}
+ }
+ async function openProjectSnapshot(){
+  if(projectBusy||!projectId)return;
+  setProjectBusy(true);
+  try{
+   const saved=await loadNamedGusekProject(projectId);
+   if(!saved)throw Error('A projekt nem található vagy érvénytelen.');
+   cancelRef.current?.abort();
+   setModel(saved.model);setData(saved.data);setRunReceipt(null);setActive('model.mod');
+   setMessage('Projekt betöltve: '+saved.name);
+  }catch(e){setMessage(e instanceof Error?e.message:'Nem sikerült megnyitni a projektet.');}
+  finally{setProjectBusy(false);}
+ }
+ async function deleteProjectSnapshot(){
+  if(projectBusy||!projectId)return;
+  if(!window.confirm('Törlöd ezt a helyi projektpillanatképet? A jelenlegi szerkesztés megmarad.'))return;
+  setProjectBusy(true);
+  try{
+   await deleteNamedGusekProject(projectId);
+   setProjectId('');setProjects(await listNamedGusekProjects());
+   setMessage('A helyi projektpillanatkép törölve.');
+  }catch(e){setMessage(e instanceof Error?e.message:'A projekt törlése sikertelen.');}
+  finally{setProjectBusy(false);}
+ }
  function setSource(next:string){
   const validated=validateWorkbenchFile(active,next);
   if(!validated.ok){setMessage(validated.error==='file_too_large'?'A fájl meghaladja a 64 KiB korlátot.':'Érvénytelen fájltartalom.');return;}
@@ -157,6 +200,26 @@ function FreeWorkspace(){
     {saveState==='loading'?'Piszkozat betöltése…':saveState==='saved'?'Helyben mentve':saveState==='saving'?'Mentés folyamatban…':'Helyi mentés nem elérhető'}
    </span>
   </header>
+  <section className="flex flex-wrap items-end gap-2 rounded-xl border p-3" aria-label="Helyi GUSEK projektek" data-testid="gusek-project-manager-r14z">
+   <label className="text-xs">Pillanatkép neve
+    <input aria-label="Projektpillanatkép neve" maxLength={80} value={projectName} onChange={e=>setProjectName(e.target.value)}
+     placeholder="Pl. szállítási feladat" className="mt-1 block rounded border bg-background p-2 text-sm"/>
+   </label>
+   <button type="button" data-testid="gusek-project-save-r14z" disabled={projectBusy||!projectName.trim()} onClick={()=>void saveProjectSnapshot()}
+    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Mentés projektként</button>
+   <label className="text-xs">Mentett helyi projektek
+    <select aria-label="Mentett helyi projektek" value={projectId} onChange={e=>setProjectId(e.target.value)}
+     className="mt-1 block max-w-52 rounded border bg-background p-2 text-sm">
+     <option value="">Projekt kiválasztása</option>
+     {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
+   </label>
+   <button type="button" data-testid="gusek-project-open-r14z" disabled={projectBusy||!projectId} onClick={()=>void openProjectSnapshot()}
+    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Projekt megnyitása</button>
+   <button type="button" data-testid="gusek-project-delete-r14z" disabled={projectBusy||!projectId} onClick={()=>void deleteProjectSnapshot()}
+    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Pillanatkép törlése</button>
+   <p className="w-full text-xs text-neutral-500">A projektmentés névvel ellátott helyi pillanatkép. A szerkesztőt külön automatikusan mentjük.</p>
+  </section>
   <div className="flex flex-wrap gap-2">
    <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>fileInput.current?.click()}>Fájl importálása</button>
    <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportFile(active,source)}>Aktív fájl letöltése</button>
