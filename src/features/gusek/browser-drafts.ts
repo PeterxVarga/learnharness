@@ -25,9 +25,9 @@ async function withStore<T>(mode:IDBTransactionMode,action:(store:IDBObjectStore
   return await new Promise<T>((resolve,reject)=>{
    const tx=db.transaction(STORE,mode);
    const req=action(tx.objectStore(STORE));
-   let result:T;let hasResult=false;
+   let result:T|undefined;let hasResult=false;
    req.onsuccess=()=>{result=req.result;hasResult=true;};
-   tx.oncomplete=()=>hasResult?resolve(result):reject(new Error('draft_request_incomplete'));
+   tx.oncomplete=()=>hasResult?resolve(result as T):reject(new Error('draft_request_incomplete'));
    tx.onerror=()=>reject(new Error('draft_storage_unavailable'));
    tx.onabort=()=>reject(new Error('draft_storage_aborted'));
   });
