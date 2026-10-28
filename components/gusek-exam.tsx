@@ -54,6 +54,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   formEpoch.current++;
   setDraftState('idle');
   nativeAbort.current?.abort();
+  nativeAbort.current=null;
+  setNativeBusy(false);setNativeCancelling(false);setBusy(false);
   setGrade(null);setNativeResult(null);setNativeSnapshot(null);
  }
  const uploadModel=useRef<HTMLInputElement|null>(null);
@@ -133,14 +135,20 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  async function importPracticeModel(event:ChangeEvent<HTMLInputElement>){
   const file=event.target.files?.[0];event.target.value='';
   if(!file)return;
+  const taskEpochAtImport=taskRequestEpoch.current;
+  const formEpochAtImport=formEpoch.current;
   if(!file.name.toLowerCase().endsWith('.mod')||file.size>65536){
    setError('Csak legfeljebb 64 KiB méretű .mod fájl tölthető be.');return;
   }
   try{
    const text=await file.text();
+   if(taskEpochAtImport!==taskRequestEpoch.current||formEpochAtImport!==formEpoch.current)return;
    if(!validateWorkbenchFile('model.mod',text).ok)throw Error('Érvénytelen vagy túl nagy MathProg-fájl.');
    invalidateForm();setFileTab('model.mod');setSource(text);setError('');
-  }catch(e){setError(e instanceof Error?e.message:'Nem sikerült megnyitni a .mod fájlt.');}
+  }catch(e){
+   if(taskEpochAtImport===taskRequestEpoch.current&&formEpochAtImport===formEpoch.current)
+    setError(e instanceof Error?e.message:'Nem sikerült megnyitni a .mod fájlt.');
+  }
  }
  async function runNative(mode:'solve'|'check'){
   // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
@@ -161,7 +169,11 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
    if(startedAt===formEpoch.current)setNativeResult(result);
   }catch(e){if(startedAt===formEpoch.current)setNativeError(controller.signal.aborted?'GLPK-futtatás megszakítva.':e instanceof Error?e.message:String(e));}
-  finally{if(nativeAbort.current===controller)nativeAbort.current=null;setNativeBusy(false);setNativeCancelling(false);}
+  finally{
+   if(nativeAbort.current===controller){
+    nativeAbort.current=null;setNativeBusy(false);setNativeCancelling(false);
+   }
+  }
  }
  function editorShortcut(e:KeyboardEvent<HTMLTextAreaElement>){
   if(!(e.ctrlKey||e.metaKey)||e.key!=='Enter')return;
@@ -186,7 +198,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
    if(startedAt===formEpoch.current)setGrade(out);
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
-  finally{setBusy(false);}
+  finally{if(startedAt===formEpoch.current)setBusy(false);}
  }
  return <div data-testid="gusek-exam-r13" className="mx-auto grid max-w-[1520px] gap-4 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(280px,0.92fr)_minmax(0,2fr)]">
   <header className="space-y-2 xl:col-span-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · GUSEK / GNU MathProg Workbench</p>
