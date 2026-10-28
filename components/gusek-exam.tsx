@@ -45,6 +45,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const uploadModel=useRef<HTMLInputElement|null>(null);
+ const nativeAbort=useRef<AbortController|null>(null);
+ const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
   .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
@@ -60,6 +62,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   return()=>{live=false;};
  },[chatId]);
  async function newTask(){
+  nativeAbort.current?.abort();
   setBusy(true);setTask(null);setGrade(null);setError('');
   try{
    if(!/^(0|[1-9]\d{0,9})$/.test(seed)||Number(seed)>4294967295)throw Error('Hibás feladatvariáns.');
@@ -98,20 +101,22 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  async function runNative(mode:'solve'|'check'){
   // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
   if(!nativeAvailable||nativeBusy||!task)return;
-  setNativeBusy(true);setNativeResult(null);setNativeError('');
+  const controller=new AbortController();nativeAbort.current=controller;
+  setNativeBusy(true);setNativeCancelling(false);setNativeResult(null);setNativeError('');
   try{
    if(!/^[a-f0-9]{64}$/.test(nativeToken))throw Error('Adj meg egy 64 karakteres, helyi GLPK tokent.');
    if(!source.trim()||source.length>65536||dataFile.length>65536)throw Error('A modell vagy az adatfájl hiányzik, illetve túl nagy.');
    const snapshot={taskId:task.id,model:source,data:dataFile};setNativeSnapshot(snapshot);
-   const r=await fetch('/api/pilot/gusek/native',{method:'POST',cache:'no-store',
+   const r=await fetch('/api/pilot/gusek/native',{method:'POST',cache:'no-store',signal:controller.signal,
     headers:{'Content-Type':'application/json','X-LH-GLPK-Token':nativeToken},
     body:JSON.stringify({model:snapshot.model,data:snapshot.data,mode})});
    const result=await r.json() as GlpkResult;
+   if(controller.signal.aborted)throw Error('A futtatás megszakadt.');
    if(!r.ok&&result.status!=='BLOCKED')throw Error(result.error??'GLPK-kérés sikertelen.');
    if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
    setNativeResult(result);
-  }catch(e){setNativeError(e instanceof Error?e.message:String(e));}
-  finally{setNativeBusy(false);}
+  }catch(e){setNativeError(controller.signal.aborted?'GLPK-futtatás megszakítva.':e instanceof Error?e.message:String(e));}
+  finally{if(nativeAbort.current===controller)nativeAbort.current=null;setNativeBusy(false);setNativeCancelling(false);}
  }
  async function check(){
   if(!task||binding==='failed'||binding==='checking')return;
@@ -188,6 +193,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
       <div className="flex flex-wrap gap-2">
        <button type="button" data-testid="gusek-native-check-r14" disabled={nativeBusy||busy||nativeToken.length!==64} onClick={()=>void runNative('check')} className="rounded border px-3 py-2 text-sm disabled:opacity-50">MathProg ellenőrzése</button>
        <button type="button" data-testid="gusek-native-solve-r14" disabled={nativeBusy||busy||nativeToken.length!==64} onClick={()=>void runNative('solve')} className="rounded border px-3 py-2 text-sm disabled:opacity-50">Megoldás futtatása GLPK-val</button>
+       {nativeBusy&&<button type="button" data-testid="gusek-native-cancel-r14" disabled={nativeCancelling} onClick={()=>{setNativeCancelling(true);nativeAbort.current?.abort();}} className="rounded border px-3 py-2 text-sm disabled:opacity-50">Futtatás megszakítása</button>}
       </div>
      </>:<p className="text-sm text-neutral-500" data-testid="gusek-native-disabled-r14">A natív GLPK jelenleg nincs helyileg engedélyezve. A korábbi, független vizsgapontozó továbbra is használható.</p>}
      {nativeBusy&&<p role="status" className="text-sm">A GLPK izolált futtatása folyamatban…</p>}
