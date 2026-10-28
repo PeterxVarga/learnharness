@@ -114,6 +114,26 @@ try{
   assert.deepEqual(form,expected);
   assert.equal(Number(await page.$eval('#gusek-objective',el=>el.value)),oracle.objective);
  });
+ await check('EDITABLE_3X3_GRID_AND_JSON_ROUNDTRIP',async()=>{
+  const grid=await page.$('[data-testid="gusek-values-grid-r14z"]');
+  assert.ok(grid);
+  assert.equal((await page.$('[data-testid^="gusek-value-cell-"]')).length,9);
+  const first='[data-testid="gusek-value-cell-0"]';
+  await page.click(first,{clickCount:3});
+  await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');
+  await page.keyboard.type('7');
+  await page.waitForFunction(()=>{
+   const answer=document.querySelector('#gusek-values');
+   return !!answer&&JSON.parse(answer.value)['x[1,1]']===7;
+  },{timeout:10000});
+  const valueAfterGrid=JSON.parse(await page.$eval('#gusek-values',el=>el.value));
+  assert.equal(valueAfterGrid['x[1,1]'],7);
+  // Restore the genuine OPTIMAL synthetic result using the existing explicit
+  // transfer action, then the unmocked grade endpoint must award 1/1.
+  await page.click('[data-testid="gusek-transfer-solution-r14"]');
+  const restored=JSON.parse(await page.$eval('#gusek-values',el=>el.value));
+  assert.deepEqual(restored,expected);
+ });
  await page.evaluate(()=>{
   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Teljes megoldás ellenőrzése');
   if(!button)throw Error('grade_button_missing');button.click();
