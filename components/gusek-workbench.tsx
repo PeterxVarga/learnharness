@@ -139,8 +139,13 @@ function FreeWorkspace(){
   finally{if(cancelRef.current===controller)cancelRef.current=null;setCancelling(false);setRunning(false);}
  }
  function keyDown(e:KeyboardEvent<HTMLTextAreaElement>){
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){
+  if(!(e.ctrlKey||e.metaKey))return;
+  if(e.key.toLowerCase()==='s'){
    e.preventDefault();setMessage('A munkaterületet a böngésző automatikusan menti.');
+  }else if(e.key==='Enter'){
+   e.preventDefault();
+   if(!nativeAvailable){setMessage('A helyi GLPK-futtatás nincs engedélyezve.');return;}
+   void runNative(e.shiftKey?'check':'solve');
   }
  }
  return <div data-testid="gusek-free-workspace-r14" className="mx-auto max-w-[1500px] space-y-3 px-3 py-4 sm:px-6">
@@ -180,7 +185,7 @@ function FreeWorkspace(){
       hidden={active!=='data.dat'} onKeyDown={keyDown}
       diagnosticLine={active==='data.dat'?diagnostic?.file==='data.dat'?diagnostic.line:null:null} />
     </div>
-    <p className="px-3 pb-2 text-xs text-neutral-500">Automatikus helyi piszkozat. Ctrl+S: mentési állapot. Nem kerül a Practice-előzményekbe.</p>
+    <p className="px-3 pb-2 text-xs text-neutral-500">Automatikus helyi piszkozat · Ctrl+Enter: GLPK-futtatás · Ctrl+Shift+Enter: ellenőrzés · Ctrl+S: mentési állapot. Nem kerül a Practice-előzményekbe.</p>
    </section>
    <section className="min-w-0 space-y-3 rounded-xl border p-4" aria-label="GLPK vezérlés és eredmény">
     <h3 className="font-semibold">GNU GLPK</h3>
