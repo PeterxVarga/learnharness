@@ -36,7 +36,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [dataFile,setDataFile]=useState(''),[nativeToken,setNativeToken]=useState('');
  const [nativeAvailable,setNativeAvailable]=useState(false),[nativeBusy,setNativeBusy]=useState(false);
  const [nativeResult,setNativeResult]=useState<GlpkResult|null>(null),[nativeError,setNativeError]=useState('');
- const [nativeSnapshot,setNativeSnapshot]=useState<{model:string;data:string}|null>(null);
+ const [nativeSnapshot,setNativeSnapshot]=useState<{taskId:string;model:string;data:string}|null>(null);
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
@@ -79,10 +79,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   try{
    if(!/^[a-f0-9]{64}$/.test(nativeToken))throw Error('Adj meg egy 64 karakteres, helyi GLPK tokent.');
    if(!source.trim()||source.length>65536||dataFile.length>65536)throw Error('A modell vagy az adatfájl hiányzik, illetve túl nagy.');
-   const snapshot={model:source,data:dataFile};setNativeSnapshot(snapshot);
+   const snapshot={taskId:task.id,model:source,data:dataFile};setNativeSnapshot(snapshot);
    const r=await fetch('/api/pilot/gusek/native',{method:'POST',cache:'no-store',
     headers:{'Content-Type':'application/json','X-LH-GLPK-Token':nativeToken},
-    body:JSON.stringify({...snapshot,mode})});
+    body:JSON.stringify({model:snapshot.model,data:snapshot.data,mode})});
    const result=await r.json() as GlpkResult;
    if(!r.ok&&result.status!=='BLOCKED')throw Error(result.error??'GLPK-kérés sikertelen.');
    if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
