@@ -12,9 +12,13 @@ const native={schema:'learnharness.r14z.native-final.v1',status:'PASS',
  translationOnly:'GLPK_COMPLETED',syntaxError:'GLPK_ERROR',
  scalar:{status:'OPTIMAL'},indexed:{status:'OPTIMAL',variables:9},
  universityTasks:['transport','froccs','tablet'].map(kind=>({kind,status:'OPTIMAL',points:1}))};
-const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',checks:['OK']},
- {schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks:['OK'],
-  mockedNativeOnly:true,realPracticeGrade:true}];
+const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',
+ checks:Array.from({length:10},(_,i)=>'W'+i)},
+ {schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks:Array.from({length:15},(_,i)=>'P'+i),
+  mockedNativeOnly:true,realPracticeGrade:true},
+ {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:Array.from({length:6},(_,i)=>'L'+i),
+  realNativeGlpk:true,realPracticeGrade:true,nativeCalls:1,gradeCalls:1,taskKind:'tablet',
+  taskId:'gusek-tablet-42'}];
 const fixture=()=>({head:H,status:'PASS',step:'final_receipt',logs,offline,native,browsers});
 describe('R14Z final-qualification receipt contract (no real Fedora execution)',()=>{
  it('accepts complete source/native/browser evidence only',()=>{
@@ -61,7 +65,17 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
  });
  it('requires two successful browser workflows, independent grader and explicit solver mock disclosure',()=>{
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0]]}).status,'BLOCKED');
-  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],realPracticeGrade:false}]}).status,'BLOCKED');
-  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],mockedNativeOnly:false}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],realPracticeGrade:false},browsers[2]]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],mockedNativeOnly:false},browsers[2]]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1]]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],realNativeGlpk:false}]}).status,'BLOCKED');
+ });
+ it('requires a genuine native browser invocation and a real grade submission',()=>{
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],nativeCalls:0}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],gradeCalls:0}]}).status,'BLOCKED');
+ });
+ it('a live run from the wrong task or wrong cardinality cannot qualify',()=>{
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],taskId:'gusek-tablet-41'}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],checks:[]}]}).status,'BLOCKED');
  });
 });
