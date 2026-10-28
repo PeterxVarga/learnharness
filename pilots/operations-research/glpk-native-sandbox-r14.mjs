@@ -16,6 +16,17 @@ const cleanText=(s,max)=>typeof s==='string'&&s.length>0&&Buffer.byteLength(s,'u
 const bounded=(s)=>typeof s==='string'?s.slice(0,MAX_OUTPUT):'';
 const result=(status,code,more={})=>({status,code,graded:false,points:null,...more});
 const allowedMode=new Set(['check','solve']);
+function readCreatedContainerId(stage){
+ let fd;
+ try{
+  fd=openSync(join(stage,'podman.cid'),constants.O_RDONLY|constants.O_NOFOLLOW);
+  const st=fstatSync(fd);
+  if(!st.isFile()||st.size<64||st.size>80)return null;
+  const cid=readFileSync(fd).toString('utf8').trim();
+  return /^[a-f0-9]{64}$/.test(cid)?cid:null;
+ }catch{return null;}
+ finally{if(fd!==undefined)closeSync(fd);}
+}
 
 /** The caller must supply a pinned, already-installed rootless Podman image.
  * Inject spawn for deterministic tests; injection is internal only, never HTTP.
@@ -44,13 +55,14 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
   if(pin.error||pin.status!==0||pin.stdout?.trim()!==imageId)
     return result('BLOCKED','immutable_image_unavailable');
   let stage;
+  let interrupted=false;
   try{
     stage=mkdtempSync(join(tmpdir(),'learnharness-r14n-'));
     writeFileSync(join(stage,'model.mod'),model,{mode:0o600,flag:'wx'});
     if(data)writeFileSync(join(stage,'data.dat'),data,{mode:0o600,flag:'wx'});
     if(mode==='solve')mkdirSync(join(stage,'out'),{mode:0o700});
     const args=[
-      'run','--rm','--pull=never','--network=none','--http-proxy=false',
+      'run','--rm','--cidfile='+join(stage,'podman.cid'),'--pull=never','--network=none','--http-proxy=false',
       '--userns=keep-id','--read-only','--read-only-tmpfs=false',
       '--cap-drop=all','--security-opt=no-new-privileges',
       '--pids-limit=32','--cpus=1','--memory=256m','--memory-swap=256m',
@@ -66,6 +78,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw','--wglp','/output/problem.glp']:[])
     ];
     const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false,env});
+    if(run.error||run.signal||run.status!==0)interrupted=true;
     if(run.error?.code==='ETIMEDOUT')return result('TIME_LIMIT','outer_timeout');
     if(run.error?.code==='ENOBUFS')return result('BLOCKED','output_limit');
     if(run.error)return result('BLOCKED','podman_run_failed');
@@ -129,6 +142,18 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
   }catch{
     return result('BLOCKED','staging_failed');
   }finally{
-    if(stage)rmSync(stage,{recursive:true,force:true});
+    if(stage){
+      if(interrupted){
+        const cid=readCreatedContainerId(stage);
+        if(cid){
+          try{
+            spawn('podman',['rm','--force','--ignore',cid],{
+              encoding:'utf8',timeout:5000,maxBuffer:8192,shell:false,env
+            });
+          }catch{/* Best-effort rootless cleanup; never a successful grade. */}
+        }
+      }
+      rmSync(stage,{recursive:true,force:true});
+    }
   }
 }
