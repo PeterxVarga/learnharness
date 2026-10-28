@@ -55,9 +55,9 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
 assert.equal(receipt.status,'PASS');
-assert.equal(receipt.totalTests,385);
-assert.equal(receipt.suites.length,30);
-console.log('R14Z_OFFLINE=PASS_385_IN_30');
+assert.equal(receipt.totalTests,393);
+assert.equal(receipt.suites.length,31);
+console.log('R14Z_OFFLINE=PASS_393_IN_31');
 JS
 STEP="npm_test"
 npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
