@@ -422,9 +422,30 @@ No filesystem path from the browser is accepted. Limits are capped
 on the entire HTTP payload and on both individual input strings.
 
 New HTTP security suite: `gusek-native-api-r14.test.mjs` (16 cases).
-The rootless process suite now has 14 cases including proof that BYOK
+The rootless process suite now has 16 cases including proof that BYOK
 credentials and remote-Podman environment variables are not inherited.
-The combined offline release contract is **274 cases / 22 suites**.
-The expected full npm count is **2630**. No current Fedora evidence for
+The combined offline release contract is **276 cases / 22 suites**.
+The expected full npm count is **2632**. No current Fedora evidence for
 this head is claimed: only the earlier R13 accepted build is qualified.
 Do not merge or mark release PASS before the final comprehensive check.
+
+### R14 GLPK solution listing (untrusted diagnostic)
+
+For `solve` runs, the original `glpsol --output /output/solution.txt`
+writes its printable row/column solution listing to a separate ephemeral
+host staging directory mounted writable only inside the rootless
+container. The runner reads at most **24 KiB** from a regular file using
+`O_NOFOLLOW`, shows the listing in the GUSEK editor, and deletes the
+staging directory after the run. `check` mode never asks for a solution
+listing. No solution file, student `.mod`, or `.dat` is saved to chat
+history. The listing is **untrusted diagnostic text**, because MathProg
+I/O statements may influence it; it never becomes an automatic
+`FULL_CREDIT` verdict. A GLPK process exit code of zero also does
+**not** imply feasibility or optimality: inspect its solution status.
+Two new mock runtime tests cover bounded listing capture and protection
+against a symlink pointing outside the staging directory.
+
+The earlier R14 one-run Fedora script was pinned before this code batch
+and must **not** be used for the final release check. The operator asked
+for just one final Fedora qualification after the larger integration
+is complete, so no interim user-run test is requested here.
