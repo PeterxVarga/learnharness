@@ -71,7 +71,7 @@ export async function POST(req:Request){
  nativeRunActive=true;
  try{
   const result=await runNativeGmplAsync({model:input.model,data:input.data as string|undefined,
-   mode:input.mode,imageId:process.env.LH_GLPK_IMAGE_ID});
+   mode:input.mode,imageId:process.env.LH_GLPK_IMAGE_ID,signal:req.signal});
   return json({schema:"learnharness.glpk-native-diagnostic.r14",...result},result.status==="BLOCKED"?503:200);
  }finally{nativeRunActive=false;}
 }
