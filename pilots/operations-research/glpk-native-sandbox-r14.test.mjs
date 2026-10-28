@@ -96,5 +96,34 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
    assert.equal(r.solutionListing,null);assert.equal(r.graded,false);
    assert.ok(!existsSync(x.stage));
  });
+ it('reads real GLPK machine header as optimum but not a Practice grade',()=>{
+  const x=setup(),base=x.spawn;
+  const fake=(binary,args,opts)=>{
+   if(args[0]==='run'){
+    const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
+    const dir=mount.slice('--volume='.length).split(':/output:')[0];
+    assert.ok(args.includes('--write'));assert.ok(args.includes('/output/solution.raw'));
+    writeFileSync(dir+'/solution.raw','s mip 4 9 o 123\\n');
+   }
+   return base(binary,args,opts);
+  };
+  const r=runNativeGmpl({model,imageId:image,spawn:fake});
+  assert.equal(r.solverStatus,'OPTIMAL');assert.equal(r.objective,123);
+  assert.equal(r.graded,false);assert.equal(r.points,null);
+ });
+ it('reports machine-confirmed infeasibility, without scoring the student',()=>{
+  const x=setup(),base=x.spawn;
+  const fake=(binary,args,opts)=>{
+   if(args[0]==='run'){
+    const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
+    const dir=mount.slice('--volume='.length).split(':/output:')[0];
+    writeFileSync(dir+'/solution.raw','s mip 4 9 n 0\\n');
+   }
+   return base(binary,args,opts);
+  };
+  const r=runNativeGmpl({model,imageId:image,spawn:fake});
+  assert.equal(r.solverStatus,'INFEASIBLE');assert.equal(r.graded,false);
+  assert.equal(r.points,null);
+ });
  it('an unavailable Podman binary is blocked, never falls back to host glpsol',()=>{const x=setup();const custom=(binary,args,opts)=>args[0]==='info'?{error:Object.assign(new Error('not found'),{code:'ENOENT'}),status:null}:x.spawn(binary,args,opts);const r=runNativeGmpl({model,imageId:image,spawn:custom});assert.equal(r.code,'rootless_podman_unavailable');});
 });
