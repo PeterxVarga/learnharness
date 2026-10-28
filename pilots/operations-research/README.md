@@ -449,3 +449,53 @@ The earlier R14 one-run Fedora script was pinned before this code batch
 and must **not** be used for the final release check. The operator asked
 for just one final Fedora qualification after the larger integration
 is complete, so no interim user-run test is requested here.
+
+## R14 integrated indexed MathProg + verified solver-status UX
+
+This batch moves R14 from isolated preparations toward an end-to-end
+student workflow. In the GUSEK editor, transport exercises now allow a
+**scalar** or **indexed** MathProg authoring mode. The server returns only
+a declaration-only starter and the trusted, seeded `.dat` fixture
+(no optimizer answer). The student writes the objective and balance
+constraints and enters nine values as `x[1,1]` through `x[3,3]`.
+
+The authoritative Practice grader routes the indexed transport subset
+to the existing bounded R7 structural verifier plus independent R3
+integer transportation enumeration. It requires `integer` on the
+indexed variable and the appropriate capacity constraint; correct
+syntax/model and optimum receive exactly 1/1. Known model/solution
+errors score 0; unsupported general GMPL syntax remains UNASSESSABLE.
+The score is still independent of any GLPK runtime output. Indexed
+receipts use `gusek_indexed_r14` and retain no original MathProg source.
+The same attempts API and replay/idempotency ledger are used.
+
+This is **not a general GNU MathProg correctness prover**. In particular
+the R7 index checker accepts one explicitly defined set/param/sum
+grammar, not arbitrary nested indices, alternate semantically
+equivalent algebraic formulations, or student-provided `.dat`
+overrides. The indexed `.dat` editor is for **native GLPK diagnostics**;
+the grader always uses the server's trusted seed data. The README
+keeps this distinction prominent.
+
+Native GLPK solving now also requests both `glpsol --output` (bounded
+human-readable listing) and `glpsol --write` (documented plain machine
+status). A bounded, source-only parser classifies LP/MIP solution status
+as OPTIMAL, INFEASIBLE, FEASIBLE_NOT_PROVEN_OPTIMAL, UNBOUNDED,
+UNDEFINED or UNKNOWN. An exit code of zero or an unrecognized log
+does not mean optimal. No solver status is itself awarded exam points.
+
+New regression coverage in this batch: **20** indexed model/oracle
+cases, **8** indexed HTTP/Practice receipts cases, **12** GLPK
+machine-status cases, and **2** additional sandbox status-file
+checks. Direct isolated JavaScript validation has passed 20/20,
+12/12 and 18/18 sandbox tests, but these do NOT prove the browser or
+real Fedora runtime. The source gate is now **318 expected tests /
+25 suites**, and the full npm count is **expected 2674**.
+
+**One final qualification remains**: after the code reaches release
+candidate quality, run the exact new HEAD on Fedora (offline tests,
+full npm/TS/build, live API, actual GLPK image, sandbox adversarial
+cases, and browser Practice). Earlier R14 scripts pinned to older
+commits are obsolete. The user explicitly requested no more
+incremental Fedora test rounds. Keep the stacked PR draft.
+
