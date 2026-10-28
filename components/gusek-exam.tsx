@@ -49,6 +49,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [draftState,setDraftState]=useState<'loading'|'restored'|'saved'|'unavailable'|'idle'>('idle');
  function invalidateForm(){
   formEpoch.current++;
+  setDraftState('idle');
   nativeAbort.current?.abort();
   setGrade(null);setNativeResult(null);setNativeSnapshot(null);
  }
