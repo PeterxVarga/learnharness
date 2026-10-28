@@ -121,13 +121,15 @@ try{
   const first='[data-testid="gusek-value-cell-0"]';
   await page.click(first,{clickCount:3});
   await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');
-  await page.keyboard.type('7');
-  await page.waitForFunction(()=>{
+  const modified=expected['x[1,1]']===7?8:7;
+  await page.keyboard.type(String(modified));
+  await page.waitForFunction(changed=>{
    const answer=document.querySelector('#gusek-values');
-   return !!answer&&JSON.parse(answer.value)['x[1,1]']===7;
-  },{timeout:10000});
+   return !!answer&&JSON.parse(answer.value)['x[1,1]']===changed;
+  },{timeout:10000},modified);
   const valueAfterGrid=JSON.parse(await page.$eval('#gusek-values',el=>el.value));
-  assert.equal(valueAfterGrid['x[1,1]'],7);
+  assert.equal(valueAfterGrid['x[1,1]'],modified);
+  assert.notEqual(valueAfterGrid['x[1,1]'],expected['x[1,1]']);
   // Restore the genuine OPTIMAL synthetic result using the existing explicit
   // transfer action, then the unmocked grade endpoint must award 1/1.
   await page.click('[data-testid="gusek-transfer-solution-r14"]');
