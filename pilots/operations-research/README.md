@@ -622,3 +622,63 @@ source is added to authoritative Practice receipts.
 
 No user-side Fedora tests are requested before the full, single final
 release-candidate acceptance.
+
+## R14Z – End-to-end Workbench coding batch (2026-10-28)
+
+R14Z is a larger, cohesive user-workflow batch, not a sequence of
+independent mock tests:
+
+- **In-editor highlighting**: the shared GMPL editor uses an editable
+  textarea and a synchronized, accessible, non-interactive syntax-color
+  layer directly behind its text. The layer is bounded and automatically
+  falls back to plain text for overly large files. Line numbers,
+  Ctrl+F search, replace, keyword suggestions, Tab/Shift+Tab indentation,
+  and error navigation remain available. No CodeMirror 6 runtime or
+  unverified npm dependency was introduced.
+- **One workflow across both modes**: both Workbench and Practice have
+  Ctrl+Enter GLPK solve, while the Workbench has Ctrl+Shift+Enter
+  translation check and Practice has Ctrl+Shift+Enter independent
+  full-credit grade. Native check/solve can be cancelled from the UI
+  with AbortController. Cancellation propagates as a request signal
+  to async Node execFile and never awards points. The original
+  container's bounded timeout remains; a client abort is a best-effort
+  termination of the CLI, not an unverified guarantee of immediate
+  process/container destruction on every platform.
+- **Draft reliability**: IndexedDB writes for the free workspace are
+  serialized; a slower older save is not allowed to commit after a
+  newer one. UI save state is revision-bound.
+- **Synthetic browser-to-real-grade acceptance**:
+  gusek-practice-browser-r14.mjs is an extra Chromium script which
+  intercepts ONLY the local native GLPK endpoint, injects an explicit
+  synthetic OPTIMAL result, and performs an actual server-side indexed
+  Practice grade. It proves the model/data transfer and the separation
+  of solver output from grade. It is not a substitute for running
+  GLPK in a real rootless Podman sandbox.
+- **Single final Fedora gate**:
+  qualify-r14z-final.sh accepts an exact Git commit SHA, requires a
+  clean R14 branch, a preinstalled pinned rootless GLPK image and local
+  Chromium, sufficient free space, and then executes npm ci, the
+  source-pinned offline suite, full npm tests, TypeScript, Next build,
+  real scalar/indexed/infeasible native GLPK cases, and both browser
+  scripts. It does NOT automatically build/pull an image or install
+  Fedora host packages. It retains private evidence logs and
+  fails closed. This script is provided as source but has not been
+  executed on the user's Fedora system.
+
+**Inner checks run during coding:** mocked async GLPK process tests
+have **12/12 PASS** including cancellation and temp cleanup.
+GMPL editor core has **16/16 PASS**. Earlier isolated tests
+for GLPK machine names and guarded grade transfer were **12/12**
+and **13/13 PASS**, respectively. These results do not establish
+that TypeScript, Next, the real solver, or Chromium passes.
+
+**Expected R14Z release contract**: 385 offline tests in 30 suites,
+full npm expected 2741 tests (not yet qualified). Re-check exact
+test counts as part of final acceptance; do not report them as PASS
+until actual Fedora receipts are obtained.
+
+**Known remaining gap**: CodeMirror 6 itself is not bundled (npm registry
+unreachable in the coding container). Current accessible, inline-
+highlighted textarea is a working dependency-free alternative,
+not a feature-identical replacement. Keep the PR DRAFT / NO MERGE
+until the one requested final qualification has completed.
