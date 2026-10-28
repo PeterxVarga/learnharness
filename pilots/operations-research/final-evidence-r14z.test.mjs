@@ -4,7 +4,7 @@ import {validateFinalR14z} from './final-evidence-r14z.mjs';
 const H='a'.repeat(40),S='b'.repeat(64);
 const logs=Object.fromEntries([
  'npm-ci.log','offline.json','npm-test.log','typecheck.log','build.log',
- 'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log'
+ 'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ].map(name=>[name,{bytes:9,sha256:S}]));
 const offline={schema:'learnharness.operations-research.offline-verification.v1',
  status:'PASS',totalTests:468,suites:Array.from({length:37},()=>({name:'x',passed:1}))};
