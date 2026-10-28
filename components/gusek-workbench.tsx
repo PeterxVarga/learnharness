@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import {GusekExam} from './gusek-exam';
 import {GmplEditor} from './gusek-gmpl-editor';
+import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
 import {readFreeWorkspaceDraft,saveFreeWorkspaceDraft,listNamedGusekProjects,saveNamedGusekProject,loadNamedGusekProject,deleteNamedGusekProject} from '@/src/features/gusek/browser-drafts';
 import {DEFAULT_MODEL,DEFAULT_DATA,validateWorkbenchFile,glpkDiagnosticLine,lineOffset,sameRunInputs} from '@/src/features/gusek/workspace-files.mjs';
 
@@ -56,6 +57,7 @@ function FreeWorkspace(){
  const dataEditor=useRef<HTMLTextAreaElement|null>(null);
  const source=active==='model.mod'?model:data;
  const currentResult=runReceipt?.result??null;
+ const feedback=currentResult?classifyGlpkFeedback(currentResult):null;
  const stale=runReceipt!==null&&!sameRunInputs(runReceipt.input,model,data);
  const diagnostic=glpkDiagnosticLine(currentResult?.diagnostic??'');
  useEffect(()=>{
@@ -266,6 +268,11 @@ function FreeWorkspace(){
     {running&&<p role="status" className="text-sm">A modell futtatása folyamatban…</p>}
     {currentResult&&<div className="space-y-2" data-testid="gusek-free-result-r14">
      <p className="text-sm font-medium">Futtatás: {currentResult.status}</p>
+     {feedback&&<div data-testid="gusek-free-feedback-r14z" role="status" className="space-y-1 border-l-2 border-neutral-400 pl-3">
+      <p className="text-sm font-semibold">{feedback.title}</p>
+      <p className="text-xs">{feedback.detail}</p>
+      <p className="text-xs text-neutral-600 dark:text-neutral-300">{feedback.nextAction}</p>
+     </div>
      {stale?<p className="text-sm text-amber-700">A fájlok a futtatás óta módosultak. Az eredmény egy korábbi változathoz tartozik.</p>:null}
      <p className="text-sm">GLPK megoldási állapot: <strong>{currentResult.solverStatus??'UNKNOWN'}</strong></p>
      {currentResult.solverStatus==='OPTIMAL'&&typeof currentResult.objective==='number'&&
