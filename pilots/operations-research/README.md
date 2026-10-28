@@ -928,3 +928,53 @@ Keep the PR DRAFT/NO MERGE. No CodeMirror 6 dependency is fabricated;
 the current learner editor uses bounded native-HTML editing and direct
 GMPL syntax highlighting. Any remaining real Fedora failures must be
 resolved from the single final qualification evidence.
+
+## R14Z final-release evidence contract R1 — current latest contract
+
+**Latest requirements supersede older R14Z counts elsewhere in this
+README**. No full Fedora qualification has been executed yet.
+
+The final operator-controlled check is now a **single exact-Git-head,
+no-merge/no-deploy, bounded release job**, not another collection of
+unrelated diagnostic stages. The Fedora script
+`qualify-r14z-final.sh` still requires the exact 40-hex commit, clean
+`pilot/operations-research-r14` checkout, non-root execution,
+preinstalled rootless pinned Podman image and an absolute Chromium
+binary. It also checks 2 GiB free space for source/build operations
+and 512 MiB for temporary evidence.
+
+It runs `npm ci --no-audit --no-fund` (up to 20 minutes),
+the fully source-hashed offline verifier (6 minutes), full npm tests
+(20 minutes), TypeScript (15 minutes), Next build (20 minutes), actual
+pinned GLPK including model translation, intentional syntax failure,
+scalar LP/MIP, 3x3 indexed model, all three university scenarios and
+infeasibility (3 minutes), then two Chromium flows (4 minutes each).
+It explicitly disables telemetry and automatic Electron/Puppeteer
+binary downloads during npm installation. These limits and platform
+prerequisites are operational guards, NOT demonstrated successful
+build/runtime times.
+
+**New evidence producer** `final-evidence-r14z.mjs` builds a
+local-only, SHA-256-indexed `r14z-release-receipt.json` with a
+bounded list of run-log hashes, exact Git SHA, last step and
+PASS/FAIL/BLOCKED verdict. It does not include the operator's
+secret token or the raw learner source. A success requires the
+source-and-test receipt, full native GLPK receipt, and both browser
+receipts; a missing/bad/mismatched artifact blocks it. A failed
+qualification leaves a FAIL receipt where the private evidence
+directory is available.
+
+The evidence contract has 12 targeted, source-executed tests,
+**12/12 PASS** in the isolated JS test runner. Current exact release
+targets: **466 offline tests in 37 suites** and **2822 full npm
+tests**, including the 12 new release-evidence tests. Do not claim
+these full target totals PASS until one genuine Fedora run produces
+the matching receipts. Final E2E still mocks only the native endpoint
+for its browser Practice test; real GLPK runs separately in the
+native gate. The independent Practice grader is never mocked.
+
+All engineering and evidence writes remain in the existing R14
+branch and draft PR #2. No GitHub Actions, merge, deploy or owner
+Fedora execution has been performed. Current GMPL editor remains the
+existing bounded in-place syntax-highlighting component; CodeMirror
+6 was not installed without a reproducible package-lock.
