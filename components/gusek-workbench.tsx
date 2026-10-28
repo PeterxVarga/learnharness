@@ -34,7 +34,7 @@ function jumpToLine(area:HTMLTextAreaElement|null,text:string,line:number){
  const linesBefore=text.slice(0,start).split('\n').length-1;
  area.scrollTop=Math.max(0,(linesBefore-3)*24);
 }
-function FreeWorkspace(){
+function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:number}|null}){
  const [model,setModel]=useState(DEFAULT_MODEL);
  const [data,setData]=useState(DEFAULT_DATA);
  const [active,setActive]=useState<FileName>('model.mod');
@@ -127,6 +127,16 @@ function FreeWorkspace(){
   }catch(e){setMessage(e instanceof Error?e.message:'A projekt törlése sikertelen.');}
   finally{setProjectBusy(false);}
  }
+ useEffect(()=>{
+  if(!ready||!incoming)return;
+  if(!validateWorkbenchFile('model.mod',incoming.model).ok||
+     !validateWorkbenchFile('data.dat',incoming.data).ok)return;
+  cancelRef.current?.abort();
+  setModel(incoming.model);setData(incoming.data);setActive('model.mod');setRunReceipt(null);
+  setMessage('Vizsgafeladat-másolat megnyitva. Ebben a munkaterületben nincs vizsgapontozás.');
+ // Each incoming revision is unique. Original Practice sources remain unchanged.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[ready,incoming?.revision]);
  function setSource(next:string){
   const validated=validateWorkbenchFile(active,next);
   if(!validated.ok){setMessage(validated.error==='file_too_large'?'A fájl meghaladja a 64 KiB korlátot.':'Érvénytelen fájltartalom.');return;}
@@ -306,6 +316,13 @@ export function GusekWorkbench({chatId,embedded=false,onRequestCoaching}:{
  chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void;
 }){
  const [mode,setMode]=useState<'practice'|'workspace'>('practice');
+ const [copied,setCopied]=useState<{model:string;data:string;revision:number}|null>(null);
+ const copyCounter=useRef(0);
+ function copyToFree(model:string,data:string){
+  if(!validateWorkbenchFile('model.mod',model).ok||!validateWorkbenchFile('data.dat',data).ok)return;
+  if(!window.confirm('A szabad munkaterület jelenlegi szerkesztését felülírjuk a vizsgafeladat másolatával. Folytatod?'))return;
+  setCopied({model,data,revision:++copyCounter.current});setMode('workspace');
+ }
  return <div data-testid="gusek-workbench-r14" className="w-full space-y-2">
   <nav aria-label="GUSEK munkaterület üzemmód" className="mx-auto flex max-w-[1500px] flex-wrap gap-2 px-5 pt-4">
    <button type="button" data-testid="gusek-mode-practice-r14" aria-pressed={mode==='practice'}
@@ -316,7 +333,7 @@ export function GusekWorkbench({chatId,embedded=false,onRequestCoaching}:{
     onClick={()=>setMode('workspace')}>Szabad munkaterület</button>
   </nav>
   {/* Keep both mounted so switching never destroys an unsent practice attempt. */}
-  <div hidden={mode!=='practice'}><GusekExam chatId={chatId} embedded={embedded} onRequestCoaching={onRequestCoaching}/></div>
-  <div hidden={mode!=='workspace'}><FreeWorkspace/></div>
+  <div hidden={mode!=='practice'}><GusekExam chatId={chatId} embedded={embedded} onRequestCoaching={onRequestCoaching} onCopyToWorkspace={copyToFree}/></div>
+  <div hidden={mode!=='workspace'}><FreeWorkspace incoming={copied}/></div>
  </div>;
 }
