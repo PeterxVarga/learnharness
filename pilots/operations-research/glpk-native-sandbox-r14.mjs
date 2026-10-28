@@ -25,7 +25,16 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
   if(!IMAGE_ID.test(imageId??''))return result('BLOCKED','image_id_not_pinned');
   if(typeof spawn!=='function')return result('BLOCKED','invalid_runtime');
   // No fallback to host glpsol if rootless containers cannot be qualified.
-  const opts={encoding:'utf8',timeout:5000,maxBuffer:32768,shell:false};
+  // Do not pass the app's BYOK/API credentials or remote-Podman settings
+  // to any Podman child process. Keep only rootless local session metadata.
+  const env=Object.fromEntries(
+    ['HOME','USER','LOGNAME','XDG_RUNTIME_DIR','DBUS_SESSION_BUS_ADDRESS']
+      .filter(k=>typeof process.env[k]==='string' && process.env[k].length>0)
+      .map(k=>[k,process.env[k]])
+  );
+  env.PATH='/usr/bin:/bin';
+  env.LANG='C.UTF-8';
+  const opts={encoding:'utf8',timeout:5000,maxBuffer:32768,shell:false,env};
   const info=spawn('podman',['info','--format','{{.Host.Security.Rootless}}'],opts);
   if(info.error||info.status!==0||info.stdout?.trim()!=='true')
     return result('BLOCKED','rootless_podman_unavailable');
@@ -50,7 +59,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
       '--tmlim','8','--seed','0'
     ];
-    const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false});
+    const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false,env});
     if(run.error?.code==='ETIMEDOUT')return result('TIME_LIMIT','outer_timeout');
     if(run.error?.code==='ENOBUFS')return result('BLOCKED','output_limit');
     if(run.error)return result('BLOCKED','podman_run_failed');
