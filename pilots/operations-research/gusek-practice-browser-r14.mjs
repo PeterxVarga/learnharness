@@ -77,6 +77,21 @@ try{
   const value=await page.$eval(modelInput,el=>el.value);
   assert.equal(value,model);
  });
+ await check('SEEDED_PRACTICE_DRAFT_SURVIVES_RELOAD',async()=>{
+  await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-practice-draft-status-r14z"]')?.textContent?.includes('helyben mentve'),{timeout:12000});
+  await page.reload({waitUntil:'networkidle2',timeout:30000});
+  await page.select('[data-testid="gusek-transport-dialect-r14"]','indexed');
+  await page.evaluate(()=>{
+   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
+   if(!button)throw Error('task_button_missing_after_reload');button.click();
+  });
+  await page.waitForFunction(expected=>{
+   const editor=document.querySelector('[data-testid="gusek-exam-source-r14"]');
+   return !!editor&&editor.value===expected;
+  },{timeout:15000},model);
+  assert.equal(await page.$eval(modelInput,el=>el.value),model);
+  assert.equal(await page.$eval('[data-testid="gusek-exam-data-r14"]',el=>el.value),trustedIndexedData(42));
+ });
  await page.type('input[type="password"]','a'.repeat(64),{delay:0});
  await page.click('[data-testid="gusek-native-solve-r14"]');
  await check('MOCK_GLPK_STRUCTURED_RESULT',async()=>{
