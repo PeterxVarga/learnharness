@@ -838,3 +838,45 @@ and one final operator-controlled qualification. No GitHub Actions,
 merge or deployment have been made. CodeMirror 6 remains a separately
 identified gap; the current Workbench uses the working GMPL-aware
 inline highlighted editor without a floating npm dependency.
+
+## R14Z Practice numerical grid: real worksheet instead of mandatory raw JSON
+
+The binary exam score still comes only from the independent HTTP
+Practice grader, but learners no longer need to edit a raw JSON blob
+for every variable:
+
+- **3×3 transport worksheet:** the 9 indexed or scalar shipping routes
+  are displayed as editable numeric cells in row-major order. Both
+  formats retain the original exact variable names in the submitted
+  JSON payload; column order does not define grading semantics.
+- **Product/tablet worksheets:** the fröccs task shows 10 product
+  variables; the tablet task shows two continuous variables.
+- **Paste:** multiple numeric values can be entered from copied
+  spreadsheet-style tabular text. Bounds, duplicate entries, unexpected
+  keys, malformed JSON, nonsensical numeric values and oversized
+  input are rejected or displayed as incomplete rather than silently
+  replacing a learner's source.
+- **Compatibility:** the original raw JSON field remains available
+  behind an explicit Advanced JSON action, retaining its exact DOM
+  ID for legacy E2E tests and restoring old IndexedDB drafts
+  unchanged. Native solver-to-Practice transfer continues to populate
+  the same JSON and therefore updates the grid; editing a cell
+  invalidates any previous exam grade.
+- **Release evidence:** the source-only numerical-grid contract suite
+  has 15 cases and passed 15/15 in isolated JavaScript execution.
+  The final-only Chromium script checks that a changed 3×3 cell
+  changes the authoritative JSON, the real unmocked grader returns
+  **zero credit** for the deliberate wrong allocation, and a new
+  explicit GLPK transfer restores the optimal values before the
+  independent **full-credit** grade. This browser test is authored,
+  syntax-checked and NOT executed on Fedora yet.
+
+The current exact release contract is **449 expected offline tests
+in 36 suites** and **2805 expected npm tests**. These numbers are
+qualification targets, not passed aggregate test receipts. The
+final genuine rootless GNU GLPK and browser checks remain pending
+by the user's explicit one-final-Fedora-verification decision.
+
+R14 stays stacked, draft and unmerged. No CodeMirror 6 dependencies
+have been installed because reproducible npm lock resolution is not
+available in this coding environment.
