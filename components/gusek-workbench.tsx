@@ -53,6 +53,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
  const [projectBusy,setProjectBusy]=useState(false);
  const fileInput=useRef<HTMLInputElement|null>(null);
  const saveRevision=useRef(0);
+ const workspaceRevision=useRef(0);
  const modelEditor=useRef<HTMLTextAreaElement|null>(null);
  const dataEditor=useRef<HTMLTextAreaElement|null>(null);
  const source=active==='model.mod'?model:data;
@@ -62,9 +63,10 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
  const diagnostic=glpkDiagnosticLine(currentResult?.diagnostic??'');
  useEffect(()=>{
   let live=true;
+  const startedAt=workspaceRevision.current;
   void readFreeWorkspaceDraft().then(saved=>{
    if(!live)return;
-   if(saved){setModel(saved.model);setData(saved.data);}
+   if(saved&&startedAt===workspaceRevision.current){setModel(saved.model);setData(saved.data);}
    setReady(true);setSaveState(saved?'saved':'saving');
   }).catch(()=>{if(live){setReady(true);setSaveState('unavailable');}});
   return()=>{live=false;};
@@ -111,6 +113,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
    const saved=await loadNamedGusekProject(projectId);
    if(!saved)throw Error('A projekt nem található vagy érvénytelen.');
    cancelRef.current?.abort();
+   workspaceRevision.current++;
    setModel(saved.model);setData(saved.data);setRunReceipt(null);setActive('model.mod');
    setMessage('Projekt betöltve: '+saved.name);
   }catch(e){setMessage(e instanceof Error?e.message:'Nem sikerült megnyitni a projektet.');}
@@ -132,6 +135,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
   if(!validateWorkbenchFile('model.mod',incoming.model).ok||
      !validateWorkbenchFile('data.dat',incoming.data).ok)return;
   cancelRef.current?.abort();
+  workspaceRevision.current++;
   setModel(incoming.model);setData(incoming.data);setActive('model.mod');setRunReceipt(null);
   setMessage('Vizsgafeladat-másolat megnyitva. Ebben a munkaterületben nincs vizsgapontozás.');
  // Each incoming revision is unique. Original Practice sources remain unchanged.
@@ -140,6 +144,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
  function setSource(next:string){
   const validated=validateWorkbenchFile(active,next);
   if(!validated.ok){setMessage(validated.error==='file_too_large'?'A fájl meghaladja a 64 KiB korlátot.':'Érvénytelen fájltartalom.');return;}
+  workspaceRevision.current++;
   if(active==='model.mod')setModel(next);else setData(next);
   setMessage('');
  }
@@ -147,14 +152,17 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
   const file=event.target.files?.[0];
   event.target.value='';
   if(!file)return;
+  const startedAt=workspaceRevision.current;
   if(file.size>65_536){setMessage('A kiválasztott fájl meghaladja a 64 KiB korlátot.');return;}
   try{
    const filename=file.name.toLowerCase();
    const target:FileName=filename.endsWith('.mod')?'model.mod':filename.endsWith('.dat')?'data.dat':active;
    if(!filename.endsWith('.mod')&&!filename.endsWith('.dat'))throw new Error('Csak .mod és .dat fájl importálható.');
    const text=await file.text();
+   if(startedAt!==workspaceRevision.current){setMessage('Az időközben módosított munkaterület megőrzése miatt a korábbi fájlimportot elvetettem.');return;}
    const checked=validateWorkbenchFile(target,text);
    if(!checked.ok)throw new Error('Nem támogatott vagy túl nagy fájl.');
+   workspaceRevision.current++;
    if(target==='model.mod')setModel(text);else setData(text);
    setActive(target);
    setMessage(target+' fájl importálva. A szerkesztőben ellenőrizheted.');
@@ -237,6 +245,8 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
    <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportFile(active,source)}>Aktív fájl letöltése</button>
    <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>{
     if(!window.confirm('Új üres munkaterületet szeretnél? A jelenlegi piszkozat felülíródik.'))return;
+    workspaceRevision.current++;
+    cancelRef.current?.abort();
     setModel('');setData('');setRunReceipt(null);setActive('model.mod');setMessage('Új munkaterület létrehozva.');
    }}>Új munkaterület</button>
    <input ref={fileInput} type="file" className="hidden" accept=".mod,.dat,text/plain" onChange={e=>void importSelected(e)} aria-label="Fájl feltöltése"/>
