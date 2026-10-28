@@ -22,7 +22,7 @@ function mockExec({rootless=true,image=true,fail=null,hold=null,output=true}={})
   if(hold)await hold;
   if(fail)throw fail;
   if(output&&args.includes('--write')){
-   writeFileSync(stage+'/out/solution.raw','s mip 1 1 o 4\nj 1 4\n');
+   writeFileSync(stage+'/out/solution.raw','s mip 1 1 o 4\nj 1 4\ne o f\n');
    writeFileSync(stage+'/out/problem.glp','p mip max 1 1 1\nn j 1 x\ne o f\n');
    writeFileSync(stage+'/out/solution.txt','Problem: x\nStatus: OPTIMAL\n');
   }
