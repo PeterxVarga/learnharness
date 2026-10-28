@@ -24,7 +24,7 @@ const expected=Object.fromEntries(Array.from({length:3},(_,i)=>
  ])).flat());
 const checks=[];
 const check=async(name,fn)=>{await fn();checks.push(name);process.stdout.write('PASS '+name+'\n');};
-const browser=await puppeteer.launch({executablePath,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+const browser=await puppeteer.launch({executablePath,headless:true,args:['--disable-dev-shm-usage']});
 try{
  const page=await browser.newPage();
  await page.setViewport({width:1440,height:900});
