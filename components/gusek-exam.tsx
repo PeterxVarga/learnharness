@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
+import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
@@ -42,6 +43,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
+ const uploadModel=useRef<HTMLInputElement|null>(null);
+ const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
   .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
   .catch(()=>{if(live)setNativeAvailable(false);});return()=>{live=false;};},[]);
@@ -72,6 +75,24 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    ),null,2):starter(t.variableNames));
    setObjective('');setHints(false);setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
   }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
+ }
+ function exportPracticeFile(name:'model.mod'|'data.dat',contents:string){
+  const url=URL.createObjectURL(new Blob([contents],{type:'text/plain;charset=utf-8'}));
+  try{
+   const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+ }
+ async function importPracticeModel(event:React.ChangeEvent<HTMLInputElement>){
+  const file=event.target.files?.[0];event.target.value='';
+  if(!file)return;
+  if(!file.name.toLowerCase().endsWith('.mod')||file.size>65536){
+   setError('Csak legfeljebb 64 KiB méretű .mod fájl tölthető be.');return;
+  }
+  try{
+   const text=await file.text();
+   if(!validateWorkbenchFile('model.mod',text).ok)throw Error('Érvénytelen vagy túl nagy MathProg-fájl.');
+   setSource(text);setGrade(null);setNativeResult(null);setNativeSnapshot(null);setError('');
+  }catch(e){setError(e instanceof Error?e.message:'Nem sikerült megnyitni a .mod fájlt.');}
  }
  async function runNative(mode:'solve'|'check'){
   // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
@@ -140,9 +161,16 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   </section>}
   {task&&<section className="space-y-3 rounded-xl border p-5">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
+    <div className="flex flex-wrap gap-2">
+     <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>uploadModel.current?.click()}>.mod importálása</button>
+     <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportPracticeFile('model.mod',source)}>.mod letöltése</button>
+     {dataFile&&<button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportPracticeFile('data.dat',dataFile)}>.dat letöltése</button>}
+     <input type="file" ref={uploadModel} accept=".mod" className="hidden" aria-label="MathProg modell megnyitása" onChange={e=>void importPracticeModel(e)}/>
+    </div>
     <GmplEditor id="gusek-source" testId="gusek-exam-source-r14"
-      label="GUSEK / MathProg modell (.mod)" value={source}
-      onChange={next=>{setSource(next);setGrade(null);setNativeResult(null);}} />
+     label="GUSEK / MathProg modell (.mod)" value={source}
+     diagnosticLine={nativeDiagnostic?.file==='model.mod'?nativeDiagnostic.line:null}
+     onChange={next=>{setSource(next);setGrade(null);setNativeResult(null);setNativeSnapshot(null);}} />
     <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
@@ -150,6 +178,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      <label htmlFor="gusek-data" className="block text-sm">Feladatadatok (.dat) – vizsgamódban csak olvasható</label>
      <GmplEditor id="gusek-data" testId="gusek-exam-data-r14"
       label="Feladatadatok (.dat)" value={dataFile} readOnly
+      diagnosticLine={nativeDiagnostic?.file==='data.dat'?nativeDiagnostic.line:null}
       onChange={()=>{}} rows={5} placeholder="A feladat nem igényel külön .dat fájlt." />
      <p className="text-xs text-neutral-500">A feladat szerveroldali adatai nem módosíthatók. Saját adatokhoz válts a Szabad munkaterületre.</p>
      {nativeAvailable?<>
