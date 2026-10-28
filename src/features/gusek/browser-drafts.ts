@@ -3,6 +3,7 @@
  */
 import {makeWorkspaceDraft,readWorkspaceDraft} from './workspace-files.mjs';
 import {makePracticeDraft,readPracticeDraft,practiceDraftKey} from './practice-draft-r14z.mjs';
+import {makeGusekProject,readGusekProject,projectStoreKey,summarizeProjects} from './project-contract-r14z.mjs';
 
 const DB_NAME='learnharness-gusek-workbench';
 const STORE='drafts';
@@ -77,4 +78,33 @@ export async function saveGusekPracticeDraft(
  if(!key)throw new Error('invalid_practice_draft_key');
  const draft=makePracticeDraft(input);
  await inWriteOrder(()=>withStore('readwrite',store=>store.put(draft,key)));
+}
+
+/** Named project snapshots; a new ID is generated only on explicit Save. */
+export async function saveNamedGusekProject(
+ name:string,model:string,data:string
+):Promise<{id:string;name:string;createdAt:number}>{
+ const id=crypto.randomUUID();
+ const project=makeGusekProject({id,name,model,data});
+ const key=projectStoreKey(project.id)!;
+ await inWriteOrder(()=>withStore('readwrite',store=>store.put(project,key)));
+ return {id:project.id,name:project.name,createdAt:project.createdAt};
+}
+export async function listNamedGusekProjects():Promise<Array<{id:string;name:string;createdAt:number}>>{
+ await lastWrite;
+ const items=await withStore<unknown[]>('readonly',store=>store.getAll());
+ return summarizeProjects(items);
+}
+export async function loadNamedGusekProject(id:string):Promise<{model:string;data:string;name:string}|null>{
+ const key=projectStoreKey(id);
+ if(!key)return null;
+ await lastWrite;
+ const stored=await withStore<unknown>('readonly',store=>store.get(key));
+ const valid=readGusekProject(stored);
+ return valid?{model:valid.model,data:valid.data,name:valid.name}:null;
+}
+export async function deleteNamedGusekProject(id:string):Promise<void>{
+ const key=projectStoreKey(id);
+ if(!key)throw new Error('invalid_project_id');
+ await inWriteOrder(()=>withStore('readwrite',store=>store.delete(key)));
 }
