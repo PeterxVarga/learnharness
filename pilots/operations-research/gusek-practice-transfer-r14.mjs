@@ -11,7 +11,7 @@ export function preparePracticeTransfer({result,task,dialect,model,data,snapshot
     result.solverStatus!=='OPTIMAL'||result.columnStatus!=='OPTIMAL_COLUMNS'||
     result.points!==null||result.graded!==false||!finite(result.objective))
   return reject('nonoptimal_or_unverified_solution');
- if(!snapshot||snapshot.model!==model||snapshot.data!==data)
+ if(!snapshot||snapshot.taskId!==task.id||snapshot.model!==model||snapshot.data!==data)
   return reject('stale_solver_result');
  const expected=task.kind==='transport'&&dialect==='indexed'?
   Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>'x['+(i+1)+','+(j+1)+']')).flat():
