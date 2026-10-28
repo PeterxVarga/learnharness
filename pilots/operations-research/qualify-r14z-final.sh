@@ -16,7 +16,7 @@ IMAGE="$(printenv LH_GLPK_IMAGE_ID || true)"
 [[ "$IMAGE" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "BLOCKED_PINNED_IMAGE_REQUIRED"; exit 2; }
 CHROME="$(printenv LH_R14_CHROMIUM || true)"
 [[ "$CHROME" == /* && -x "$CHROME" ]] || { echo "BLOCKED_ABSOLUTE_CHROMIUM_REQUIRED"; exit 2; }
-for tool in node npm git podman curl; do
+for tool in node npm git podman curl timeout sha256sum; do
  command -v "$tool" >/dev/null || { echo "BLOCKED_MISSING_TOOL_$tool"; exit 2; }
 done
 [[ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" == true ]] || {
@@ -25,31 +25,44 @@ done
 [[ "$(podman image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null)" == "$IMAGE" ]] || {
  echo "BLOCKED_PINNED_IMAGE_MISSING"; exit 2;
 }
+export NEXT_TELEMETRY_DISABLED=1 ELECTRON_SKIP_BINARY_DOWNLOAD=1
+export PUPPETEER_SKIP_DOWNLOAD=1 npm_config_update_notifier=false
+ulimit -c 0 || true
 AVAILABLE_KB="$(df -Pk "$ROOT" | awk 'END{print $4}')"
 [[ "$AVAILABLE_KB" =~ ^[0-9]+$ && "$AVAILABLE_KB" -ge 2097152 ]] || {
  echo "BLOCKED_LESS_THAN_2GIB_FREE"; exit 2;
+}
+TMP_AVAILABLE_KB="$(df -Pk /tmp | awk 'END{print $4}')"
+[[ "$TMP_AVAILABLE_KB" =~ ^[0-9]+$ && "$TMP_AVAILABLE_KB" -ge 524288 ]] || {
+ echo "BLOCKED_TMP_SPACE_UNDER_512MIB"; exit 2;
 }
 EVIDENCE="$(mktemp -d "/tmp/learnharness-r14z-final-XXXXXXXX")"
 chmod 700 "$EVIDENCE"
 PORT="$(printenv LH_R14_FINAL_PORT || printf 33770)"
 [[ "$PORT" =~ ^[0-9]{4,5}$ ]] || { echo "BLOCKED_INVALID_PORT"; exit 2; }
 SERVER_PID=""
+STEP="preflight"
 cleanup(){
+ local status=$?
+ trap - EXIT
  if [[ -n "$SERVER_PID" ]]; then
   kill "$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
  fi
+ if ((status!=0)); then
+  node pilots/operations-research/final-evidence-r14z.mjs "$EVIDENCE" "$PIN" FAIL "$STEP" >/dev/null 2>&1 || true
+ fi
+ return "$status"
 }
 trap cleanup EXIT
-STEP="initial"
 trap 'echo "R14Z_FAIL_STEP=$STEP"; echo "EVIDENCE_DIR=$EVIDENCE" >&2' ERR
 echo "R14Z_FINAL_HEAD=$PIN"
 echo "R14Z_EVIDENCE_DIR=$EVIDENCE"
 echo "=== exact source, dependencies and build ==="
 STEP="npm_ci"
-npm ci >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
+timeout --kill-after=15s 1200s npm ci --no-audit --no-fund >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
 STEP="offline"
-node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
+timeout --kill-after=15s 360s node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
 node --input-type=module - "$EVIDENCE/offline.json" <<'JS'
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
@@ -60,7 +73,7 @@ assert.equal(receipt.suites.length,36);
 console.log('R14Z_OFFLINE=PASS_454_IN_36');
 JS
 STEP="npm_test"
-npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
+timeout --kill-after=15s 1200s npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
 node --input-type=module - "$EVIDENCE/npm-test.log" <<'JS'
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
@@ -72,14 +85,14 @@ assert.equal(Number(value('fail')),0,'Nonzero npm test failures');
 console.log('R14Z_FULL_NPM_TESTS=PASS_2810');
 JS
 STEP="typecheck"
-npm run typecheck >"$EVIDENCE/typecheck.log" 2>&1 || { tail -n 40 "$EVIDENCE/typecheck.log"; exit 1; }
+timeout --kill-after=15s 900s npm run typecheck >"$EVIDENCE/typecheck.log" 2>&1 || { tail -n 40 "$EVIDENCE/typecheck.log"; exit 1; }
 STEP="next_build"
-npm run build >"$EVIDENCE/build.log" 2>&1 || { tail -n 40 "$EVIDENCE/build.log"; exit 1; }
+timeout --kill-after=15s 1200s npm run build >"$EVIDENCE/build.log" 2>&1 || { tail -n 40 "$EVIDENCE/build.log"; exit 1; }
 echo "R14Z_NPM_TYPESCRIPT_BUILD=PASS"
 echo "=== actual immutable rootless GNU GLPK ==="
 STEP="native_glpsol"
 export LH_GLPK_IMAGE_ID="$IMAGE"
-node --input-type=module <<'JS' >"$EVIDENCE/native-glpk.json"
+timeout --kill-after=15s 180s node --input-type=module <<'JS' >"$EVIDENCE/native-glpk.json"
 import assert from 'node:assert/strict';
 import {runNativeGmplAsync} from './pilots/operations-research/glpk-native-async-r14.mjs';
 import {EXAMPLE_INDEXED_MODEL,trustedIndexedData} from './pilots/operations-research/mathprog-indexed-r7.mjs';
@@ -170,16 +183,21 @@ done
 [[ "$READY" == 1 ]] || { echo "BLOCKED_NEXT_NOT_READY"; exit 2; }
 export LH_R14_BROWSER_URL="$URL"
 STEP="browser_workbench"
-node pilots/operations-research/gusek-workbench-browser-r14.mjs >"$EVIDENCE/browser-workbench.log" 2>&1 || {
+timeout --kill-after=15s 240s node pilots/operations-research/gusek-workbench-browser-r14.mjs >"$EVIDENCE/browser-workbench.log" 2>&1 || {
  tail -n 60 "$EVIDENCE/browser-workbench.log"; exit 1;
 }
 STEP="browser_practice"
-node pilots/operations-research/gusek-practice-browser-r14.mjs >"$EVIDENCE/browser-practice.log" 2>&1 || {
+timeout --kill-after=15s 240s node pilots/operations-research/gusek-practice-browser-r14.mjs >"$EVIDENCE/browser-practice.log" 2>&1 || {
  tail -n 60 "$EVIDENCE/browser-practice.log"; exit 1;
 }
 STEP="final_git"
 [[ "$(git rev-parse HEAD)" == "$PIN" ]] || { echo "BLOCKED_HEAD_CHANGED"; exit 2; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { echo "BLOCKED_DIRTY_AFTER_CHECK"; exit 2; }
+STEP="final_receipt"
+node pilots/operations-research/final-evidence-r14z.mjs "$EVIDENCE" "$PIN" PASS "$STEP" >"$EVIDENCE/receipt-check.log" || {
+ cat "$EVIDENCE/receipt-check.log"; exit 1;
+}
 echo "R14Z_FINAL_QUALIFICATION=PASS"
 echo "HEAD=$PIN"
 echo "EVIDENCE_DIR=$EVIDENCE"
+echo "RECEIPT=$EVIDENCE/r14z-release-receipt.json"
