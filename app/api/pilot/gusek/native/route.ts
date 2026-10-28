@@ -3,10 +3,12 @@
  * The existing Practice grade authority is deliberately unchanged.
  */
 import { timingSafeEqual } from "node:crypto";
-import { runNativeGmpl } from "../../../../../pilots/operations-research/glpk-native-sandbox-r14.mjs";
+import { runNativeGmplAsync } from "../../../../../pilots/operations-research/glpk-native-async-r14.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Local single-user execution: no in-process queue; reject concurrent runs.
+let nativeRunActive=false;
 const LIMIT=140_000;
 const SHA=/^sha256:[a-f0-9]{64}$/;
 const TOKEN=/^[a-f0-9]{64}$/;
@@ -65,7 +67,11 @@ export async function POST(req:Request){
  if(typeof input.model!=="string"||typeof input.mode!=="string"||
    (input.mode!=="solve"&&input.mode!=="check")||
    (input.data!==undefined&&typeof input.data!=="string"))return json({error:"invalid_request_fields"},400);
- const result=runNativeGmpl({model:input.model,data:input.data as string|undefined,
-  mode:input.mode,imageId:process.env.LH_GLPK_IMAGE_ID});
- return json({schema:"learnharness.glpk-native-diagnostic.r14",...result},result.status==="BLOCKED"?503:200);
+ if(nativeRunActive)return json({error:"native_runner_busy"},429);
+ nativeRunActive=true;
+ try{
+  const result=await runNativeGmplAsync({model:input.model,data:input.data as string|undefined,
+   mode:input.mode,imageId:process.env.LH_GLPK_IMAGE_ID});
+  return json({schema:"learnharness.glpk-native-diagnostic.r14",...result},result.status==="BLOCKED"?503:200);
+ }finally{nativeRunActive=false;}
 }
