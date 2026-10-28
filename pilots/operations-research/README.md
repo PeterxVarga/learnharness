@@ -978,3 +978,52 @@ branch and draft PR #2. No GitHub Actions, merge, deploy or owner
 Fedora execution has been performed. Current GMPL editor remains the
 existing bounded in-place syntax-highlighting component; CodeMirror
 6 was not installed without a reproducible package-lock.
+
+## R14Z final integration closure R2 — unmocked Chromium -> rootless GLPK -> real grade
+
+**This supersedes earlier R14Z final acceptance counts and flows**.
+The final one-shot Fedora gate now has three independently scoped
+Chromium journeys, not only the old two:
+
+1. **Free Workbench:** live React edit, file tabs, highlighting,
+   named project save/restore, IndexedDB persistence and mode switch;
+   **11** browser checks.
+2. **Exam Practice (synthetic native response only):** indexed
+   transport `.mod` + read-only `.dat`, local draft reload,
+   exact model/solution transfer, **actual independent Next.js API**
+   0/1 for deliberately wrong allocation then 1/1 after explicit
+   re-transfer, three safe task starters and ungraded experiment copy;
+   **15** browser checks.
+3. **New LIVE end-to-end real GLPK browser check:** Chromium
+   navigates the real local Next.js app, loads tablet seed 42,
+   types the complete MathProg `.mod` into the actual React editor,
+   provides the operator's locally scoped GLPK token, requests
+   **exactly one real POST to `/api/pilot/gusek/native`** (no browser
+   request interception or solver mocking), requires an OPTIMAL
+   named-column transfer result from the genuine pinned rootless
+   Podman GLPK image, explicitly copies those values into the
+   two-variable student grid, then requires **exactly one POST to the
+   real independent grading endpoint**, with task ID
+   `gusek-tablet-42` and a binary 1/1 response. The script never
+   emits the token or learner model source. **6** browser checks.
+
+The final release evidence requires the three distinct browser
+schemas and exact check counts, and rejects a mocked-native
+response in the live third browser flow. The live browser check
+is separate from the native GLPK CLI checks for all university
+task kinds; both must pass. A misleading green browser receipt
+without an actual native call or correct task can no longer qualify.
+
+**Current target totals:** **468 offline tests / 37 suites**,
+**2824 full npm tests**, plus **11 + 15 + 6** browser acceptance
+steps. These are required final qualification counts, NOT
+currently attested full Fedora results. The 14 targeted receipt
+contract tests passed **14/14** in isolated JavaScript evaluation;
+the new browser source passes syntactic validation but has not
+run against Next.js, Chromium or the actual GLPK container.
+No intermediate execution on the user's Fedora host, merge,
+deployment, provider send or GitHub Actions has occurred.
+
+The limited, dependency-free highlighted GMPL editor remains;
+true CodeMirror 6 adoption still requires reproducible installation
+and a verified lockfile, and is intentionally not represented as done.
