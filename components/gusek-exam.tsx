@@ -223,22 +223,29 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      {dataFile&&<button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportPracticeFile('data.dat',dataFile)}>.dat letöltése</button>}
      <input type="file" ref={uploadModel} accept=".mod" className="hidden" aria-label="MathProg modell megnyitása" onChange={e=>void importPracticeModel(e)}/>
     </div>
+    <nav aria-label="MathProg fájlfülek" data-testid="gusek-practice-file-tabs-r14z" className="flex gap-2 border-b pb-2">
+     <button type="button" data-testid="gusek-practice-tab-model-r14z" aria-pressed={fileTab==='model.mod'}
+      className={'rounded px-3 py-2 font-mono text-xs '+(fileTab==='model.mod'?'bg-neutral-200 font-semibold text-neutral-900 dark:bg-neutral-800 dark:text-white':'')}
+      onClick={()=>setFileTab('model.mod')}>model.mod</button>
+     <button type="button" data-testid="gusek-practice-tab-data-r14z" aria-pressed={fileTab==='data.dat'}
+      className={'rounded px-3 py-2 font-mono text-xs '+(fileTab==='data.dat'?'bg-neutral-200 font-semibold text-neutral-900 dark:bg-neutral-800 dark:text-white':'')}
+      onClick={()=>setFileTab('data.dat')}>data.dat · csak olvasható</button>
+    </nav>
     <GmplEditor id="gusek-source" testId="gusek-exam-source-r14"
-     label="GUSEK / MathProg modell (.mod)" value={source}
+     label="GUSEK / MathProg modell (.mod)" value={source} hidden={fileTab!=='model.mod'}
      onKeyDown={editorShortcut}
      diagnosticLine={nativeDiagnostic?.file==='model.mod'?nativeDiagnostic.line:null}
      onChange={next=>{invalidateForm();setSource(next);}} />
+    <GmplEditor id="gusek-data" testId="gusek-exam-data-r14"
+     label="Feladatadatok (.dat)" value={dataFile} readOnly hidden={fileTab!=='data.dat'}
+     diagnosticLine={nativeDiagnostic?.file==='data.dat'?nativeDiagnostic.line:null}
+     onChange={()=>{}} rows={5} placeholder="A feladat nem igényel külön .dat fájlt." />
     <p className="text-xs text-neutral-500">Ctrl+Enter: GLPK-futtatás · Ctrl+Shift+Enter: teljes megoldás ellenőrzése.</p>
     <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
      <h3 className="font-semibold">GNU GLPK – eredeti MathProg-futtatás (R14)</h3>
-     <label htmlFor="gusek-data" className="block text-sm">Feladatadatok (.dat) – vizsgamódban csak olvasható</label>
-     <GmplEditor id="gusek-data" testId="gusek-exam-data-r14"
-      label="Feladatadatok (.dat)" value={dataFile} readOnly
-      diagnosticLine={nativeDiagnostic?.file==='data.dat'?nativeDiagnostic.line:null}
-      onChange={()=>{}} rows={5} placeholder="A feladat nem igényel külön .dat fájlt." />
-     <p className="text-xs text-neutral-500">A feladat szerveroldali adatai nem módosíthatók. Saját adatokhoz válts a Szabad munkaterületre.</p>
+     <p className="text-xs text-neutral-500">A .dat fül a feladat szerveroldali adatait mutatja, és a vizsgamódban csak olvasható.</p>
      {nativeAvailable?<>
       <label htmlFor="gusek-native-token" className="block text-sm">Helyi futtatási token (nem mentjük az előzményekbe)</label>
       <input id="gusek-native-token" type="password" autoComplete="off" spellCheck={false} value={nativeToken} onChange={e=>setNativeToken(e.target.value)} className="w-full rounded border bg-transparent p-2 font-mono text-sm" placeholder="64 karakteres hex token"/>
@@ -285,7 +292,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{formEpoch.current++;setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
     <button disabled={busy||binding==='checking'||binding==='failed'} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Teljes megoldás ellenőrzése</button>
   </section>}
-  {task&&<p data-testid="gusek-practice-draft-status-r14z" className="xl:col-span-2" className="text-xs text-neutral-500">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
+  {task&&<p data-testid="gusek-practice-draft-status-r14z" className="text-xs text-neutral-500 xl:col-span-2">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
   {grade&&<section role="status" className="space-y-2 rounded-xl border p-4 xl:col-start-2"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
