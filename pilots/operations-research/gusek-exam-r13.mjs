@@ -4,6 +4,7 @@
 import {makeTransportTask,solveTransportTask} from './transport-exam-r3.mjs';
 import {parseGusekModel,verifyGusekModel} from './gusek-model-r13.mjs';
 import {proveEquivalentScalarModel} from './gusek-equivalence-r14.mjs';
+import {looksIndexedTransport,gradeIndexedGusekTransport} from './gusek-indexed-r14.mjs';
 
 const TRANSPORT_NAMES=[
  ['Raktar1_Bolt1','Raktar1_Bolt2','Raktar1_Bolt3'],
@@ -118,6 +119,8 @@ export function gradeGusekExam(kind,seed,answer){
   const task=makeGusekTask(kind,seed);
   const reject=(points,code)=>({status:points===null?'UNASSESSABLE':'ZERO_CREDIT',points,maxPoints:1,correct:points===null?null:false,errors:[code],verifiedBy:'r13_synthetic_reference_oracle'});
   if(!answer||typeof answer!=='object'||Array.isArray(answer))return reject(0,'invalid_answer');
+  if(kind==='transport'&&looksIndexedTransport(answer.mathprog))
+    return gradeIndexedGusekTransport(seed,answer);
   const parsed=parseGusekModel(answer.mathprog);
   // R14 proves selected equivalent scalar rewrites before the legacy R13 gate.
   // Unproven rewrites retain the conservative legacy verdict; no solver or
