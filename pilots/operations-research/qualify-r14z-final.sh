@@ -83,6 +83,7 @@ node --input-type=module <<'JS' >"$EVIDENCE/native-glpk.json"
 import assert from 'node:assert/strict';
 import {runNativeGmplAsync} from './pilots/operations-research/glpk-native-async-r14.mjs';
 import {EXAMPLE_INDEXED_MODEL,trustedIndexedData} from './pilots/operations-research/mathprog-indexed-r7.mjs';
+import {makeGusekTask,trustedGusekModel,solveGusekTask,gradeGusekExam} from './pilots/operations-research/gusek-exam-r13.mjs';
 const imageId=process.env.LH_GLPK_IMAGE_ID;
 const single=await runNativeGmplAsync({
  imageId,model:'var x >= 0; maximize obj: x; s.t. upper: x <= 3; solve; end;'
@@ -101,6 +102,30 @@ assert.equal(indexed.status,'GLPK_COMPLETED');
 assert.equal(indexed.solverStatus,'OPTIMAL');
 assert.equal(indexed.columnStatus,'OPTIMAL_COLUMNS');
 assert.equal(indexed.columns?.filter(x=>/^x\[[1-3],[1-3]\]$/.test(x.name)).length,9);
+// Real, NOT mocked GLPK interpretation for each university task type.
+const universityKinds=['transport','froccs','tablet'];
+const nativeTasks=[];
+for(const kind of universityKinds){
+ const seed=42,task=makeGusekTask(kind,seed);
+ const source=trustedGusekModel(task)+'\nsolve;\nend;\n';
+ const outcome=await runNativeGmplAsync({imageId,model:source});
+ assert.equal(outcome.status,'GLPK_COMPLETED',kind+' glpsol completion');
+ assert.equal(outcome.solverStatus,'OPTIMAL',kind+' GLPK optimum');
+ assert.equal(outcome.columnStatus,'OPTIMAL_COLUMNS',kind+' named columns');
+ assert.ok(Array.isArray(outcome.columns),kind+' missing columns');
+ const values=Object.fromEntries(outcome.columns.map(x=>[x.name,x.value]));
+ assert.deepEqual(Object.keys(values).sort(),[...task.variableNames].sort(),kind+' variable names');
+ const reference=solveGusekTask(task);
+ assert.equal(reference.status,'optimal',kind+' oracle');
+ const tolerance=1e-6*Math.max(1,Math.abs(reference.objective));
+ assert.ok(Math.abs(outcome.objective-reference.objective)<=tolerance,kind+' objective mismatch');
+ const grade=gradeGusekExam(kind,seed,{
+  taskKind:kind,mathprog:source,values,reportedObjective:outcome.objective,hintsUsed:false
+ });
+ assert.equal(grade.points,1,kind+' independent grade after GLPK');
+ assert.equal(grade.maxPoints,1,kind+' grading contract');
+ nativeTasks.push({kind,status:outcome.solverStatus,variables:outcome.columns.length,points:grade.points});
+}
 const infeasible=await runNativeGmplAsync({
  imageId,model:'var x >= 2, integer; minimize obj: x; s.t. cap: x <= 1; solve; end;'
 });
@@ -111,6 +136,7 @@ console.log(JSON.stringify({
  schema:'learnharness.r14z.native-final.v1',status:'PASS',
  scalar:{status:single.solverStatus,objective:single.objective},
  indexed:{status:indexed.solverStatus,variables:indexed.columns.length},
+ universityTasks:nativeTasks,
  infeasible:{status:infeasible.solverStatus}
 }));
 JS
