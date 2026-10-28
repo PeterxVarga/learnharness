@@ -9,10 +9,10 @@ import {basename,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const SHA=/^[a-f0-9]{40}$/;
 const STEPS=new Set(['preflight','npm_ci','offline','npm_test','typecheck','next_build',
- 'native_glpsol','server','browser_workbench','browser_practice','final_git','final_receipt']);
+ 'native_glpsol','server','browser_workbench','browser_practice','browser_live_native','final_git','final_receipt']);
 const LOGS=Object.freeze([
  'npm-ci.log','offline.json','npm-test.log','typecheck.log','build.log',
- 'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log'
+ 'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ]);
 const EXPECTED={offline:466,suites:37,npm:2822};
 const validName=n=>typeof n==='string'&&LOGS.includes(n);
@@ -37,9 +37,18 @@ export function validateFinalR14z({head,status,step,logs,offline,native,browsers
     !['transport','froccs','tablet'].every(kind=>native.universityTasks.some(x=>
       x.kind===kind&&x.status==='OPTIMAL'&&x.points===1)))
   return {status:'BLOCKED',reason:'native_solver_receipt_not_qualified'};
- if(!Array.isArray(browsers)||browsers.length!==2||
+ if(!Array.isArray(browsers)||browsers.length!==3||
     browsers.some(x=>!x||x.status!=='PASS'||!Array.isArray(x.checks))||
-    browsers[1].mockedNativeOnly!==true||browsers[1].realPracticeGrade!==true)
+    browsers[0].schema!=='learnharness.r14.workbench-browser.v1'||
+    browsers[0].checks.length!==10||
+    browsers[1].schema!=='learnharness.r14z.practice-browser.v1'||
+    browsers[1].checks.length!==15||
+    browsers[1].mockedNativeOnly!==true||browsers[1].realPracticeGrade!==true||
+    browsers[2].schema!=='learnharness.r14z.live-browser.v1'||
+    browsers[2].checks.length!==6||
+    browsers[2].realNativeGlpk!==true||browsers[2].realPracticeGrade!==true||
+    browsers[2].nativeCalls!==1||browsers[2].gradeCalls!==1||
+    browsers[2].taskKind!=='tablet'||browsers[2].taskId!=='gusek-tablet-42')
   return {status:'BLOCKED',reason:'browser_receipts_not_qualified'};
  return {status:'PASS',reason:null};
 }
@@ -69,7 +78,7 @@ export function writeFinalR14zEvidence(dir,head,status,step){
   if(!logs[name])return null;
   try{const raw=readFileSync(file,'utf8');return raw.length<=512*1024?JSON.parse(raw):null;}catch{return null;}
  };
- const browsers=['browser-workbench.log','browser-practice.log'].map(name=>
+ const browsers=['browser-workbench.log','browser-practice.log','browser-live-native.log'].map(name=>
    logs[name]?readBrowserLog(join(dir,name)):null);
  const verdict=validateFinalR14z({head,status,step,logs,offline:load('offline.json'),
   native:load('native-glpk.json'),browsers});
