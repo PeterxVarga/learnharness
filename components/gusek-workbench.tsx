@@ -89,11 +89,15 @@ function FreeWorkspace(){
   if(!file)return;
   if(file.size>65_536){setMessage('A kiválasztott fájl meghaladja a 64 KiB korlátot.');return;}
   try{
+   const filename=file.name.toLowerCase();
+   const target:FileName=filename.endsWith('.mod')?'model.mod':filename.endsWith('.dat')?'data.dat':active;
+   if(!filename.endsWith('.mod')&&!filename.endsWith('.dat'))throw new Error('Csak .mod és .dat fájl importálható.');
    const text=await file.text();
-   const checked=validateWorkbenchFile(active,text);
+   const checked=validateWorkbenchFile(target,text);
    if(!checked.ok)throw new Error('Nem támogatott vagy túl nagy fájl.');
-   setSource(text);
-   setMessage(active+' fájl importálva. A szerkesztőben ellenőrizheted.');
+   if(target==='model.mod')setModel(text);else setData(text);
+   setActive(target);
+   setMessage(target+' fájl importálva. A szerkesztőben ellenőrizheted.');
   }catch(e){setMessage(e instanceof Error?e.message:'Fájlolvasási hiba.');}
  }
  function diagnosticJump(){
