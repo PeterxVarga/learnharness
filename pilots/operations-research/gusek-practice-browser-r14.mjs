@@ -117,7 +117,7 @@ try{
  await check('EDITABLE_3X3_GRID_AND_JSON_ROUNDTRIP',async()=>{
   const grid=await page.$('[data-testid="gusek-values-grid-r14z"]');
   assert.ok(grid);
-  assert.equal((await page.$('[data-testid^="gusek-value-cell-"]')).length,9);
+  assert.equal((await page.$$('[data-testid^="gusek-value-cell-"]')).length,9);
   const first='[data-testid="gusek-value-cell-0"]';
   await page.click(first,{clickCount:3});
   await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');
