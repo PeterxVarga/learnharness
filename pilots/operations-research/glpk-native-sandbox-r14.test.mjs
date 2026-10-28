@@ -103,7 +103,7 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
     const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
     const dir=mount.slice('--volume='.length).split(':/output:')[0];
     assert.ok(args.includes('--write'));assert.ok(args.includes('/output/solution.raw'));
-    writeFileSync(dir+'/solution.raw','s mip 4 9 o 123\\n');
+    writeFileSync(dir+'/solution.raw','s mip 4 9 o 123\n');
    }
    return base(binary,args,opts);
   };
@@ -117,7 +117,7 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
    if(args[0]==='run'){
     const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
     const dir=mount.slice('--volume='.length).split(':/output:')[0];
-    writeFileSync(dir+'/solution.raw','s mip 4 9 n 0\\n');
+    writeFileSync(dir+'/solution.raw','s mip 4 9 n 0\n');
    }
    return base(binary,args,opts);
   };
