@@ -69,6 +69,20 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   .catch(e=>{if(live){setBinding('failed');setError(String(e));}});
   return()=>{live=false;};
  },[chatId]);
+ // Local-only autosave, scoped to exact seeded task, dialect and chat.
+ useEffect(()=>{
+  if(!task||task.kind!==kind||task.id!=='gusek-'+kind+'-'+seed||
+   draftState==='loading'||draftState==='unavailable')return;
+  const dialect=kind==='transport'?transportDialect:'scalar';
+  let active=true;
+  const timer=window.setTimeout(()=>{
+   void saveGusekPracticeDraft(chatId??linkedChat??null,{
+    taskId:task.id,kind,seed,dialect,model:source,values,objective,hintsUsed:hints
+   }).then(()=>{if(active)setDraftState('saved');})
+    .catch(()=>{if(active)setDraftState('unavailable');});
+  },700);
+  return()=>{active=false;window.clearTimeout(timer);};
+ },[task,chatId,linkedChat,kind,seed,transportDialect,source,values,objective,hints]);
  async function newTask(){
   const epoch=++taskRequestEpoch.current;
   invalidateForm();
@@ -115,13 +129,14 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   try{
    const text=await file.text();
    if(!validateWorkbenchFile('model.mod',text).ok)throw Error('Érvénytelen vagy túl nagy MathProg-fájl.');
-   setSource(text);setGrade(null);setNativeResult(null);setNativeSnapshot(null);setError('');
+   invalidateForm();setSource(text);setError('');
   }catch(e){setError(e instanceof Error?e.message:'Nem sikerült megnyitni a .mod fájlt.');}
  }
  async function runNative(mode:'solve'|'check'){
   // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
   if(!nativeAvailable||nativeBusy||!task)return;
   const controller=new AbortController();nativeAbort.current=controller;
+  const startedAt=formEpoch.current;
   setNativeBusy(true);setNativeCancelling(false);setNativeResult(null);setNativeError('');
   try{
    if(!/^[a-f0-9]{64}$/.test(nativeToken))throw Error('Adj meg egy 64 karakteres, helyi GLPK tokent.');
@@ -134,8 +149,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    if(controller.signal.aborted)throw Error('A futtatás megszakadt.');
    if(!r.ok&&result.status!=='BLOCKED')throw Error(result.error??'GLPK-kérés sikertelen.');
    if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
-   setNativeResult(result);
-  }catch(e){setNativeError(controller.signal.aborted?'GLPK-futtatás megszakítva.':e instanceof Error?e.message:String(e));}
+   if(startedAt===formEpoch.current)setNativeResult(result);
+  }catch(e){if(startedAt===formEpoch.current)setNativeError(controller.signal.aborted?'GLPK-futtatás megszakítva.':e instanceof Error?e.message:String(e));}
   finally{if(nativeAbort.current===controller)nativeAbort.current=null;setNativeBusy(false);setNativeCancelling(false);}
  }
  function editorShortcut(e:KeyboardEvent<HTMLTextAreaElement>){
@@ -144,7 +159,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   if(e.shiftKey)void check();else void runNative('solve');
  }
  async function check(){
-  if(!task||binding==='failed'||binding==='checking')return;
+  if(!task||busy||binding==='failed'||binding==='checking')return;
+  const startedAt=formEpoch.current;
   setBusy(true);setGrade(null);setError('');
   try{
    if(!objective.trim()||!Number.isFinite(Number(objective)))throw Error('Add meg a kiszámított célfüggvényértéket.');
@@ -157,8 +173,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    });const x=await r.json();if(!r.ok)throw Error(x.error??'Ellenőrzés sikertelen.');
    const out=(linkedChat?x.receipt:x) as Grade;
    if(out.taskId!==task.id||out.maxPoints!==1||![0,1,null].includes(out.points))throw Error('Érvénytelen értékelőválasz.');
-   setGrade(out);if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
-  }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
+   if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
+   if(startedAt===formEpoch.current)setGrade(out);
+  }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
+  finally{setBusy(false);}
  }
  return <div data-testid="gusek-exam-r13" className="mx-auto max-w-5xl space-y-5 px-5 py-6">
   <header className="space-y-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · R13 · GUSEK / GNU MathProg</p>
@@ -167,18 +185,18 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    {!embedded&&<Link className="text-sm underline" href={linkedChat?`/chat/${linkedChat}`:'/chat/new?mode=practice'}>Vissza a Practice beszélgetéshez</Link>}
   </header>
   <section className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
-    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);setTask(null);setGrade(null);}}>
+    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
     {kind==='transport'&&<label className="text-sm">MathProg felírás
      <select data-testid="gusek-transport-dialect-r14" aria-label="MathProg felírás" value={transportDialect}
-      onChange={e=>{setTransportDialect(e.target.value as 'scalar'|'indexed');setTask(null);setGrade(null);setNativeResult(null);}}
+      onChange={e=>{taskRequestEpoch.current++;invalidateForm();setTransportDialect(e.target.value as 'scalar'|'indexed');setTask(null);}}
       className="mt-1 block rounded border bg-background p-2">
       <option value="scalar">Skalár változók (R13)</option>
       <option value="indexed">Indexelt x[i,j] + .dat (R14)</option>
      </select>
     </label>}
-    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{setSeed(e.target.value);setTask(null);setGrade(null);}}/></label>
+    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setSeed(e.target.value);setTask(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
   {task&&<section aria-label="Vizsgafeladat" className="space-y-3 rounded-xl border p-5">
@@ -202,7 +220,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      label="GUSEK / MathProg modell (.mod)" value={source}
      onKeyDown={editorShortcut}
      diagnosticLine={nativeDiagnostic?.file==='model.mod'?nativeDiagnostic.line:null}
-     onChange={next=>{setSource(next);setGrade(null);setNativeResult(null);setNativeSnapshot(null);}} />
+     onChange={next=>{invalidateForm();setSource(next);}} />
     <p className="text-xs text-neutral-500">Ctrl+Enter: GLPK-futtatás · Ctrl+Shift+Enter: teljes megoldás ellenőrzése.</p>
     <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
@@ -243,7 +261,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
        onClick={()=>{
         const transfer=preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot});
         if(!transfer.ok){setNativeError('A GLPK-eredmény nem vehető át: '+transfer.code);return;}
-        setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));setGrade(null);
+        formEpoch.current++;setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));setGrade(null);
        }} className="rounded border px-3 py-2 text-sm disabled:opacity-50">
        Optimális GLPK-megoldás átvétele a beadáshoz
       </button>}
@@ -254,12 +272,13 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      </div>}
     </section>
     <label htmlFor="gusek-values" className="block font-semibold">Megoldó által kiszámított változóértékek (JSON)</label>
-    <textarea id="gusek-values" className="h-40 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} spellCheck={false} onChange={e=>{setValues(e.target.value);setGrade(null);}}/>
+    <textarea id="gusek-values" className="h-40 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} spellCheck={false} onChange={e=>{formEpoch.current++;setValues(e.target.value);setGrade(null);}}/>
     <label htmlFor="gusek-objective" className="block font-semibold">{task.objectiveSense==='max'?'Maximális bevétel':'Minimális célfüggvényérték'}</label>
-    <input id="gusek-objective" inputMode="decimal" className="w-full rounded border bg-transparent p-2" value={objective} onChange={e=>{setObjective(e.target.value);setGrade(null);}}/>
-    <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
+    <input id="gusek-objective" inputMode="decimal" className="w-full rounded border bg-transparent p-2" value={objective} onChange={e=>{formEpoch.current++;setObjective(e.target.value);setGrade(null);}}/>
+    <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{formEpoch.current++;setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
     <button disabled={busy||binding==='checking'||binding==='failed'} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Teljes megoldás ellenőrzése</button>
   </section>}
+  {task&&<p data-testid="gusek-practice-draft-status-r14z" className="text-xs text-neutral-500">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
   {grade&&<section role="status" className="space-y-2 rounded-xl border p-4"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
