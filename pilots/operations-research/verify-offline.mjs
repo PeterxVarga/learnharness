@@ -39,7 +39,7 @@ const suites = [
   { name: 'r14-indexed-transport', file: 'gusek-indexed-r14.test.mjs', count: 20 },
   { name: 'r14-indexed-http', file: 'gusek-indexed-http-r14.test.mjs', count: 8, flags: ['--experimental-strip-types'] },
   { name: 'r14-workbench-files', file: 'gusek-workspace-r14.test.mjs', count: 14 },
-  { name: 'r14-glpk-columns', file: 'glpk-columns-r14.test.mjs', count: 12 },
+  { name: 'r14-glpk-columns', file: 'glpk-columns-r14.test.mjs', count: 15 },
   { name: 'r14-practice-transfer', file: 'gusek-practice-transfer-r14.test.mjs', count: 13 },
   { name: 'r14-glpk-async-runtime', file: 'glpk-native-async-r14.test.mjs', count: 12 },
   { name: 'r14-gmpl-editor', file: 'gmpl-editor-r14.test.mjs', count: 16 },
