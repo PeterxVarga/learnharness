@@ -130,5 +130,42 @@ try{
   await page.waitForFunction(()=>!document.querySelector('[data-testid="gusek-native-result-r14"]'));
   assert.equal(await page.$('[data-testid="gusek-transfer-solution-r14"]'),null);
  });
+ await check('PRACTICE_FILE_TABS_AND_READONLY_FIXTURE',async()=>{
+  await page.click('[data-testid="gusek-practice-tab-data-r14z"]');
+  const readOnly=await page.$eval('[data-testid="gusek-exam-data-r14"]',el=>el.readOnly);
+  assert.equal(readOnly,true);
+  await page.click('[data-testid="gusek-practice-tab-model-r14z"]');
+  assert.equal(await page.$eval(modelInput,el=>el.hidden),false);
+ });
+ await page.select('select[aria-label="Feladattípus"]','froccs');
+ await page.evaluate(()=>{
+  const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
+  if(!button)throw Error('new_froccs_task_missing');button.click();
+ });
+ await check('FROCCS_HAS_REAL_ANSWER_FREE_STARTER',async()=>{
+  await page.waitForFunction(()=>{
+   const m=document.querySelector('[data-testid="gusek-exam-source-r14"]');
+   return !!m&&m.value.includes('var xKF >= 0, integer;');
+  },{timeout:15000});
+  const starter=await page.$eval(modelInput,el=>el.value);
+  assert.equal((starter.match(/^var /gm)||[]).length,10);
+  assert.ok(starter.includes('solve;'));
+  assert.ok(!/^maximize\s/m.test(starter));
+ });
+ await page.select('select[aria-label="Feladattípus"]','tablet');
+ await page.evaluate(()=>{
+  const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
+  if(!button)throw Error('new_tablet_task_missing');button.click();
+ });
+ await check('TABLET_HAS_CONTINUOUS_ANSWER_FREE_STARTER',async()=>{
+  await page.waitForFunction(()=>{
+   const m=document.querySelector('[data-testid="gusek-exam-source-r14"]');
+   return !!m&&m.value.includes('var spenotos >= 0;');
+  },{timeout:15000});
+  const starter=await page.$eval(modelInput,el=>el.value);
+  assert.equal((starter.match(/^var /gm)||[]).length,2);
+  assert.ok(!/^minimize\s/m.test(starter));
+  assert.ok(!/var epres.*integer/.test(starter));
+ });
  process.stdout.write(JSON.stringify({schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks,mockedNativeOnly:true,realPracticeGrade:true})+'\n');
 }finally{await browser.close();}
