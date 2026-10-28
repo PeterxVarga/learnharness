@@ -85,6 +85,19 @@ import {runNativeGmplAsync} from './pilots/operations-research/glpk-native-async
 import {EXAMPLE_INDEXED_MODEL,trustedIndexedData} from './pilots/operations-research/mathprog-indexed-r7.mjs';
 import {makeGusekTask,trustedGusekModel,solveGusekTask,gradeGusekExam} from './pilots/operations-research/gusek-exam-r13.mjs';
 const imageId=process.env.LH_GLPK_IMAGE_ID;
+const translated=await runNativeGmplAsync({
+ imageId,mode:'check',model:'var x >= 0; minimize obj: x; s.t. mincap: x >= 1; solve; end;'
+});
+assert.equal(translated.status,'GLPK_COMPLETED','actual glpsol --check');
+assert.equal(translated.mode,'check');
+assert.equal(translated.columnStatus,'NOT_TRANSFERABLE');
+assert.equal(translated.points,null);
+const malformed=await runNativeGmplAsync({
+ imageId,model:'var x >= 0; minimize broken: ; solve; end;'
+});
+assert.equal(malformed.status,'GLPK_ERROR','invalid MathProg must not be completed');
+assert.equal(malformed.graded,false);
+assert.equal(malformed.points,null);
 const single=await runNativeGmplAsync({
  imageId,model:'var x >= 0; maximize obj: x; s.t. upper: x <= 3; solve; end;'
 });
@@ -134,6 +147,7 @@ assert.equal(infeasible.points,null);
 assert.equal(infeasible.graded,false);
 console.log(JSON.stringify({
  schema:'learnharness.r14z.native-final.v1',status:'PASS',
+ translationOnly:translated.status,syntaxError:malformed.status,
  scalar:{status:single.solverStatus,objective:single.objective},
  indexed:{status:indexed.solverStatus,variables:indexed.columns.length},
  universityTasks:nativeTasks,
