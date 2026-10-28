@@ -130,6 +130,15 @@ try{
   const valueAfterGrid=JSON.parse(await page.$eval('#gusek-values',el=>el.value));
   assert.equal(valueAfterGrid['x[1,1]'],modified);
   assert.notEqual(valueAfterGrid['x[1,1]'],expected['x[1,1]']);
+  // The real, unmocked grading API must issue exactly zero for this deliberately
+  // wrong candidate, not partial points or an automatic solver score.
+  await page.evaluate(()=>{
+   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Teljes megoldás ellenőrzése');
+   if(!button)throw Error('grade_button_missing_for_wrong_answer');button.click();
+  });
+  await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-exam-r13"]')?.textContent?.includes('0/1'),{timeout:15000});
+  const wrongVerdict=await page.$eval('[data-testid="gusek-exam-r13"]',el=>el.textContent);
+  assert.match(wrongVerdict,/0\/1/);
   // Restore the genuine OPTIMAL synthetic result using the existing explicit
   // transfer action, then the unmocked grade endpoint must award 1/1.
   await page.click('[data-testid="gusek-transfer-solution-r14"]');
