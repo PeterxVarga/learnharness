@@ -9,7 +9,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
 type Attempt=Grade&{id:string;submittedAt:string};
-type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;mode?:'solve'|'check';error?:string};
+type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;mode?:'solve'|'check';error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={
  source_wrong_variables:'A változónevek vagy a változók száma nem felel meg a feladatnak.',
@@ -140,6 +140,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
       <p className="text-sm font-medium">GLPK állapot: {nativeResult.status} ({nativeResult.code})</p>
       <p className="text-xs text-neutral-500">Diagnosztika, nem vizsgapont. A kimenet tanulói modellből is származhat.</p>
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.diagnostic??'Nincs diagnosztikai kimenet.'}</pre>
+      {nativeResult.solutionListing&&<>
+       <h4 className="text-sm font-semibold">GLPK-megoldás: célfüggvény, korlátok és változók</h4>
+       <pre data-testid="gusek-native-solution-r14" className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.solutionListing}</pre>
+      </>}
      </div>}
     </section>
     <label htmlFor="gusek-values" className="block font-semibold">Megoldó által kiszámított változóértékek (JSON)</label>
