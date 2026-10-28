@@ -36,7 +36,18 @@ function canonicalIndexedSource(source){
  const declarations=[...clean.matchAll(decl)];
  if(declarations.length!==1)return {ok:false,code:'unsupported_indexed_variable'};
  const d=declarations[0];
- const parts=d[1].split(',').map(s=>s.replace(/\s+/g,'').toLowerCase()).filter(Boolean);
+ // Attribute commas are different from commas inside cap[i,j].
+ const parts=[];let token='',brackets=0;
+ for(const ch of d[1]){
+  if(ch==='[')brackets++;else if(ch===']')brackets--;
+  if(brackets<0)return {ok:false,code:'unsupported_variable_declaration'};
+  if(ch===','&&brackets===0){parts.push(token);token='';}
+  else token+=ch;
+ }
+ if(brackets!==0)return {ok:false,code:'unsupported_variable_declaration'};
+ parts.push(token);
+ for(let i=0;i<parts.length;i++)parts[i]=parts[i].replace(/\s+/g,'').toLowerCase();
+ if(parts.some(p=>!p))return {ok:false,code:'unsupported_variable_declaration'};
  if(new Set(parts).size!==parts.length || !parts.includes('>=0')||
     parts.some(p=>!['>=0','<=cap[i,j]','integer'].includes(p)))
   return {ok:false,code:'unsupported_variable_declaration'};
