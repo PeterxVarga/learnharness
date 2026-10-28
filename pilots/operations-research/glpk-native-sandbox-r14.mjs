@@ -8,6 +8,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,rmSync,openSync,closeSync,fstatSync,
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readGlpkSolutionStatus} from './glpk-solution-status-r14.mjs';
+import {parseGlpkColumns} from './glpk-columns-r14.mjs';
 
 const IMAGE_ID=/^sha256:[a-f0-9]{64}$/;
 const MODEL_MAX=65536, DATA_MAX=65536, MAX_OUTPUT=8192, MAX_LISTING=24_576;
@@ -62,7 +63,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       imageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
       '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
       '--tmlim','8','--memlim','192','--seed','0',
-      ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw']:[])
+      ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw','--wglp','/output/problem.glp']:[])
     ];
     const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false,env});
     if(run.error?.code==='ETIMEDOUT')return result('TIME_LIMIT','outer_timeout');
@@ -103,11 +104,27 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       }catch{/* missing/untrusted file yields UNKNOWN */}
       finally{if(fd!==undefined)closeSync(fd);}
     }
-    // Solver console output is deliberately informational, NOT a trusted
-    // proof of correctness: source can contain display/printf statements.
+    // Variable names from --wglp, activities from --write. Both must match
+    // the same GLPK run. Missing/oversized/symlink outputs fail closed.
+    const safeRead=name=>{
+      let fd;
+      try{
+        fd=openSync(join(stage,'out',name),constants.O_RDONLY|constants.O_NOFOLLOW);
+        const st=fstatSync(fd);
+        if(!st.isFile()||st.size>49152)return null;
+        const raw=readFileSync(fd);
+        return raw.length<=49152?raw.toString('utf8'):null;
+      }catch{return null;}
+      finally{if(fd!==undefined)closeSync(fd);}
+    };
+    const variables=mode==='solve'
+      ?parseGlpkColumns(safeRead('solution.raw'),safeRead('problem.glp'),solutionMeta)
+      :{status:'NOT_TRANSFERABLE',columns:[]};
     return result('GLPK_COMPLETED','completed',{
       exitCode:0,mode,diagnostic:bounded(run.stdout),
-      solutionListing,...solutionMeta,solverOutputTrusted:false
+      solutionListing,...solutionMeta,
+      columns: variables.columns,columnStatus:variables.status,
+      solverOutputTrusted:false
     });
   }catch{
     return result('BLOCKED','staging_failed');
