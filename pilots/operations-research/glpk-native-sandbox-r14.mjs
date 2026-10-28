@@ -40,7 +40,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
     const args=[
       'run','--rm','--pull=never','--network=none','--http-proxy=false',
       '--userns=keep-id','--read-only','--read-only-tmpfs=false',
-      '--cap-drop=all','--security-opt=no-new-privileges','--security-opt=label=type:container_t',
+      '--cap-drop=all','--security-opt=no-new-privileges',
       '--pids-limit=32','--cpus=1','--memory=256m','--memory-swap=256m',
       '--ipc=private','--image-volume=ignore',
       '--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m',
