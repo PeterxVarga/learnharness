@@ -15,6 +15,16 @@ const LOGS=Object.freeze([
  'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ]);
 const EXPECTED={offline:468,suites:37,npm:2824};
+const LIVE_BROWSER_CHECKS=[
+ 'LIVE_NATIVE_UI_READY',
+ ...['transport','froccs','tablet'].flatMap(kind=>[
+  kind+'_SEEDED_TASK_LOADED',
+  kind+'_EXACT_TRUSTED_SOURCE_ENTERED',
+  kind+'_REAL_GLPK_OPTIMAL_COLUMNS',
+  kind+'_EXPLICIT_TRANSFER_TO_NAMED_GRID',
+  kind+'_REAL_INDEPENDENT_FULL_CREDIT'
+ ])
+];
 const validName=n=>typeof n==='string'&&LOGS.includes(n);
 const boundedLog=b=>b.length<=64*1024*1024;
 export function validateFinalR14z({head,status,step,logs,offline,native,browsers}){
@@ -45,7 +55,8 @@ export function validateFinalR14z({head,status,step,logs,offline,native,browsers
     browsers[1].checks.length!==15||
     browsers[1].mockedNativeOnly!==true||browsers[1].realPracticeGrade!==true||
     browsers[2].schema!=='learnharness.r14z.live-browser.v1'||
-    browsers[2].checks.length!==16||
+    browsers[2].checks.length!==LIVE_BROWSER_CHECKS.length||
+    browsers[2].checks.some((name,index)=>name!==LIVE_BROWSER_CHECKS[index])||
     browsers[2].realNativeGlpk!==true||browsers[2].realPracticeGrade!==true||
     browsers[2].nativeCalls!==3||browsers[2].gradeCalls!==3||
     !Array.isArray(browsers[2].scenarios)||browsers[2].scenarios.length!==3||
