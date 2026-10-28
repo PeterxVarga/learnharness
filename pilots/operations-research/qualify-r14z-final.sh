@@ -39,7 +39,17 @@ TMP_AVAILABLE_KB="$(df -Pk /tmp | awk 'END{print $4}')"
 EVIDENCE="$(mktemp -d "/tmp/learnharness-r14z-final-XXXXXXXX")"
 chmod 700 "$EVIDENCE"
 PORT="$(printenv LH_R14_FINAL_PORT || printf 33770)"
-[[ "$PORT" =~ ^[0-9]{4,5}$ ]] || { echo "BLOCKED_INVALID_PORT"; exit 2; }
+[[ "$PORT" =~ ^[0-9]{4,5}$ ]] && ((10#$PORT>=1024 && 10#$PORT<=65535)) || {
+ echo "BLOCKED_INVALID_PORT"; exit 2;
+}
+# Refuse to mistake an unrelated process already serving this port for Next.js.
+node - "$PORT" <<'JS'
+import net from 'node:net';
+const port=Number(process.argv[2]);
+const server=net.createServer();
+server.once('error',()=>{console.error('BLOCKED_PORT_ALREADY_IN_USE');process.exitCode=2;});
+server.listen({host:'127.0.0.1',port,exclusive:true},()=>server.close());
+JS
 SERVER_PID=""
 STEP="preflight"
 cleanup(){
@@ -177,7 +187,14 @@ SERVER_PID="$!"
 URL="http://127.0.0.1:$PORT/pilot/gusek"
 READY=0
 for _ in $(seq 1 60); do
- if curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then READY=1; break; fi
+ if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+  echo "BLOCKED_NEXT_PROCESS_EXITED"; exit 2;
+ fi
+ # Verify the actual task API and schema, not just a stray HTTP 200 page.
+ if curl -fsS --max-time 2 "http://127.0.0.1:$PORT/api/pilot/gusek?kind=tablet&seed=42" 2>/dev/null |
+  node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{try{const r=JSON.parse(s);if(r.schema!=="learnharness.gusek-task.r13"||r.task?.id!=="gusek-tablet-42")process.exitCode=1;}catch{process.exitCode=1;}})' >/dev/null 2>&1; then
+  READY=1; break;
+ fi
  sleep 1
 done
 [[ "$READY" == 1 ]] || { echo "BLOCKED_NEXT_NOT_READY"; exit 2; }
