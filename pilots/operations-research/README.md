@@ -880,3 +880,51 @@ by the user's explicit one-final-Fedora-verification decision.
 R14 stays stacked, draft and unmerged. No CodeMirror 6 dependencies
 have been installed because reproducible npm lock resolution is not
 available in this coding environment.
+
+## R14Z integration closure — request epochs, Podman orphan recovery, final acceptance
+
+This batch replaces feature accumulation with structural integration fixes
+on the same stacked R14 draft PR.
+
+- **Two guarded runner paths**: web/async and CLI/sync rootless Podman
+  now write a private `--cidfile` into the run-specific 0700 staging
+  directory. If the Podman CLI exits abnormally or is aborted, a
+  bounded 5-second `podman rm --force --ignore <validated 64-hex CID>`
+  is attempted without inheriting provider credentials or a remote
+  Podman endpoint. Normal `--rm` completion performs no forced
+  deletion. Missing, malformed or symlinked cidfiles never trigger
+  deletion. This is best-effort recovery, not an unqualified promise
+  that every orphan is instantly removed.
+- **Stale async result fences**: an older Practice submission cannot
+  unlock an unrelated active request or restore a stale grade. Editing
+  an answer cancels the visual busy state without deleting the
+  successfully obtained, still re-transferable GLPK solution.
+  Invalidating a model/task aborts the old GLPK request, clears the
+  matching controller and prevents its finalizer from altering the
+  next run. The asynchronous Practice file picker is tied to task and
+  form epochs, and a late `.mod` read is discarded after another edit.
+- **Free Workbench import and workspace safety**: a source revision
+  counter fences initial IndexedDB recovery, asynchronous file reads,
+  project opening, and Practice-to-free copies. A delayed file load
+  cannot overwrite a newer edit, imported project, copied model or
+  deliberately cleared workspace.
+- **Actual Chromium test defect fixed**: the 3x3 grid E2E assertion
+  previously called Puppeteer's single-element `page.$` then checked
+  `.length`. It now calls the correct `page.$$` to assert all nine
+  actual inputs. The full real 0/1 to 1/1 API assertion remains.
+- **One final Fedora gate extended**: beyond real GLPK optimization,
+  it will prove actual `--check` translation-only behavior and a
+  malformed MathProg input returning `GLPK_ERROR`, neither supplying
+  an authoritative score. This gate is authored but has NOT run.
+- **Scope of inner evidence**: the synchronous sandbox test module
+  passed **20/20** and async sandbox passed **15/15** via isolated
+  JavaScript mock filesystem and injected Podman commands. No actual
+  Podman, Next.js build, React browser or Fedora execution was run.
+  The exact final release receipt expects **454 offline cases across
+  36 suites**, and **2810 full npm cases**. These are target counts,
+  not aggregate full-suite PASS results.
+
+Keep the PR DRAFT/NO MERGE. No CodeMirror 6 dependency is fabricated;
+the current learner editor uses bounded native-HTML editing and direct
+GMPL syntax highlighting. Any remaining real Fedora failures must be
+resolved from the single final qualification evidence.
