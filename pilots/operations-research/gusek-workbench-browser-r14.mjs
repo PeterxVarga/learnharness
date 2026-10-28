@@ -35,6 +35,14 @@ try{
   const value=await page.$eval(editor,e=>e.value);
   assert.equal(value,target);
  });
+ await check('INLINE_GMPL_HIGHLIGHT_AND_GUTTER',async()=>{
+  const preview=await page.$('[data-testid="gusek-free-model-r14-highlight"]');
+  assert.ok(preview);
+  const text=await page.$eval('[data-testid="gusek-free-model-r14-highlight"]',el=>el.textContent);
+  assert.ok(text.includes('minimize'));
+  const editorVisible=await page.$eval(editor,el=>el.getBoundingClientRect().height>0);
+  assert.equal(editorVisible,true);
+ });
  await check('GMPL_EDITOR_SEARCH',async()=>{
   await page.click('[data-testid="gusek-free-model-r14-shell"] button');
   await page.type('input[aria-label="Keresett szöveg"]','minimize');
