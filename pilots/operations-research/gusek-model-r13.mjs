@@ -92,7 +92,12 @@ export function parseGusekModel(text){
     if(vars.size>30||constraints.length>45)return {ok:false,code:'oversize_model'};
     if([...constraints,...(objective?[objective]:[])].some(e=>[...e.coeff.keys()].some(k=>!vars.has(k))))return {ok:false,code:'undeclared_variable'};
     return {ok:true,vars,constraints,objective};
-  }catch(error){return {ok:false,code:error instanceof Error?error.message:'invalid_source'};}
+  }catch(error){
+    // Stack exhaustion or other runtime exceptions must not leak arbitrary strings
+    // into persisted grade-error contracts (which only permit stable code tokens).
+    const code=error instanceof Error?error.message:'invalid_source';
+    return {ok:false,code:/^[a-z][a-z0-9_]{0,95}$/.test(code)?code:'unsupported_expression'};
+  }
 }
 const vector=(c,names)=>names.map(n=>c.get(n)??0);
 export function sameLinearConstraint(a,b,names){
