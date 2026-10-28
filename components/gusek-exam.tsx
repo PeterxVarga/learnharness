@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
+import type {ChangeEvent} from 'react';
 import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
@@ -82,7 +83,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
   }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
  }
- async function importPracticeModel(event:React.ChangeEvent<HTMLInputElement>){
+ async function importPracticeModel(event:ChangeEvent<HTMLInputElement>){
   const file=event.target.files?.[0];event.target.value='';
   if(!file)return;
   if(!file.name.toLowerCase().endsWith('.mod')||file.size>65536){
