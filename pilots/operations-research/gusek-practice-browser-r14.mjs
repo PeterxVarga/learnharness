@@ -167,5 +167,27 @@ try{
   assert.ok(!/^minimize\s/m.test(starter));
   assert.ok(!/var epres.*integer/.test(starter));
  });
+ const originalTablet=await page.$eval(modelInput,el=>el.value);
+ page.once('dialog',dialog=>{void dialog.accept();});
+ await page.click('[data-testid="gusek-copy-free-r14z"]');
+ await check('COPY_EXAM_MODEL_TO_UNGRADED_WORKSPACE',async()=>{
+  await page.waitForFunction(expected=>{
+   const editor=document.querySelector('[data-testid="gusek-free-model-r14"]');
+   return !!editor&&editor.value===expected;
+  },{timeout:15000},originalTablet);
+  assert.equal(await page.$eval('[data-testid="gusek-free-model-r14"]',el=>el.value),originalTablet);
+  assert.equal(await page.$('[data-testid="gusek-transfer-solution-r14"]')!==null,true);
+  const mode=await page.$eval('[data-testid="gusek-mode-free-r14"]',el=>el.getAttribute('aria-pressed'));
+  assert.equal(mode,'true');
+ });
+ await page.click('[data-testid="gusek-free-model-r14"]');
+ await page.keyboard.press('End');
+ await page.keyboard.type('\n# Free mode experiment');
+ await page.click('[data-testid="gusek-mode-practice-r14"]');
+ await check('FREE_COPY_NEVER_MUTATES_ORIGINAL_PRACTICE_MODEL',async()=>{
+  const actual=await page.$eval(modelInput,el=>el.value);
+  assert.equal(actual,originalTablet);
+  assert.ok(!actual.includes('Free mode experiment'));
+ });
  process.stdout.write(JSON.stringify({schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks,mockedNativeOnly:true,realPracticeGrade:true})+'\n');
 }finally{await browser.close();}
