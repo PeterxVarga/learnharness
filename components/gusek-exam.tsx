@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
+import {GusekValuesGrid} from './gusek-values-grid';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
@@ -293,8 +294,9 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
       </>}
      </div>}
     </section>
-    <label htmlFor="gusek-values" className="block font-semibold">Megoldó által kiszámított változóértékek (JSON)</label>
-    <textarea id="gusek-values" className="h-40 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} spellCheck={false} onChange={e=>{formEpoch.current++;setValues(e.target.value);setGrade(null);}}/>
+    <GusekValuesGrid kind={kind} dialect={kind==='transport'?transportDialect:'scalar'}
+     variableNames={task.variableNames} value={values} disabled={busy}
+     onChange={next=>{formEpoch.current++;setDraftState('idle');setValues(next);setGrade(null);}}/>
     <label htmlFor="gusek-objective" className="block font-semibold">{task.objectiveSense==='max'?'Maximális bevétel':'Minimális célfüggvényérték'}</label>
     <input id="gusek-objective" inputMode="decimal" className="w-full rounded border bg-transparent p-2" value={objective} onChange={e=>{formEpoch.current++;setObjective(e.target.value);setGrade(null);}}/>
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{formEpoch.current++;setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
