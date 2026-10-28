@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
+import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -9,7 +10,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
 type Attempt=Grade&{id:string;submittedAt:string};
-type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;solverStatus?:string;objective?:number|null;statusCode?:string;mode?:'solve'|'check';error?:string};
+type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;solverStatus?:string;objective?:number|null;statusCode?:string;mode?:'solve'|'check';columnStatus?:string;columns?:{name:string;value:number}[];error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={
  source_wrong_variables:'A változónevek vagy a változók száma nem felel meg a feladatnak.',
@@ -35,6 +36,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [dataFile,setDataFile]=useState(''),[nativeToken,setNativeToken]=useState('');
  const [nativeAvailable,setNativeAvailable]=useState(false),[nativeBusy,setNativeBusy]=useState(false);
  const [nativeResult,setNativeResult]=useState<GlpkResult|null>(null),[nativeError,setNativeError]=useState('');
+ const [nativeSnapshot,setNativeSnapshot]=useState<{model:string;data:string}|null>(null);
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
@@ -67,7 +69,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    setValues(indexed?JSON.stringify(Object.fromEntries(
     Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>[`x[${i+1},${j+1}]`,0])).flat()
    ),null,2):starter(t.variableNames));
-   setObjective('');setHints(false);setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeError('');pending.current=null;
+   setObjective('');setHints(false);setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
   }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
  }
  async function runNative(mode:'solve'|'check'){
@@ -77,9 +79,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   try{
    if(!/^[a-f0-9]{64}$/.test(nativeToken))throw Error('Adj meg egy 64 karakteres, helyi GLPK tokent.');
    if(!source.trim()||source.length>65536||dataFile.length>65536)throw Error('A modell vagy az adatfájl hiányzik, illetve túl nagy.');
+   const snapshot={model:source,data:dataFile};setNativeSnapshot(snapshot);
    const r=await fetch('/api/pilot/gusek/native',{method:'POST',cache:'no-store',
     headers:{'Content-Type':'application/json','X-LH-GLPK-Token':nativeToken},
-    body:JSON.stringify({model:source,data:dataFile,mode})});
+    body:JSON.stringify({...snapshot,mode})});
    const result=await r.json() as GlpkResult;
    if(!r.ok&&result.status!=='BLOCKED')throw Error(result.error??'GLPK-kérés sikertelen.');
    if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
@@ -141,8 +144,9 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
      <h3 className="font-semibold">GNU GLPK – eredeti MathProg-futtatás (R14)</h3>
-     <label htmlFor="gusek-data" className="block text-sm">Opcionális adatfájl (.dat)</label>
-     <textarea id="gusek-data" className="h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" spellCheck={false} value={dataFile} onChange={e=>{setDataFile(e.target.value);setNativeResult(null);}} placeholder="data; ... end;" />
+     <label htmlFor="gusek-data" className="block text-sm">Feladatadatok (.dat) – vizsgamódban csak olvasható</label>
+     <textarea id="gusek-data" className="h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" spellCheck={false} value={dataFile} readOnly placeholder="A feladat nem igényel külön .dat fájlt." />
+     <p className="text-xs text-neutral-500">A feladat szerveroldali adatai nem módosíthatók. Saját adatokhoz válts a Szabad munkaterületre.</p>
      {nativeAvailable?<>
       <label htmlFor="gusek-native-token" className="block text-sm">Helyi futtatási token (nem mentjük az előzményekbe)</label>
       <input id="gusek-native-token" type="password" autoComplete="off" spellCheck={false} value={nativeToken} onChange={e=>setNativeToken(e.target.value)} className="w-full rounded border bg-transparent p-2 font-mono text-sm" placeholder="64 karakteres hex token"/>
@@ -160,6 +164,21 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
       {nativeResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A megadott modellhez nincs lehetséges megoldás. Ez nem jelenti, hogy a feladat helyes modelljét írtad fel.</p>}
       <p className="text-xs text-neutral-500">Diagnosztika, nem vizsgapont. A kimenet tanulói modellből is származhat.</p>
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.diagnostic??'Nincs diagnosztikai kimenet.'}</pre>
+      {nativeResult.columns&&nativeResult.columns.length>0&&<div className="overflow-x-auto rounded border p-2">
+       <h4 className="mb-1 text-sm font-semibold">GLPK változóértékek</h4>
+       <table className="w-full text-xs"><thead><tr><th className="text-left">Változó</th><th className="text-right">Érték</th></tr></thead>
+        <tbody>{nativeResult.columns.slice(0,30).map(c=><tr key={c.name} className="border-t"><td className="font-mono">{c.name}</td><td className="text-right font-mono">{c.value}</td></tr>)}</tbody>
+       </table>
+      </div>}
+      {nativeResult.mode==='solve'&&task&&<button type="button" data-testid="gusek-transfer-solution-r14"
+       disabled={!preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot}).ok}
+       onClick={()=>{
+        const transfer=preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot});
+        if(!transfer.ok){setNativeError('A GLPK-eredmény nem vehető át: '+transfer.code);return;}
+        setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));setGrade(null);
+       }} className="rounded border px-3 py-2 text-sm disabled:opacity-50">
+       Optimális GLPK-megoldás átvétele a beadáshoz
+      </button>}
       {nativeResult.solutionListing&&<>
        <h4 className="text-sm font-semibold">GLPK-megoldás: célfüggvény, korlátok és változók</h4>
        <pre data-testid="gusek-native-solution-r14" className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.solutionListing}</pre>
