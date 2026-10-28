@@ -516,3 +516,48 @@ Free-workspace native results are tagged to the exact in-memory input snapshot. 
 **Explicitly not yet implemented:** CodeMirror 6 and GMPL syntax highlighting/advanced editor affordances, line-accurate diagnostic markers in CodeMirror, structured machine-variable table and safe transfer of optimal values into Practice, a non-blocking bounded local solver queue, and browser end-to-end acceptance of the Workbench. CodeMirror is not introduced as a floating dependency without a reproducible package-lock update; that belongs to the next cohesive code batch.
 
 Do not merge until final acceptance. The original R13 qualified draft and main branch remain untouched.
+
+## R14X: named solver variables, explicit Practice transfer and async Podman
+
+This cohesive code batch now provides the missing path from a GNU MathProg
+solve to a structured, student-inspectable result and optionally populated
+exam answer (without claiming the answer is correct):
+
+1. **glpk-columns-r14.mjs** joins GLPSOL --write and --wglp machine output,
+   bounded by index, name, dimensions and finite values. Neither the console
+   nor printable --output log is used as numerical proof. Malformed,
+   duplicated, oversized or non-optimal output is NOT transferable.
+2. **gusek-practice-transfer-r14.mjs** populates Practice JSON values and
+   objective only on explicit user action, for an OPTIMAL solver status,
+   complete matching named columns, identical source/data and identical
+   seeded task identity. Copying never automatically submits/grades the answer.
+   The existing independent 1/0/null Practice grade remains authoritative.
+3. **glpk-native-async-r14.mjs** replaces synchronous subprocess calls
+   in the authenticated local HTTP route with asynchronous Node execFile,
+   without a shell. The endpoint rejects concurrent native requests (429)
+   in a single Next.js process. Immutable local image, rootless Podman,
+   disabled network/proxy, bounded CPU/RAM/PIDs/time and no credential
+   inheritance remain mandatory. The old synchronous CLI runner remains
+   available for explicit owner-directed diagnostics. The per-process
+   concurrency gate is not a cluster-wide queue; client disconnect is not
+   an explicit cancellation API, but process/container timeouts are bounded.
+4. The standalone Workbench and embedded exam now show actual structured
+   solver variable tables, and a guarded transfer button is available in
+   exam mode. The exam's .dat fixture is read-only; custom data belong
+   in the free Workbench.
+
+New regression coverage: 12 machine-column cases, 13 Practice-transfer
+cases (including cross-task mixups) and 9 async runner cases. Isolated
+source execution has shown 12/12, 13/13 and 9/9 PASS respectively,
+not a Fedora/Next.js/Podman acceptance claim. Expected final offline
+contract: **366 cases in 29 suites**; expected full npm count **2722**.
+
+**Remaining before a qualified R14 release:** CodeMirror 6 with correct
+GMPL syntax highlighting/decorations, fully demonstrated browser draft
+reload and solver-to-grade acceptance, adversarial rootless GLPK
+containment, real Fedora npm ci/typecheck/build, and a fresh exact-commit
+qualification. The current code environment cannot reach the npm
+registry, so the CodeMirror package and package-lock are not changed
+without reproducible dependency resolution; no runtime CDN injection.
+The user explicitly requested ONE FINAL Fedora verification only.
+The stacked PR stays DRAFT / NO MERGE.
