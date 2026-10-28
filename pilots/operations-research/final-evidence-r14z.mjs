@@ -40,7 +40,7 @@ export function validateFinalR14z({head,status,step,logs,offline,native,browsers
  if(!Array.isArray(browsers)||browsers.length!==3||
     browsers.some(x=>!x||x.status!=='PASS'||!Array.isArray(x.checks))||
     browsers[0].schema!=='learnharness.r14.workbench-browser.v1'||
-    browsers[0].checks.length!==10||
+    browsers[0].checks.length!==11||
     browsers[1].schema!=='learnharness.r14z.practice-browser.v1'||
     browsers[1].checks.length!==15||
     browsers[1].mockedNativeOnly!==true||browsers[1].realPracticeGrade!==true||
