@@ -12,7 +12,7 @@ if(!/^http:\/\/(?:127\.0\.0\.1|localhost):\d{2,5}\/pilot\/gusek$/.test(url))
 if(!executablePath||!executablePath.startsWith('/'))throw new Error('LH_R14_CHROMIUM must be absolute Chromium path');
 const report={schema:'learnharness.r14.workbench-browser.v1',checks:[]};
 const check=async(name,fn)=>{await fn();report.checks.push(name);process.stdout.write('PASS '+name+'\n');};
-const browser=await puppeteer.launch({executablePath,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+const browser=await puppeteer.launch({executablePath,headless:true,args:['--disable-dev-shm-usage']});
 try{
  const page=await browser.newPage();
  await page.setViewport({width:1440,height:900});
