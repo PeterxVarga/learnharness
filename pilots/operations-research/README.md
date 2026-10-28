@@ -1027,3 +1027,52 @@ deployment, provider send or GitHub Actions has occurred.
 The limited, dependency-free highlighted GMPL editor remains;
 true CodeMirror 6 adoption still requires reproducible installation
 and a verified lockfile, and is intentionally not represented as done.
+
+## R14Z release closeout R3 — three real browser-to-GLPK-to-grade journeys
+
+**This section supersedes the prior R2 live-browser tablet-only
+acceptance requirement.** The R14Z final operator-controlled Fedora
+qualification now requires the entire browser-to-native GLPK-to-
+independent-grader chain for **all three actual university kinds**,
+not just a single tablet example.
+
+The dedicated `gusek-live-native-browser-r14z.mjs` script starts
+from the real `/pilot/gusek` UI on localhost, with no fetch interception
+or synthetic native response. For each of `transport`, `froccs`
+and `tablet` (seed 42), it:
+
+1. Loads the real seeded task through the Next.js API and enters
+   a complete source model in the React GMPL editor.
+2. Invokes the real local-only native endpoint, which uses the
+   preinstalled immutable rootless Podman GNU GLPK image.
+3. Requires an OPTIMAL, complete named-column result and an
+   explicitly enabled solution-transfer action.
+4. Transfers exactly those named values into the learner's numeric
+   worksheet without automatically awarding credit.
+5. Calls the unmocked authoritative Practice grading endpoint once,
+   and requires exactly 1/1 for the **same task ID**.
+
+The third browser receipt must contain exactly **16 distinct ordered
+checks** (one entry preflight plus five per problem type), **three
+real native HTTP calls, three real independent grade submissions**
+and separate 1/1 outcomes for each exact `gusek-<kind>-42` task.
+Neither a successful CLI-only GLPK run nor the synthetic-native
+15-check browser workflow may substitute for the three genuine
+browser journeys.
+
+The SHA-256 release receipt and its 14 targeted source-only tests
+are updated to fail closed on omitted/reordered task results, wrong
+task/score, wrong calls, or a stale/substituted check label.
+The **14/14 receipt contract cases passed isolated JS testing**,
+and the new multi-kind live browser script passed static JS syntax
+checking. **This is not a Fedora/Chromium/real GLPK PASS**:
+the owner-requested single final qualification has not run.
+
+**Latest qualification contract** remains **468 offline cases in
+37 suites**, **2824 expected npm tests** and **42 browser checks**
+(11 free-workspace + 15 synthetic-native Practice + 16 genuinely
+native browser-to-grade). All numbers are required targets, not
+attested end-to-end results. The PR remains draft, unmerged and
+undeployed; no GitHub Actions or user Fedora execution was triggered.
+CodeMirror 6 remains a separate integration gap because its
+dependencies could not yet be reproducibly locked.
