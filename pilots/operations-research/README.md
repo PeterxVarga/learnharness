@@ -788,3 +788,53 @@ UNASSESSABLE rather than falsely graded zero. CodeMirror 6 itself
 is not installed; the common editor retains its dependency-free
 inline highlighted textarea. Keep PR DRAFT / NO MERGE until the
 single final exact-commit Fedora acceptance is genuinely PASS.
+
+## R14Z native GLPK outcome hardening, all-three-kind real GLPK acceptance, and sandboxed experiment copy
+
+The R14Z release candidate now has a cohesive GLPK/runtime hardening
+and free-vs-exam workflow update:
+
+- **Hungarian GLPK diagnostics, not scoring**: a deterministic
+  `glpk-feedback-r14z.mjs` maps GNU GLPK status and bounded console
+  diagnostics into separate syntax-error, runtime-error, cancelled,
+  timeout, unavailable, infeasible, unbounded, nonoptimal, unknown,
+  translated-only, optimal-without-columns, and fully named optimal
+  outcomes. Both free Workbench and exam display explanatory next
+  steps. All feedback explicitly has `scoreAuthority:false` and no
+  `points` field; only the independent exam grader determines credit.
+- **Stronger machine-output binding**: the named column parser joins
+  GLPK `--write` and `--wglp` outputs only if LP/MIP kind, row and
+  column dimensions, unique names/indices, finite values, and both
+  complete EOF markers match. This is based on the GLPK native problem
+  and plain solution formats, not `printf` or human-readable solver
+  text. The column unit tests are now 15 cases.
+- **Real native three-kind terminal gate**: the final one-shot Fedora
+  qualification will run genuine pinned rootless GNU GLPK models for
+  transport (integer), fröccs (integer), and tablet (continuous). It
+  requires OPTIMAL, complete named variables, objective close to the
+  independent reference solution, then a FULL_CREDIT 1/1 verdict
+  from the original source-and-solution grader. The gate also checks
+  an intentionally infeasible problem and the 3x3 indexed transport
+  model. This is a RELEASE GATE DEFINITION, not previously executed
+  Fedora evidence.
+- **Unscored experiment fork**: a single explicit confirmation copies
+  the current Practice `.mod` and trusted read-only `.dat` into a
+  separate editable free Workbench. The practice attempt remains
+  untouched, the free copy cannot award points, and the user can
+  return to the original model. The final browser acceptance now
+  exercises these boundaries.
+- **Inner execution evidence**: newly added GLPK feedback tests 15/15,
+  full machine-output parser tests 15/15, and mocked asynchronous
+  native runner regression 12/12 passed isolated JS execution. This
+  does not replace a real Fedora/Next.js/Chromium/GLPK qualification.
+  The exact release contract is now **434 expected offline tests in
+  35 suites**, and **2790 expected full npm tests**. These are NOT
+  aggregate PASS claims; require the exact final receipts.
+
+The production/host GLPK path still requires the immutable image
+already present on Fedora, an explicit local run token, loopback
+request authority, rootless Podman/no network, time/memory bounds,
+and one final operator-controlled qualification. No GitHub Actions,
+merge or deployment have been made. CodeMirror 6 remains a separately
+identified gap; the current Workbench uses the working GMPL-aware
+inline highlighted editor without a floating npm dependency.
