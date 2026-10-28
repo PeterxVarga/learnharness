@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
+import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
 import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
 
 type Kind='transport'|'froccs'|'tablet';
@@ -58,6 +59,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const nativeAbort=useRef<AbortController|null>(null);
  const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
+ const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
  useEffect(()=>{if(nativeDiagnostic)setFileTab(nativeDiagnostic.file);},[nativeResult]);
  useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
   .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
@@ -259,6 +261,11 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      {nativeError&&<p role="alert" className="text-sm text-red-600">{nativeError}</p>}
      {nativeResult&&<div data-testid="gusek-native-result-r14" className="space-y-2" role="status">
       <p className="text-sm font-medium">GLPK futtatás: {nativeResult.status} ({nativeResult.code})</p>
+      {nativeFeedback&&<div data-testid="gusek-native-feedback-r14z" className="space-y-1 border-l-2 border-neutral-400 pl-3">
+       <p className="text-sm font-semibold">{nativeFeedback.title}</p>
+       <p className="text-xs">{nativeFeedback.detail}</p>
+       <p className="text-xs text-neutral-600 dark:text-neutral-300">{nativeFeedback.nextAction}</p>
+      </div>
       {nativeResult.mode==='solve'&&<p data-testid="gusek-native-status-r14" className="text-sm">Megoldás állapota: <strong>{nativeResult.solverStatus??'UNKNOWN'}</strong>{nativeResult.solverStatus==='OPTIMAL'&&Number.isFinite(nativeResult.objective)?` · GLPK célfüggvény: ${nativeResult.objective}`:''}</p>}
       {nativeResult.solverStatus==='FEASIBLE_NOT_PROVEN_OPTIMAL'&&<p className="text-xs text-amber-700">A GLPK talált lehetséges megoldást, de az optimumot nem bizonyította.</p>}
       {nativeResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A megadott modellhez nincs lehetséges megoldás. Ez nem jelenti, hogy a feladat helyes modelljét írtad fel.</p>}
