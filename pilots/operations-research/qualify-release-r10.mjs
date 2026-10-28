@@ -12,7 +12,7 @@ export const EXPECTED_SUITES=Object.freeze({
  'exam-all-or-nothing':12,'r3-transport-exam':12,'r3-transport-cli':5,
  'r4-next-api-transport':9,'r4-mathprog-generation':8,'r5-native-glpsol-preflight':7,
  'r6-expanded-mathprog':23,'r6-mathprog-http':9,'r7-indexed-mathprog':18,
- 'r7-indexed-mathprog-http':11,'r9-authoritative-attempts':15,'r11-formative-feedback':17,'r12-native-practice':12,'r13-gusek-model':22,'r13-gusek-http':6,'r14-scalar-equivalence':16,'r14n-native-glpsol-sandbox':13,
+ 'r7-indexed-mathprog-http':11,'r9-authoritative-attempts':15,'r11-formative-feedback':17,'r12-native-practice':12,'r13-gusek-model':22,'r13-gusek-http':6,'r14-scalar-equivalence':16,'r14n-native-glpsol-sandbox':13,'r14-native-http-security':16,
 });
 export const EXPECTED_TESTS=Object.values(EXPECTED_SUITES).reduce((x,y)=>x+y,0);
 export const REQUIRED_STEPS=Object.freeze(['git_pin','git_tree','offline','r10_selftests','npm_ci','npm_test','typecheck','next_build','native_glpsol']);
