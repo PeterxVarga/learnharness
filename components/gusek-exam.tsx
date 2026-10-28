@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import type {ChangeEvent} from 'react';
+import type {ChangeEvent,KeyboardEvent} from 'react';
 import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
@@ -118,6 +118,11 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   }catch(e){setNativeError(controller.signal.aborted?'GLPK-futtatás megszakítva.':e instanceof Error?e.message:String(e));}
   finally{if(nativeAbort.current===controller)nativeAbort.current=null;setNativeBusy(false);setNativeCancelling(false);}
  }
+ function editorShortcut(e:KeyboardEvent<HTMLTextAreaElement>){
+  if(!(e.ctrlKey||e.metaKey)||e.key!=='Enter')return;
+  e.preventDefault();
+  if(e.shiftKey)void check();else void runNative('solve');
+ }
  async function check(){
   if(!task||binding==='failed'||binding==='checking')return;
   setBusy(true);setGrade(null);setError('');
@@ -175,8 +180,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     </div>
     <GmplEditor id="gusek-source" testId="gusek-exam-source-r14"
      label="GUSEK / MathProg modell (.mod)" value={source}
+     onKeyDown={editorShortcut}
      diagnosticLine={nativeDiagnostic?.file==='model.mod'?nativeDiagnostic.line:null}
      onChange={next=>{setSource(next);setGrade(null);setNativeResult(null);setNativeSnapshot(null);}} />
+    <p className="text-xs text-neutral-500">Ctrl+Enter: GLPK-futtatás · Ctrl+Shift+Enter: teljes megoldás ellenőrzése.</p>
     <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
