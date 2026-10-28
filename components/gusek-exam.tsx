@@ -101,16 +101,17 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>[`x[${i+1},${j+1}]`,0])).flat()
    ),null,2):starter(t.variableNames);
    let restored:null|{model:string;values:string;objective:string;hintsUsed:boolean}=null;
+   let storageFailed=false;
    try{
     restored=await readGusekPracticeDraft(chatId??linkedChat??null,kind,seed,indexed?'indexed':'scalar');
-   }catch{if(epoch===taskRequestEpoch.current)setDraftState('unavailable');}
+   }catch{storageFailed=true;}
    if(epoch!==taskRequestEpoch.current)return;
    setTask(t);
    setSource(restored?.model??defaultModel);
    setValues(restored?.values??initialValues);
    setObjective(restored?.objective??'');setHints(restored?.hintsUsed??false);
    setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
-   setDraftState(restored?'restored':'idle');
+   setDraftState(storageFailed?'unavailable':restored?'restored':'idle');
   }catch(e){if(epoch===taskRequestEpoch.current)setError(e instanceof Error?e.message:String(e));}
   finally{if(epoch===taskRequestEpoch.current)setBusy(false);}
  }
@@ -185,18 +186,18 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    {!embedded&&<Link className="text-sm underline" href={linkedChat?`/chat/${linkedChat}`:'/chat/new?mode=practice'}>Vissza a Practice beszélgetéshez</Link>}
   </header>
   <section className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
-    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setKind(e.target.value as Kind);setTask(null);}}>
+    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
     {kind==='transport'&&<label className="text-sm">MathProg felírás
      <select data-testid="gusek-transport-dialect-r14" aria-label="MathProg felírás" value={transportDialect}
-      onChange={e=>{taskRequestEpoch.current++;invalidateForm();setTransportDialect(e.target.value as 'scalar'|'indexed');setTask(null);}}
+      onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setTransportDialect(e.target.value as 'scalar'|'indexed');setTask(null);}}
       className="mt-1 block rounded border bg-background p-2">
       <option value="scalar">Skalár változók (R13)</option>
       <option value="indexed">Indexelt x[i,j] + .dat (R14)</option>
      </select>
     </label>}
-    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setSeed(e.target.value);setTask(null);}}/></label>
+    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(e.target.value);setTask(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
   {task&&<section aria-label="Vizsgafeladat" className="space-y-3 rounded-xl border p-5">
@@ -284,7 +285,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
-    <button className="text-sm underline" onClick={()=>{setSeed(String((Number(seed)+1)>>>0));setTask(null);setGrade(null);}}>Új variáns kiválasztása</button>
+    <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
    </div>
   </section>}
   {linkedChat&&<section className="rounded-xl border p-4"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
