@@ -45,10 +45,15 @@ export function validateFinalR14z({head,status,step,logs,offline,native,browsers
     browsers[1].checks.length!==15||
     browsers[1].mockedNativeOnly!==true||browsers[1].realPracticeGrade!==true||
     browsers[2].schema!=='learnharness.r14z.live-browser.v1'||
-    browsers[2].checks.length!==6||
+    browsers[2].checks.length!==16||
     browsers[2].realNativeGlpk!==true||browsers[2].realPracticeGrade!==true||
-    browsers[2].nativeCalls!==1||browsers[2].gradeCalls!==1||
-    browsers[2].taskKind!=='tablet'||browsers[2].taskId!=='gusek-tablet-42')
+    browsers[2].nativeCalls!==3||browsers[2].gradeCalls!==3||
+    !Array.isArray(browsers[2].scenarios)||browsers[2].scenarios.length!==3||
+    !['transport','froccs','tablet'].every((kind,index)=>{
+      const x=browsers[2].scenarios[index];
+      return x&&x.kind===kind&&x.taskId==='gusek-'+kind+'-42'&&
+       x.nativeCalls===1&&x.gradeCalls===1&&x.points===1;
+    }))
   return {status:'BLOCKED',reason:'browser_receipts_not_qualified'};
  return {status:'PASS',reason:null};
 }
