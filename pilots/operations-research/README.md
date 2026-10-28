@@ -604,3 +604,21 @@ No intermediate user-run Fedora test is needed. The older R14
 qualification scripts are pinned to obsolete SHAs and must not be used
 as final evidence. The R14 PR remains DRAFT / NO MERGE, with the
 single comprehensive Fedora qualification still outstanding.
+
+### R14Y original GUSEK .mod/.dat interoperability
+
+The Practice editor now supports importing a bounded local `.mod` file
+and exporting the current `.mod` and trusted task `.dat` as ordinary
+files, so students can continue with the original GUSEK/GLPK tools.
+Import validates the local file extension, size and contents, resets
+the old solver result and never imports arbitrary `.dat` overrides
+into the examination. The trusted seeded Practice data stay read-only.
+
+Both free and Practice editors accept at most 64 KiB of UTF-8 source
+per file. The optional GMPL preview is informational and is **not**
+a validated GNU MathProg syntax tree; actual GLPK diagnostics are
+separate and can navigate by staged file and line. No raw student
+source is added to authoritative Practice receipts.
+
+No user-side Fedora tests are requested before the full, single final
+release-candidate acceptance.
