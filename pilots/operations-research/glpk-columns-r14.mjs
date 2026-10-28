@@ -51,7 +51,7 @@ export function parseGlpkColumns(solution,problem,{solverStatus,objective,soluti
   const i=Number(fields[1]),token=fields[solutionKind==='bas'?3:2];
   if(!Number.isSafeInteger(i)||i<1||i>count||values.has(i)||!NUM.test(token))
    return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
-  if(solutionKind==='bas'&&!/^[bluf s]$/.test(fields[2]))
+  if(solutionKind==='bas'&&!/^[blufs]$/.test(fields[2]))
    return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
   const value=Number(token);
   if(!Number.isFinite(value))return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
