@@ -9,7 +9,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
 type Attempt=Grade&{id:string;submittedAt:string};
-type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;mode?:'solve'|'check';error?:string};
+type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;solverStatus?:string;objective?:number|null;statusCode?:string;mode?:'solve'|'check';error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={
  source_wrong_variables:'A változónevek vagy a változók száma nem felel meg a feladatnak.',
@@ -154,7 +154,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      {nativeBusy&&<p role="status" className="text-sm">A GLPK izolált futtatása folyamatban…</p>}
      {nativeError&&<p role="alert" className="text-sm text-red-600">{nativeError}</p>}
      {nativeResult&&<div data-testid="gusek-native-result-r14" className="space-y-2" role="status">
-      <p className="text-sm font-medium">GLPK állapot: {nativeResult.status} ({nativeResult.code})</p>
+      <p className="text-sm font-medium">GLPK futtatás: {nativeResult.status} ({nativeResult.code})</p>
+      {nativeResult.mode==='solve'&&<p data-testid="gusek-native-status-r14" className="text-sm">Megoldás állapota: <strong>{nativeResult.solverStatus??'UNKNOWN'}</strong>{nativeResult.solverStatus==='OPTIMAL'&&Number.isFinite(nativeResult.objective)?` · GLPK célfüggvény: ${nativeResult.objective}`:''}</p>}
+      {nativeResult.solverStatus==='FEASIBLE_NOT_PROVEN_OPTIMAL'&&<p className="text-xs text-amber-700">A GLPK talált lehetséges megoldást, de az optimumot nem bizonyította.</p>}
+      {nativeResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A megadott modellhez nincs lehetséges megoldás. Ez nem jelenti, hogy a feladat helyes modelljét írtad fel.</p>}
       <p className="text-xs text-neutral-500">Diagnosztika, nem vizsgapont. A kimenet tanulói modellből is származhat.</p>
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.diagnostic??'Nincs diagnosztikai kimenet.'}</pre>
       {nativeResult.solutionListing&&<>
