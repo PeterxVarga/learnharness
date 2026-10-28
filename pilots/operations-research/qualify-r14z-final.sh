@@ -65,7 +65,7 @@ node --input-type=module - "$EVIDENCE/npm-test.log" <<'JS'
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const log=readFileSync(process.argv[2],'utf8');
-const value=name=>[...log.matchAll(new RegExp('(?:^|\\\\n)# '+name+' (\\\\d+)','g'))].at(-1)?.[1];
+const value=name=>[...log.matchAll(new RegExp('(?:^|\\n)# '+name+' (\\d+)','g'))].at(-1)?.[1];
 assert.equal(Number(value('tests')),2749,'Unexpected full npm test count');
 assert.equal(Number(value('pass')),2749,'A new test silently skipped or failed');
 assert.equal(Number(value('fail')),0,'Nonzero npm test failures');
