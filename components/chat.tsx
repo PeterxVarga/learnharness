@@ -54,7 +54,7 @@ import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
 import { TransportExam } from "@/components/transport-exam";
-import { GusekExam } from "@/components/gusek-exam";
+import { GusekWorkbench } from "@/components/gusek-workbench";
 import { createPracticeCourseStarter } from "@/src/agent/courses/operations-research-hu";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
@@ -1351,7 +1351,7 @@ export function Chat({
             <div className="sticky top-0 z-10 border-b bg-background px-5 py-3">
               <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => {setGusekExamOpen(false);void syncFromServer();}}>Vissza a Practice beszélgetéshez</button>
             </div>
-            <GusekExam chatId={chatId} embedded onRequestCoaching={() => {
+            <GusekWorkbench chatId={chatId} embedded onRequestCoaching={() => {
               setGusekExamOpen(false);
               void (async () => {
                 await syncFromServer();
