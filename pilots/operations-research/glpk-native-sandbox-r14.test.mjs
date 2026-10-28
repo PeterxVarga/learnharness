@@ -125,5 +125,44 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
   assert.equal(r.solverStatus,'INFEASIBLE');assert.equal(r.graded,false);
   assert.equal(r.points,null);
  });
+ it('synchronous Podman timeout cleans only its private cidfile container',()=>{
+  const cid='d'.repeat(64),x=setup(),calls=[];let stage;
+  const mocked=(binary,args,opts)=>{
+   calls.push(args);
+   if(args[0]==='rm'){
+    assert.deepEqual(args,['rm','--force','--ignore',cid]);
+    assert.ok(opts.timeout<=5000);return {status:0,stdout:''};
+   }
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    assert.ok(args.includes('--cidfile='+stage+'/podman.cid'));
+    writeFileSync(stage+'/podman.cid',cid+'\n');
+    return {status:null,error:Object.assign(new Error('deadline'),{code:'ETIMEDOUT'})};
+   }
+   return x.spawn(binary,args,opts);
+  };
+  const result=runNativeGmpl({model,imageId:image,spawn:mocked});
+  assert.equal(result.status,'TIME_LIMIT');
+  assert.equal(result.points,null);
+  assert.equal(calls.filter(c=>c[0]==='rm').length,1);
+  assert.equal(existsSync(stage),false);
+ });
+ it('synchronous cleanup never accepts an untrusted cidfile',()=>{
+  const x=setup(),calls=[];let stage;
+  const mocked=(binary,args,opts)=>{
+   calls.push(args);
+   if(args[0]==='rm')throw Error('must not run podman rm');
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    writeFileSync(stage+'/podman.cid','../../not-a-container\n');
+    return {status:null,error:Object.assign(new Error('deadline'),{code:'ETIMEDOUT'})};
+   }
+   return x.spawn(binary,args,opts);
+  };
+  const result=runNativeGmpl({model,imageId:image,spawn:mocked});
+  assert.equal(result.status,'TIME_LIMIT');
+  assert.equal(calls.filter(c=>c[0]==='rm').length,0);
+  assert.equal(existsSync(stage),false);
+ });
  it('an unavailable Podman binary is blocked, never falls back to host glpsol',()=>{const x=setup();const custom=(binary,args,opts)=>args[0]==='info'?{error:Object.assign(new Error('not found'),{code:'ENOENT'}),status:null}:x.spawn(binary,args,opts);const r=runNativeGmpl({model,imageId:image,spawn:custom});assert.equal(r.code,'rootless_podman_unavailable');});
 });
