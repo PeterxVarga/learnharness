@@ -9,6 +9,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
 type Attempt=Grade&{id:string;submittedAt:string};
+type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;mode?:'solve'|'check';error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={
  source_wrong_variables:'A változónevek vagy a változók száma nem felel meg a feladatnak.',
@@ -30,10 +31,16 @@ const errorsHu:Record<string,string>={
 export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void}){
  const [kind,setKind]=useState<Kind>('transport'),[seed,setSeed]=useState('42'),[task,setTask]=useState<Task|null>(null);
  const [source,setSource]=useState(''),[values,setValues]=useState(''),[objective,setObjective]=useState(''),[hints,setHints]=useState(false);
+ const [dataFile,setDataFile]=useState(''),[nativeToken,setNativeToken]=useState('');
+ const [nativeAvailable,setNativeAvailable]=useState(false),[nativeBusy,setNativeBusy]=useState(false);
+ const [nativeResult,setNativeResult]=useState<GlpkResult|null>(null),[nativeError,setNativeError]=useState('');
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
+ useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
+  .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
+  .catch(()=>{if(live)setNativeAvailable(false);});return()=>{live=false;};},[]);
  useEffect(()=>{
   const id=chatId??new URLSearchParams(window.location.search).get('chatId');
   if(!id){setBinding('none');return;}
@@ -52,8 +59,25 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    if(!r.ok)throw Error(x.error??'Feladat nem érhető el.');
    const t=x.task as Task;
    setTask(t);setSource('# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n');
-   setValues(starter(t.variableNames));setObjective('');setHints(false);pending.current=null;
+   setValues(starter(t.variableNames));setObjective('');setHints(false);setDataFile('');setNativeResult(null);setNativeError('');pending.current=null;
   }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
+ }
+ async function runNative(mode:'solve'|'check'){
+  // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
+  if(!nativeAvailable||nativeBusy||!task)return;
+  setNativeBusy(true);setNativeResult(null);setNativeError('');
+  try{
+   if(!/^[a-f0-9]{64}$/.test(nativeToken))throw Error('Adj meg egy 64 karakteres, helyi GLPK tokent.');
+   if(!source.trim()||source.length>65536||dataFile.length>65536)throw Error('A modell vagy az adatfájl hiányzik, illetve túl nagy.');
+   const r=await fetch('/api/pilot/gusek/native',{method:'POST',cache:'no-store',
+    headers:{'Content-Type':'application/json','X-LH-GLPK-Token':nativeToken},
+    body:JSON.stringify({model:source,data:dataFile,mode})});
+   const result=await r.json() as GlpkResult;
+   if(!r.ok&&result.status!=='BLOCKED')throw Error(result.error??'GLPK-kérés sikertelen.');
+   if(result.graded!==false||result.points!==null)throw Error('Érvénytelen GLPK-diagnosztikai válasz.');
+   setNativeResult(result);
+  }catch(e){setNativeError(e instanceof Error?e.message:String(e));}
+  finally{setNativeBusy(false);}
  }
  async function check(){
   if(!task||binding==='failed'||binding==='checking')return;
@@ -96,8 +120,28 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   </section>}
   {task&&<section className="space-y-3 rounded-xl border p-5">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
-    <textarea id="gusek-source" className="h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={source} spellCheck={false} onChange={e=>{setSource(e.target.value);setGrade(null);}}/>
-    <p className="text-xs text-neutral-500">Támogatott: névvel ellátott skalár var, integer, ≥, ≤, =, s.t., minimize/maximize, lineáris összegek és zárójelek; opcionális solve/end. Az indexelt set/param/sum és a GUSEK teljes nyelve még nem támogatott – ezeket nem értékelhetőnek jelöljük.</p>
+    <textarea id="gusek-source" className="h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={source} spellCheck={false} onChange={e=>{setSource(e.target.value);setGrade(null);setNativeResult(null);}}/>
+    <p className="text-xs text-neutral-500">A vizsgapontozó jelenleg skalár modelleket ellenőriz. A natív GLPK mód ettől külön működik: indexelt GNU MathProg modelleket is lefordíthat és megoldhat, de a konzolkimenete <strong>nem</strong> bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
+    <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
+     <h3 className="font-semibold">GNU GLPK – eredeti MathProg-futtatás (R14)</h3>
+     <label htmlFor="gusek-data" className="block text-sm">Opcionális adatfájl (.dat)</label>
+     <textarea id="gusek-data" className="h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" spellCheck={false} value={dataFile} onChange={e=>{setDataFile(e.target.value);setNativeResult(null);}} placeholder="data; ... end;" />
+     {nativeAvailable?<>
+      <label htmlFor="gusek-native-token" className="block text-sm">Helyi futtatási token (nem mentjük az előzményekbe)</label>
+      <input id="gusek-native-token" type="password" autoComplete="off" spellCheck={false} value={nativeToken} onChange={e=>setNativeToken(e.target.value)} className="w-full rounded border bg-transparent p-2 font-mono text-sm" placeholder="64 karakteres hex token"/>
+      <div className="flex flex-wrap gap-2">
+       <button type="button" data-testid="gusek-native-check-r14" disabled={nativeBusy||busy||nativeToken.length!==64} onClick={()=>void runNative('check')} className="rounded border px-3 py-2 text-sm disabled:opacity-50">MathProg ellenőrzése</button>
+       <button type="button" data-testid="gusek-native-solve-r14" disabled={nativeBusy||busy||nativeToken.length!==64} onClick={()=>void runNative('solve')} className="rounded border px-3 py-2 text-sm disabled:opacity-50">Megoldás futtatása GLPK-val</button>
+      </div>
+     </>:<p className="text-sm text-neutral-500" data-testid="gusek-native-disabled-r14">A natív GLPK jelenleg nincs helyileg engedélyezve. A korábbi, független vizsgapontozó továbbra is használható.</p>}
+     {nativeBusy&&<p role="status" className="text-sm">A GLPK izolált futtatása folyamatban…</p>}
+     {nativeError&&<p role="alert" className="text-sm text-red-600">{nativeError}</p>}
+     {nativeResult&&<div data-testid="gusek-native-result-r14" className="space-y-2" role="status">
+      <p className="text-sm font-medium">GLPK állapot: {nativeResult.status} ({nativeResult.code})</p>
+      <p className="text-xs text-neutral-500">Diagnosztika, nem vizsgapont. A kimenet tanulói modellből is származhat.</p>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 font-mono text-xs text-neutral-900">{nativeResult.diagnostic??'Nincs diagnosztikai kimenet.'}</pre>
+     </div>}
+    </section>
     <label htmlFor="gusek-values" className="block font-semibold">Megoldó által kiszámított változóértékek (JSON)</label>
     <textarea id="gusek-values" className="h-40 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} spellCheck={false} onChange={e=>{setValues(e.target.value);setGrade(null);}}/>
     <label htmlFor="gusek-objective" className="block font-semibold">{task.objectiveSense==='max'?'Maximális bevétel':'Minimális célfüggvényérték'}</label>
@@ -107,7 +151,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   </section>}
   {grade&&<section role="status" className="space-y-2 rounded-xl border p-4"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
-   <p className="text-xs text-neutral-500">Az értékelés nem AI-jóslat, hanem korlátozott, reprodukálható szerveroldali ellenőrzés.</p>
+   <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
     <button className="text-sm underline" onClick={()=>{setSeed(String((Number(seed)+1)>>>0));setTask(null);setGrade(null);}}>Új variáns kiválasztása</button>
