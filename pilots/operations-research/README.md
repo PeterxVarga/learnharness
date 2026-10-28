@@ -379,3 +379,52 @@ execution, cross-checking GLPK's optimum with an independent solver, and
 browser integration are **not qualified** merely by these tests.
 Do not merge or expose the solver route until the real Fedora qualification,
 a malicious MathProg isolation probe, and user-facing acceptance have passed.
+
+## R14 browser integration — opt-in diagnostic-only native GLPK
+
+The Practice GUSEK editor now has an optional `.dat` editor, a GLPK
+translation check and a GLPK solve button, with a bounded diagnostic
+console. This is separate from authoritative 1/0/null Practice grades:
+the GLPK console is untrusted diagnostics and is **never** persisted as
+a grade, counted as mastery, or passed to the teacher as proof of
+model correctness. GUSEK models with indexed `set`/`param`/`sum`
+can be run in the native diagnostic mode, but the synthetic exam grader
+still supports a restricted scalar syntax; no automatic point is awarded
+for general indexed models.
+
+A new Next.js endpoint `/api/pilot/gusek/native` exposes only
+diagnostic execution, and **defaults to off**. It requires all of:
+
+- Explicit process-level `LH_GLPK_ENABLE_LOCAL=1`.
+- `LH_GLPK_IMAGE_ID=sha256:<64 hex>` for a locally built, inspected image.
+- A fresh `LH_GLPK_RUN_TOKEN` of exactly 64 hexadecimal characters
+  (for example: `openssl rand -hex 32`). The secret is entered into
+  the UI password control, lives only in client memory, is never
+  recorded in the chat or source tree, and is sent as a header.
+- An exact `http://localhost:<port>` or `http://127.0.0.1:<port>`
+  same-origin request with no forwarded-host headers. A custom header
+  and constant-time token verification block casual CSRF and unauthenticated
+  remote requests. **Host checks alone are not a security boundary.**
+- Rootless local Podman and the exact immutable image ID; if missing,
+  execution refuses rather than falling back to host `glpsol`.
+
+**Do not use this setting on a public or reverse-proxied instance.**
+Disable the token and local-run flag when not in use. The next release
+gate must validate the network threat model, including attempts to
+reach the service from another host and token-redaction evidence.
+The native adapter uses synchronous process execution with time limits;
+it is intended for a single local user, not a multi-tenant service.
+
+The browser's manual `.mod`/`.dat` execution route neither uploads a
+learner file to a provider nor silently uses an AI model. The source
+code and data are transient to the request and Podman staging files.
+No filesystem path from the browser is accepted. Limits are capped
+on the entire HTTP payload and on both individual input strings.
+
+New HTTP security suite: `gusek-native-api-r14.test.mjs` (16 cases).
+The rootless process suite now has 14 cases including proof that BYOK
+credentials and remote-Podman environment variables are not inherited.
+The combined offline release contract is **274 cases / 22 suites**.
+The expected full npm count is **2630**. No current Fedora evidence for
+this head is claimed: only the earlier R13 accepted build is qualified.
+Do not merge or mark release PASS before the final comprehensive check.
