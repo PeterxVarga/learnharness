@@ -31,15 +31,15 @@ describe('R14 bounded equivalence and open-source GLPK JSON bridge',()=>{
   return gradeGusekExam(kind,42,{taskKind:kind,mathprog:model,values:opt.values,reportedObjective:opt.objective,hintsUsed:false});
  };
  it('integrated transport grade accepts route cap as variable upper bound',()=>{
-  const grade=graded('transport',(model,task)=>model.replace('var Raktar1_Bolt3 >=0, integer;',`var Raktar1_Bolt3 >=0, <= ${task.capacities[0][2]}, integer;`).replace(/^s\\.t\\. route_cap:[^\\n]*;\\n?/m,''));
+  const grade=graded('transport',(model,task)=>model.replace('var Raktar1_Bolt3 >=0, integer;',`var Raktar1_Bolt3 >=0, <= ${task.capacities[0][2]}, integer;`).replace(/^s\.t\. route_cap:[^\n]*;\n?/m,''));
   assert.equal(grade.points,1);
  });
  it('integrated tablet grade accepts explicit nonnegative constraint',()=>{
-  const grade=graded('tablet',model=>model.replace('var epres >=0;','var epres;').replace('s.t. osszetetel:','s.t. nonneg_epres: epres >= 0;\\ns.t. osszetetel:'));
+  const grade=graded('tablet',model=>model.replace('var epres >=0;','var epres;').replace('s.t. osszetetel:','s.t. nonneg_epres: epres >= 0;\ns.t. osszetetel:'));
   assert.equal(grade.points,1);
  });
  it('integrated transport grade accepts split equality and weaker redundant route cap',()=>{
-  const grade=graded('transport',(model,task)=>model.replace(/s\\.t\\. supply_1: ([^;]+) = (\\d+);/,(_m,expr,n)=>`s.t. upper_balance: ${expr} <= ${n};\\ns.t. lower_balance: ${expr} >= ${n};`).concat(`\\ns.t. duplicate_weak: Raktar1_Bolt3 <= ${task.capacities[0][2]+10};`));
+  const grade=graded('transport',(model,task)=>model.replace(/s\.t\. supply_1: ([^;]+) = (\d+);/,(_m,expr,n)=>`s.t. upper_balance: ${expr} <= ${n};\ns.t. lower_balance: ${expr} >= ${n};`).concat(`\ns.t. duplicate_weak: Raktar1_Bolt3 <= ${task.capacities[0][2]+10};`));
   assert.equal(grade.points,1);
  });
  it('integrated grading still rejects altered capacity and integer relaxation',()=>{
