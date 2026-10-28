@@ -55,9 +55,9 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
 assert.equal(receipt.status,'PASS');
-assert.equal(receipt.totalTests,416);
-assert.equal(receipt.suites.length,34);
-console.log('R14Z_OFFLINE=PASS_416_IN_34');
+assert.equal(receipt.totalTests,431);
+assert.equal(receipt.suites.length,35);
+console.log('R14Z_OFFLINE=PASS_431_IN_35');
 JS
 STEP="npm_test"
 npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
@@ -66,10 +66,10 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const log=readFileSync(process.argv[2],'utf8');
 const value=name=>[...log.matchAll(new RegExp('(?:^|\\n)# '+name+' (\\d+)','g'))].at(-1)?.[1];
-assert.equal(Number(value('tests')),2772,'Unexpected full npm test count');
-assert.equal(Number(value('pass')),2772,'A new test silently skipped or failed');
+assert.equal(Number(value('tests')),2787,'Unexpected full npm test count');
+assert.equal(Number(value('pass')),2787,'A new test silently skipped or failed');
 assert.equal(Number(value('fail')),0,'Nonzero npm test failures');
-console.log('R14Z_FULL_NPM_TESTS=PASS_2772');
+console.log('R14Z_FULL_NPM_TESTS=PASS_2787');
 JS
 STEP="typecheck"
 npm run typecheck >"$EVIDENCE/typecheck.log" 2>&1 || { tail -n 40 "$EVIDENCE/typecheck.log"; exit 1; }
