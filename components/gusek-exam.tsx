@@ -38,6 +38,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [transportDialect,setTransportDialect]=useState<'scalar'|'indexed'>('scalar');
  const [source,setSource]=useState(''),[values,setValues]=useState(''),[objective,setObjective]=useState(''),[hints,setHints]=useState(false);
  const [dataFile,setDataFile]=useState(''),[nativeToken,setNativeToken]=useState('');
+ const [fileTab,setFileTab]=useState<'model.mod'|'data.dat'>('model.mod');
  const [nativeAvailable,setNativeAvailable]=useState(false),[nativeBusy,setNativeBusy]=useState(false);
  const [nativeResult,setNativeResult]=useState<GlpkResult|null>(null),[nativeError,setNativeError]=useState('');
  const [nativeSnapshot,setNativeSnapshot]=useState<{taskId:string;model:string;data:string}|null>(null);
@@ -57,6 +58,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const nativeAbort=useRef<AbortController|null>(null);
  const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
+ useEffect(()=>{if(nativeDiagnostic)setFileTab(nativeDiagnostic.file);},[nativeResult]);
  useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
   .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
   .catch(()=>{if(live)setNativeAvailable(false);});return()=>{live=false;};},[]);
@@ -96,8 +98,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    const t=x.task as Task;
    const indexed=kind==='transport'&&transportDialect==='indexed';
    const preset=x.indexed as {starter?:string;dataTemplate?:string}|undefined;
+   const scalar=x.scalar as {starter?:string}|undefined;
+   if(!scalar?.starter)throw Error('A MathProg kezdőmodell nem érhető el.');
    if(indexed&&(!preset?.starter||!preset.dataTemplate))throw Error('Indexelt feladatminta nem érhető el.');
-   const defaultModel=indexed?preset!.starter!:'# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n';
+   const defaultModel=indexed?preset!.starter!:scalar.starter;
    const initialValues=indexed?JSON.stringify(Object.fromEntries(
     Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>[`x[${i+1},${j+1}]`,0])).flat()
    ),null,2):starter(t.variableNames);
@@ -108,6 +112,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    }catch{storageFailed=true;}
    if(epoch!==taskRequestEpoch.current)return;
    setTask(t);
+   setFileTab('model.mod');
    setSource(restored?.model??defaultModel);
    setValues(restored?.values??initialValues);
    setObjective(restored?.objective??'');setHints(restored?.hintsUsed??false);
@@ -131,7 +136,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   try{
    const text=await file.text();
    if(!validateWorkbenchFile('model.mod',text).ok)throw Error('Érvénytelen vagy túl nagy MathProg-fájl.');
-   invalidateForm();setSource(text);setError('');
+   invalidateForm();setFileTab('model.mod');setSource(text);setError('');
   }catch(e){setError(e instanceof Error?e.message:'Nem sikerült megnyitni a .mod fájlt.');}
  }
  async function runNative(mode:'solve'|'check'){
@@ -180,13 +185,13 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
   finally{setBusy(false);}
  }
- return <div data-testid="gusek-exam-r13" className="mx-auto max-w-5xl space-y-5 px-5 py-6">
-  <header className="space-y-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · R13 · GUSEK / GNU MathProg</p>
+ return <div data-testid="gusek-exam-r13" className="mx-auto grid max-w-[1520px] gap-4 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(280px,0.92fr)_minmax(0,2fr)]">
+  <header className="space-y-2 xl:col-span-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · GUSEK / GNU MathProg Workbench</p>
    <h1 className="text-3xl font-semibold">Vizsgagyakorló – GUSEK szintaxis</h1>
    <p className="text-sm text-neutral-500">A beadott .mod szöveget a rendszer <strong>nem futtatja</strong>, hanem korlátozott, biztonságos nyelvtani és matematikai ellenőrzéssel értékeli. Helyes teljes modell és optimum: 1 pont. Más: 0 pont vagy nem értékelhető. Nincs részpont.</p>
    {!embedded&&<Link className="text-sm underline" href={linkedChat?`/chat/${linkedChat}`:'/chat/new?mode=practice'}>Vissza a Practice beszélgetéshez</Link>}
   </header>
-  <section className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
+  <section className="flex flex-wrap items-end gap-3 rounded-xl border p-4 xl:col-span-2">
     <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
@@ -201,7 +206,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(e.target.value);setTask(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
-  {task&&<section aria-label="Vizsgafeladat" className="space-y-3 rounded-xl border p-5">
+  {task&&<section aria-label="Vizsgafeladat" className="min-w-0 space-y-3 rounded-xl border p-4 xl:sticky xl:top-4 xl:self-start">
     <h2 className="text-xl font-semibold">{task.taskType} · {task.id}</h2>
     {task.kind==='transport'?<><p>Optimalizáld a három raktárból három boltba történő szállítást. Minden változó nemnegatív egész. Az első raktár harmadik útvonala korlátozott.</p>
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Raktár</th><th>Bolt 1</th><th>Bolt 2</th><th>Bolt 3</th><th>Kínálat</th></tr></thead><tbody>{task.costs?.map((row,i)=><tr key={i} className="border-t"><th>{i+1}</th>{row.map((cost,j)=><td key={j} className="p-2 text-center">{cost}{i===0&&j===2&&<small className="block">max. {task.capacities?.[0]?.[2]}</small>}</td>)}<td className="text-center">{task.supply?.[i]}</td></tr>)}<tr className="border-t"><th>Kereslet</th>{task.demand?.map((d,j)=><td key={j} className="text-center">{d}</td>)}</tr></tbody></table></div></>
@@ -210,7 +215,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     :<p>Minimális vásárlási költség: {task.variableNames[0]} ({task.prices?.[0]} Ft, +{task.knowledge?.[0]} tudásegység), {task.variableNames[1]} ({task.prices?.[1]} Ft, +{task.knowledge?.[1]} tudásegység). Legalább {task.target} tudásegység szükséges; összesen legfeljebb {task.maxTablets} tabletta, és legalább annyi epres, mint spenótos. Folytonos változókat használj.</p>}
     <p className="text-xs text-neutral-500">Szükséges változónevek: {task.variableNames.join(', ')}. Az optimális megoldást nem fedjük fel.</p>
   </section>}
-  {task&&<section className="space-y-3 rounded-xl border p-5">
+  {task&&<section className="min-w-0 space-y-3 rounded-xl border p-4">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
     <div className="flex flex-wrap gap-2">
      <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>uploadModel.current?.click()}>.mod importálása</button>
@@ -280,8 +285,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{formEpoch.current++;setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
     <button disabled={busy||binding==='checking'||binding==='failed'} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Teljes megoldás ellenőrzése</button>
   </section>}
-  {task&&<p data-testid="gusek-practice-draft-status-r14z" className="text-xs text-neutral-500">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
-  {grade&&<section role="status" className="space-y-2 rounded-xl border p-4"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
+  {task&&<p data-testid="gusek-practice-draft-status-r14z" className="xl:col-span-2" className="text-xs text-neutral-500">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
+  {grade&&<section role="status" className="space-y-2 rounded-xl border p-4 xl:col-start-2"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
@@ -289,7 +294,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
    </div>
   </section>}
-  {linkedChat&&<section className="rounded-xl border p-4"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
+  {linkedChat&&<section className="rounded-xl border p-4 xl:col-span-2"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
   {error&&<p role="alert" className="rounded border border-red-500 p-3 text-red-600">{error}</p>}
  </div>;
 }
