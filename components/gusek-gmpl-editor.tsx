@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,useMemo} from 'react';
 import type {KeyboardEvent,Ref} from 'react';
 import {tokenizeGmplLine,makeGmplEdit,indentGmplSelection,commentGmplSelection,
  nextSearchMatch,completionForGmpl,lineNumberAt} from '@/src/features/gusek/gmpl-editor-core.mjs';
@@ -25,13 +25,17 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
  diagnosticLine,placeholder,className='',onKeyDown,testId,rows=15}:Props){
  const local=useRef<HTMLTextAreaElement|null>(null);
  const gutter=useRef<HTMLDivElement|null>(null);
+ const highlightLayer=useRef<HTMLPreElement|null>(null);
  const [findOpen,setFindOpen]=useState(false);
- const [previewOpen,setPreviewOpen]=useState(false);
+ const [highlightEnabled,setHighlightEnabled]=useState(true);
  const [query,setQuery]=useState('');
  const [replacement,setReplacement]=useState('');
  const [cursor,setCursor]=useState(0);
  const [searchStatus,setSearchStatus]=useState('');
- const lines=value.split('\n');
+ const lines=useMemo(()=>value.split('\n'),[value]);
+ // The fallback always shows editable source as plain text when highlighting
+ // would require an excessively large DOM or line exceeds lexer limits.
+ const highlight=highlightEnabled&&lines.length<=1000&&value.length<=36000&&lines.every(x=>x.length<=4096);
  const completions=completionForGmpl(value.slice(Math.max(0,cursor-64),cursor));
  function attach(node:HTMLTextAreaElement|null){
   local.current=node;
@@ -45,6 +49,7 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
    const before=value.slice(0,from).split('\n').length-1;
    t.scrollTop=Math.max(0,(before-3)*24);
    if(gutter.current)gutter.current.scrollTop=t.scrollTop;
+   if(highlightLayer.current)highlightLayer.current.scrollTop=t.scrollTop;
   });
  }
  useEffect(()=>{
@@ -115,7 +120,7 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
    <span className="text-xs text-neutral-500">{lines.length} sor · {lineNumberAt(value,cursor)}. sor</span>
    <span className="ml-auto"/>
    <button type="button" className={control} onClick={()=>setFindOpen(x=>!x)}>Keresés / csere</button>
-   <button type="button" className={control} aria-pressed={previewOpen} onClick={()=>setPreviewOpen(x=>!x)}>Szintaxisnézet</button>
+   <button type="button" className={control} aria-pressed={highlightEnabled} onClick={()=>setHighlightEnabled(x=>!x)}>Szintaxiskiemelés</button>
   </div>
   {findOpen&&<div className="flex flex-wrap items-center gap-2 rounded border p-2" data-testid="gusek-editor-find-r14">
     <input aria-label="Keresett szöveg" placeholder="Keresés" className="max-w-40 rounded border bg-transparent p-1 text-sm" value={query} onChange={e=>setQuery(e.target.value)} />
@@ -128,25 +133,33 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
    <div ref={gutter} aria-hidden="true" className="max-h-[34rem] shrink-0 select-none overflow-hidden border-r bg-neutral-100/60 px-2 py-3 text-right font-mono text-xs leading-6 text-neutral-500 dark:bg-neutral-900/50">
     {lines.map((_,i)=><div key={i} className={diagnosticLine===i+1?'bg-amber-200 text-amber-950 dark:bg-amber-800 dark:text-white':''}>{i+1}</div>)}
    </div>
-   <textarea ref={attach} id={id} aria-label={label} data-testid={testId} readOnly={readOnly}
-    rows={rows} value={value} spellCheck={false} placeholder={placeholder}
-    onChange={e=>{const next=e.target.value;
-     if(next.includes('\0')||new TextEncoder().encode(next).length>65536)return;
-     onChange(next);setCursor(e.target.selectionStart);}}
-    onSelect={e=>setCursor(e.currentTarget.selectionStart)}
-    onScroll={e=>{if(gutter.current)gutter.current.scrollTop=e.currentTarget.scrollTop;}}
-    onKeyDown={handleKey}
-    className="max-h-[34rem] min-h-[22rem] w-full min-w-0 resize-y bg-transparent p-3 font-mono text-sm leading-6 outline-none"/>
+   <div className="relative min-w-0 flex-1">
+    {highlight&&<pre ref={highlightLayer} aria-hidden="true" data-testid={testId?testId+'-highlight':undefined}
+     className="pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-foreground">
+     {lines.map((line,i)=><span key={i}>
+      {tokenizeGmplLine(line).map((token,j)=><span key={j} className={colors[token.kind]??colors.plain}>{token.text}</span>)}
+      {i<lines.length-1?'\n':null}
+     </span>)}
+     {'\n'}
+    </pre>}
+    <textarea ref={attach} id={id} aria-label={label} data-testid={testId} readOnly={readOnly}
+     rows={rows} value={value} spellCheck={false} placeholder={placeholder}
+     onChange={e=>{const next=e.target.value;
+      if(next.includes('\0')||new TextEncoder().encode(next).length>65536)return;
+      onChange(next);setCursor(e.target.selectionStart);}}
+     onSelect={e=>setCursor(e.currentTarget.selectionStart)}
+     onScroll={e=>{
+      if(gutter.current)gutter.current.scrollTop=e.currentTarget.scrollTop;
+      if(highlightLayer.current){highlightLayer.current.scrollTop=e.currentTarget.scrollTop;highlightLayer.current.scrollLeft=e.currentTarget.scrollLeft;}
+     }}
+     onKeyDown={handleKey}
+     className={'relative z-10 max-h-[34rem] min-h-[22rem] w-full min-w-0 resize-y bg-transparent p-3 font-mono text-sm leading-6 outline-none '+(highlight?'text-transparent caret-foreground selection:bg-blue-500/30 dark:text-transparent':'text-foreground')}/>
+   </div>
   </div>
   {!readOnly&&completions.length>0&&<div className="flex flex-wrap gap-1" aria-label="MathProg kulcsszójavaslatok">
    {completions.map(term=><button key={term} type="button" className={control} onClick={()=>insertCompletion(term)}>{term}</button>)}
   </div>}
-  {previewOpen&&<section className="max-h-52 overflow-auto rounded border bg-neutral-50 p-3 font-mono text-xs dark:bg-neutral-900" aria-label="MathProg szintaxiskiemelt előnézet">
-   {lines.slice(0,400).map((line,i)=><div key={i} className="min-h-5 whitespace-pre-wrap break-all">
-    {tokenizeGmplLine(line).map((token,j)=><span key={j} className={colors[token.kind]??colors.plain}>{token.text}</span>)}
-   </div>)}
-   {lines.length>400&&<p className="text-neutral-500">Az előnézet az első 400 sorra korlátozódik.</p>}
-  </section>}
+  {!highlight&&highlightEnabled&&<p className="text-xs text-amber-700">Hosszú dokumentum: a kiemelés a szerkesztő teljesítménye érdekében automatikusan kikapcsolt.</p>}
   <p className="text-xs text-neutral-500">Tab: behúzás · Shift+Tab: visszahúzás · Ctrl+/: komment · Ctrl+F: keresés</p>
  </div>;
 }
