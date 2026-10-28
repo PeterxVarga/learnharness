@@ -42,9 +42,12 @@ function FreeWorkspace(){
  const [nativeAvailable,setNativeAvailable]=useState(false);
  const [token,setToken]=useState(initialToken);
  const [running,setRunning]=useState(false);
+ const cancelRef=useRef<AbortController|null>(null);
+ const [cancelling,setCancelling]=useState(false);
  const [runReceipt,setRunReceipt]=useState<RunReceipt|null>(null);
  const [message,setMessage]=useState('');
  const fileInput=useRef<HTMLInputElement|null>(null);
+ const saveRevision=useRef(0);
  const modelEditor=useRef<HTMLTextAreaElement|null>(null);
  const dataEditor=useRef<HTMLTextAreaElement|null>(null);
  const source=active==='model.mod'?model:data;
@@ -62,11 +65,12 @@ function FreeWorkspace(){
  },[]);
  useEffect(()=>{
   if(!ready||saveState==='unavailable')return;
+  const revision=++saveRevision.current;
   setSaveState('saving');
   const id=window.setTimeout(()=>{
    void saveFreeWorkspaceDraft(model,data)
-    .then(()=>setSaveState('saved'))
-    .catch(()=>setSaveState('unavailable'));
+    .then(()=>{if(revision===saveRevision.current)setSaveState('saved');})
+    .catch(()=>{if(revision===saveRevision.current)setSaveState('unavailable');});
   },600);
   return()=>window.clearTimeout(id);
  },[model,data,ready]);
@@ -118,19 +122,21 @@ function FreeWorkspace(){
    setMessage('A modell vagy az adatfájl túl nagy.');return;
   }
   const input={model,data};
-  setRunning(true);setRunReceipt(null);
+  const controller=new AbortController();cancelRef.current=controller;
+  setRunning(true);setCancelling(false);setRunReceipt(null);
   try{
    const response=await fetch('/api/pilot/gusek/native',{
-    method:'POST',cache:'no-store',
+    method:'POST',cache:'no-store',signal:controller.signal,
     headers:{'Content-Type':'application/json','X-LH-GLPK-Token':token},
     body:JSON.stringify({model:input.model,data:input.data,mode})
    });
    const result=await response.json() as RuntimeResult;
+   if(controller.signal.aborted)throw new Error('Futtatás megszakítva.');
    if(!response.ok&&result.status!=='BLOCKED')throw new Error(result.error??'GLPK futtatási hiba.');
    if(result.graded!==false||result.points!==null)throw new Error('Érvénytelen megoldóválasz.');
    setRunReceipt({input,result});
-  }catch(e){setMessage(e instanceof Error?e.message:'Nem sikerült futtatni a GLPK-t.');}
-  finally{setRunning(false);}
+  }catch(e){setMessage(controller.signal.aborted?'A GLPK-futtatás megszakítva. A konténer felszabadításáig új kérés átmenetileg foglalt lehet.':e instanceof Error?e.message:'Nem sikerült futtatni a GLPK-t.');}
+  finally{if(cancelRef.current===controller)cancelRef.current=null;setCancelling(false);setRunning(false);}
  }
  function keyDown(e:KeyboardEvent<HTMLTextAreaElement>){
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){
@@ -186,6 +192,7 @@ function FreeWorkspace(){
      <div className="flex flex-wrap gap-2">
       <button type="button" data-testid="gusek-free-check-r14" disabled={running||!ready} onClick={()=>void runNative('check')} className="rounded border px-3 py-2 text-sm disabled:opacity-50">Fordítás ellenőrzése</button>
       <button type="button" data-testid="gusek-free-solve-r14" disabled={running||!ready} onClick={()=>void runNative('solve')} className="rounded bg-foreground px-3 py-2 text-sm text-background disabled:opacity-50">Megoldás GLPK-val</button>
+      {running&&<button type="button" data-testid="gusek-free-cancel-r14" disabled={cancelling} onClick={()=>{setCancelling(true);cancelRef.current?.abort();}} className="rounded border px-3 py-2 text-sm disabled:opacity-50">Futtatás megszakítása</button>}
      </div>
     </div>:<p data-testid="gusek-free-disabled-r14" className="text-sm text-neutral-500">A natív megoldó ezen a gépen nincs engedélyezve. A fájlok továbbra is szerkeszthetők és menthetők.</p>}
     {running&&<p role="status" className="text-sm">A modell futtatása folyamatban…</p>}
