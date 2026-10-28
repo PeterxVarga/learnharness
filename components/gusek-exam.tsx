@@ -34,7 +34,7 @@ const errorsHu:Record<string,string>={
  not_optimal:'A beadott megoldás nem optimális.',
  independence_not_demonstrated:'A segítséghasználat önbevallása alapján nem jár önálló vizsgapont.',
 };
-export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void}){
+export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorkspace}:{chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void;onCopyToWorkspace?:(model:string,data:string)=>void}){
  const [kind,setKind]=useState<Kind>('transport'),[seed,setSeed]=useState('42'),[task,setTask]=useState<Task|null>(null);
  const [transportDialect,setTransportDialect]=useState<'scalar'|'indexed'>('scalar');
  const [source,setSource]=useState(''),[values,setValues]=useState(''),[objective,setObjective]=useState(''),[hints,setHints]=useState(false);
@@ -223,6 +223,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
      <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>uploadModel.current?.click()}>.mod importálása</button>
      <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportPracticeFile('model.mod',source)}>.mod letöltése</button>
      {dataFile&&<button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>exportPracticeFile('data.dat',dataFile)}>.dat letöltése</button>}
+     {onCopyToWorkspace&&<button type="button" data-testid="gusek-copy-free-r14z" className="rounded border px-3 py-1.5 text-sm" onClick={()=>onCopyToWorkspace(source,dataFile)}>Másolat a szabad munkaterületre</button>}
      <input type="file" ref={uploadModel} accept=".mod" className="hidden" aria-label="MathProg modell megnyitása" onChange={e=>void importPracticeModel(e)}/>
     </div>
     <nav aria-label="MathProg fájlfülek" data-testid="gusek-practice-file-tabs-r14z" className="flex gap-2 border-b pb-2">
