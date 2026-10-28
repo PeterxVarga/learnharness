@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
+import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -44,6 +45,13 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
+ const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
+ const [draftState,setDraftState]=useState<'loading'|'restored'|'saved'|'unavailable'|'idle'>('idle');
+ function invalidateForm(){
+  formEpoch.current++;
+  nativeAbort.current?.abort();
+  setGrade(null);setNativeResult(null);setNativeSnapshot(null);
+ }
  const uploadModel=useRef<HTMLInputElement|null>(null);
  const nativeAbort=useRef<AbortController|null>(null);
  const [nativeCancelling,setNativeCancelling]=useState(false);
@@ -62,23 +70,35 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   return()=>{live=false;};
  },[chatId]);
  async function newTask(){
-  nativeAbort.current?.abort();
-  setBusy(true);setTask(null);setGrade(null);setError('');
+  const epoch=++taskRequestEpoch.current;
+  invalidateForm();
+  setBusy(true);setTask(null);setDraftState('loading');setError('');
   try{
    if(!/^(0|[1-9]\d{0,9})$/.test(seed)||Number(seed)>4294967295)throw Error('Hibás feladatvariáns.');
    const r=await fetch(`/api/pilot/gusek?kind=${kind}&seed=${seed}`,{cache:'no-store'}),x=await r.json();
    if(!r.ok)throw Error(x.error??'Feladat nem érhető el.');
+   if(epoch!==taskRequestEpoch.current)return;
    const t=x.task as Task;
    const indexed=kind==='transport'&&transportDialect==='indexed';
    const preset=x.indexed as {starter?:string;dataTemplate?:string}|undefined;
    if(indexed&&(!preset?.starter||!preset.dataTemplate))throw Error('Indexelt feladatminta nem érhető el.');
-   setTask(t);
-   setSource(indexed?preset!.starter!:'# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n');
-   setValues(indexed?JSON.stringify(Object.fromEntries(
+   const defaultModel=indexed?preset!.starter!:'# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n';
+   const initialValues=indexed?JSON.stringify(Object.fromEntries(
     Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>[`x[${i+1},${j+1}]`,0])).flat()
-   ),null,2):starter(t.variableNames));
-   setObjective('');setHints(false);setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
-  }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
+   ),null,2):starter(t.variableNames);
+   let restored:null|{model:string;values:string;objective:string;hintsUsed:boolean}=null;
+   try{
+    restored=await readGusekPracticeDraft(chatId??linkedChat??null,kind,seed,indexed?'indexed':'scalar');
+   }catch{if(epoch===taskRequestEpoch.current)setDraftState('unavailable');}
+   if(epoch!==taskRequestEpoch.current)return;
+   setTask(t);
+   setSource(restored?.model??defaultModel);
+   setValues(restored?.values??initialValues);
+   setObjective(restored?.objective??'');setHints(restored?.hintsUsed??false);
+   setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
+   setDraftState(restored?'restored':'idle');
+  }catch(e){if(epoch===taskRequestEpoch.current)setError(e instanceof Error?e.message:String(e));}
+  finally{if(epoch===taskRequestEpoch.current)setBusy(false);}
  }
  function exportPracticeFile(name:'model.mod'|'data.dat',contents:string){
   const url=URL.createObjectURL(new Blob([contents],{type:'text/plain;charset=utf-8'}));
