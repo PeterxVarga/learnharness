@@ -44,5 +44,26 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
  it('outer timeout fails closed',()=>{const x=setup({error:Object.assign(new Error('timed out'),{code:'ETIMEDOUT'})});const r=runNativeGmpl({model,imageId:image,spawn:x.spawn});assert.equal(r.status,'TIME_LIMIT');assert.equal(r.code,'outer_timeout');assert.ok(!existsSync(x.stage));});
  it('oversized process output fails closed',()=>{const x=setup({error:Object.assign(new Error('maxBuffer'),{code:'ENOBUFS'})});const r=runNativeGmpl({model,imageId:image,spawn:x.spawn});assert.equal(r.code,'output_limit');assert.equal(r.status,'BLOCKED');});
  it('truncates solver-provided diagnostics',()=>{const x=setup();const base=x.spawn;const custom=(b,a,o)=>a[0]==='run'?{status:0,stdout:'A'.repeat(40000),stderr:''}:base(b,a,o);const r=runNativeGmpl({model,imageId:image,spawn:custom});assert.equal(r.diagnostic.length,8192);assert.equal(r.graded,false);});
+ it('does not inherit BYOK secrets or remote Podman configuration',()=>{
+   const oldSecret=process.env.LH_TEST_R14_SECRET,oldRemote=process.env.CONTAINER_HOST;
+   process.env.LH_TEST_R14_SECRET='should_not_reach_podman';
+   process.env.CONTAINER_HOST='ssh://remote.example/run/user/1000/podman.sock';
+   try{
+     const x=setup(),base=x.spawn;
+     let saw=false;
+     const spawn=(binary,args,opts)=>{
+       assert.equal(opts.env.LH_TEST_R14_SECRET,undefined);
+       assert.equal(opts.env.CONTAINER_HOST,undefined);
+       assert.equal(opts.env.LH_GLPK_RUN_TOKEN,undefined);
+       assert.ok(opts.env.PATH);
+       saw=true;return base(binary,args,opts);
+     };
+     assert.equal(runNativeGmpl({model,imageId:image,spawn}).status,'GLPK_COMPLETED');
+     assert.equal(saw,true);
+   }finally{
+     if(oldSecret===undefined)delete process.env.LH_TEST_R14_SECRET;else process.env.LH_TEST_R14_SECRET=oldSecret;
+     if(oldRemote===undefined)delete process.env.CONTAINER_HOST;else process.env.CONTAINER_HOST=oldRemote;
+   }
+ });
  it('an unavailable Podman binary is blocked, never falls back to host glpsol',()=>{const x=setup();const custom=(binary,args,opts)=>args[0]==='info'?{error:Object.assign(new Error('not found'),{code:'ENOENT'}),status:null}:x.spawn(binary,args,opts);const r=runNativeGmpl({model,imageId:image,spawn:custom});assert.equal(r.code,'rootless_podman_unavailable');});
 });
