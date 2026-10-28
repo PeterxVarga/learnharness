@@ -16,9 +16,9 @@ const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',
  checks:Array.from({length:11},(_,i)=>'W'+i)},
  {schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks:Array.from({length:15},(_,i)=>'P'+i),
   mockedNativeOnly:true,realPracticeGrade:true},
- {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:Array.from({length:6},(_,i)=>'L'+i),
-  realNativeGlpk:true,realPracticeGrade:true,nativeCalls:1,gradeCalls:1,taskKind:'tablet',
-  taskId:'gusek-tablet-42'}];
+ {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:Array.from({length:16},(_,i)=>'L'+i),
+  realNativeGlpk:true,realPracticeGrade:true,nativeCalls:3,gradeCalls:3,
+  scenarios:['transport','froccs','tablet'].map(kind=>({kind,taskId:'gusek-'+kind+'-42',nativeCalls:1,gradeCalls:1,points:1}))}];
 const fixture=()=>({head:H,status:'PASS',step:'final_receipt',logs,offline,native,browsers});
 describe('R14Z final-qualification receipt contract (no real Fedora execution)',()=>{
  it('accepts complete source/native/browser evidence only',()=>{
@@ -63,7 +63,7 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
  it('rejects an unverified translation-only status',()=>{
   assert.equal(validateFinalR14z({...fixture(),native:{...native,translationOnly:'BLOCKED'}}).status,'BLOCKED');
  });
- it('requires two successful browser workflows, independent grader and explicit solver mock disclosure',()=>{
+ it('requires three successful browser workflows, independent grader and explicit solver mock disclosure',()=>{
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0]]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],realPracticeGrade:false},browsers[2]]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],{...browsers[1],mockedNativeOnly:false},browsers[2]]}).status,'BLOCKED');
@@ -75,7 +75,9 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],gradeCalls:0}]}).status,'BLOCKED');
  });
  it('a live run from the wrong task or wrong cardinality cannot qualify',()=>{
-  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],taskId:'gusek-tablet-41'}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[...browsers[2].scenarios.slice(0,2),{...browsers[2].scenarios[2],taskId:'gusek-tablet-41'}]}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[browsers[2].scenarios[0],browsers[2].scenarios[0],browsers[2].scenarios[2]]}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[{...browsers[2].scenarios[0],points:0},...browsers[2].scenarios.slice(1)]}]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],checks:[]}]}).status,'BLOCKED');
  });
 });
