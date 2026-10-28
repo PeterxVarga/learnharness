@@ -7,6 +7,14 @@ const DB_NAME='learnharness-gusek-workbench';
 const STORE='drafts';
 const VERSION=1;
 const KEY='free-workspace-v1';
+// IndexedDB opens per operation. Serialize writes so a slow previous commit
+// cannot overwrite a newer revision with old .mod/.dat source.
+let lastWrite:Promise<unknown>=Promise.resolve();
+function inWriteOrder<T>(action:()=>Promise<T>):Promise<T>{
+ const current=lastWrite.then(action);
+ lastWrite=current.catch(()=>{});
+ return current;
+}
 function openDb():Promise<IDBDatabase>{
  return new Promise((resolve,reject)=>{
   if(typeof indexedDB==='undefined'){reject(new Error('indexeddb_unavailable'));return;}
@@ -34,14 +42,15 @@ async function withStore<T>(mode:IDBTransactionMode,action:(store:IDBObjectStore
  }finally{db.close();}
 }
 export async function readFreeWorkspaceDraft():Promise<{model:string;data:string;modifiedAt:number}|null>{
+ await lastWrite;
  const stored=await withStore<unknown>('readonly',store=>store.get(KEY));
  const valid=readWorkspaceDraft(stored);
  return valid?{model:valid.model,data:valid.data,modifiedAt:valid.modifiedAt}:null;
 }
 export async function saveFreeWorkspaceDraft(model:string,data:string):Promise<void>{
  const draft=makeWorkspaceDraft({model,data});
- await withStore('readwrite',store=>store.put(draft,KEY));
+ await inWriteOrder(()=>withStore('readwrite',store=>store.put(draft,KEY)));
 }
 export async function clearFreeWorkspaceDraft():Promise<void>{
- await withStore('readwrite',store=>store.delete(KEY));
+ await inWriteOrder(()=>withStore('readwrite',store=>store.delete(KEY)));
 }
