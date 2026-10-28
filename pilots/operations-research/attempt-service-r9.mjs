@@ -4,6 +4,7 @@ import { makeTransportTask, gradeTransportExam } from './transport-exam-r3.mjs';
 import { gradeExpandedMathProg } from './mathprog-expanded-r6.mjs';
 import { gradeIndexedMathProg } from './mathprog-indexed-r7.mjs';
 import { gradeGusekExam } from './gusek-exam-r13.mjs';
+import { looksIndexedTransport } from './gusek-indexed-r14.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CHAT = /^chat_[a-z0-9]+_[0-9a-f]{8}$/;
@@ -23,6 +24,7 @@ export function prepareVerifiedAttempt({chatId,attemptId,seed,answer,at = new Da
   const indexed = answer.mathprogDialect === 'indexed' ||
     (answer.mathprogDialect === undefined && (/\bvar\s+x\s*\{/.test(code) || /\bminimize\s+\w+\s*:\s*sum\s*\{/.test(code)));
   const isGusek = ['transport','froccs','tablet'].includes(answer.taskKind);
+  const isIndexedGusek = answer.taskKind==='transport' && looksIndexedTransport(answer.mathprog);
   const grade = isGusek ? gradeGusekExam(answer.taskKind,n,answer) : !hasSource ? gradeTransportExam(makeTransportTask(n),answer)
     : indexed ? gradeIndexedMathProg(n,answer)
     : (answer.mathprogDialect === undefined || answer.mathprogDialect === 'expanded') ? gradeExpandedMathProg(n,answer)
@@ -35,7 +37,7 @@ export function prepareVerifiedAttempt({chatId,attemptId,seed,answer,at = new Da
   const receipt = {
     schema:'learnharness.transport-attempt.r9', id:attemptId, chatId, taskId:isGusek ? `gusek-${answer.taskKind}-${n}` : `synthetic-transport-r3-${n}`,
     seed:n, submittedAt:at, status, points:grade.points,maxPoints:1,correct:grade.correct,errors,
-    dialect:isGusek ? 'gusek_scalar_r13' : !hasSource ? 'json' : indexed ? 'indexed' : 'expanded',
+    dialect:isIndexedGusek ? 'gusek_indexed_r14' : isGusek ? 'gusek_scalar_r13' : !hasSource ? 'json' : indexed ? 'indexed' : 'expanded',
     answerSha256:stableAnswerHash(answer),scope:'formative_unproctored_self_reported_hints',
   };
   // Only server-derived, finite, bounded fields reach the model. No raw learner source or model text.
