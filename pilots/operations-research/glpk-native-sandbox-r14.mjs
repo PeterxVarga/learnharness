@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync,openSync,closeSync,fstatSync,readFileSync,constants} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {readGlpkSolutionStatus} from './glpk-solution-status-r14.mjs';
 
 const IMAGE_ID=/^sha256:[a-f0-9]{64}$/;
 const MODEL_MAX=65536, DATA_MAX=65536, MAX_OUTPUT=8192, MAX_LISTING=24_576;
@@ -61,7 +62,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       imageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
       '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
       '--tmlim','8','--memlim','192','--seed','0',
-      ...(mode==='solve'?['--output','/output/solution.txt']:[])
+      ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw']:[])
     ];
     const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false,env});
     if(run.error?.code==='ETIMEDOUT')return result('TIME_LIMIT','outer_timeout');
@@ -87,11 +88,26 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       }catch{/* absence, symlink or oversized output is not a grade */}
       finally{if(fd!==undefined)closeSync(fd);}
     }
+    // Read GLPK's machine solution header separately from printable output.
+    // Only known, bounded solution shapes are recognized; never a score.
+    let solutionMeta=readGlpkSolutionStatus(null);
+    if(mode==='solve'){
+      let fd;
+      try{
+        fd=openSync(join(stage,'out','solution.raw'),constants.O_RDONLY|constants.O_NOFOLLOW);
+        const st=fstatSync(fd);
+        if(st.isFile()&&st.size<=MAX_LISTING){
+          const raw=readFileSync(fd);
+          if(raw.length<=MAX_LISTING)solutionMeta=readGlpkSolutionStatus(raw.toString('utf8'));
+        }
+      }catch{/* missing/untrusted file yields UNKNOWN */}
+      finally{if(fd!==undefined)closeSync(fd);}
+    }
     // Solver console output is deliberately informational, NOT a trusted
     // proof of correctness: source can contain display/printf statements.
     return result('GLPK_COMPLETED','completed',{
       exitCode:0,mode,diagnostic:bounded(run.stdout),
-      solutionListing,solverOutputTrusted:false
+      solutionListing,...solutionMeta,solverOutputTrusted:false
     });
   }catch{
     return result('BLOCKED','staging_failed');
