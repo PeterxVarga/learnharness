@@ -7,7 +7,7 @@ const KINDS=new Set(['transport','froccs','tablet']);
 const seedOf=(x:unknown):number|null=>typeof x==='string'&&/^(0|[1-9]\d{0,9})$/.test(x)&&Number(x)<=4294967295?Number(x):null;
 export function GET(req:Request){
  const url=new URL(req.url),kind=url.searchParams.get('kind'),seed=seedOf(url.searchParams.get('seed'));
- if([...url.searchParams.keys()].sort().join(',')!=='kind,seed'||url.searchParams.getAll('kind').length!==1||url.searchParams.getAll('seed').length!==1||!KINDS.has(kind??'')||seed===null)return json({error:'invalid_task'},400);
+ if([...url.searchParams.keys()].sort().join(',')!=='kind,seed'||url.searchParams.getAll('kind').length!==1||url.searchParams.getAll('seed').length!==1||(kind===null||!KINDS.has(kind))||seed===null)return json({error:'invalid_task'},400);
  const task=makeGusekTask(kind,seed);
  return json({schema:'learnharness.gusek-task.r13',task});
 }
