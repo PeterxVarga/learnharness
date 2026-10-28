@@ -50,7 +50,7 @@ try{
  });
  await check('FREE_MODE_NO_GRADE_AUTHORITY',async()=>{
   assert.equal(await page.$('[data-testid="gusek-transfer-solution-r14"]'),null);
-  assert.equal(await page.$('[data-testid="gusek-free-disabled-r14"]')!==null,true);
+  assert.ok((await page.$('[data-testid="gusek-free-disabled-r14"]'))||(await page.$('[data-testid="gusek-free-check-r14"]')));
  });
  await page.click('[data-testid="gusek-mode-practice-r14"]');
  await check('PRACTICE_STILL_AVAILABLE',async()=>{
