@@ -14,7 +14,7 @@ const LOGS=Object.freeze([
  'npm-ci.log','offline.json','npm-test.log','typecheck.log','build.log',
  'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log'
 ]);
-const EXPECTED={offline:454,suites:36,npm:2810};
+const EXPECTED={offline:466,suites:37,npm:2822};
 const validName=n=>typeof n==='string'&&LOGS.includes(n);
 const boundedLog=b=>b.length<=64*1024*1024;
 export function validateFinalR14z({head,status,step,logs,offline,native,browsers}){
