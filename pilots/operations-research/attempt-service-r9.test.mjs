@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {describe,it} from 'node:test';
 import {prepareVerifiedAttempt,appendOnceToChat,stableAnswerHash} from './attempt-service-r9.mjs';
 import {makeTransportTask,solveTransportTask} from './transport-exam-r3.mjs';
+import {makeGusekTask,trustedGusekModel,solveGusekTask} from './gusek-exam-r13.mjs';
 const chatId='chat_abc123_1234abcd',id='123e4567-e89b-42d3-a456-426614174000';
 const good=()=>{const t=makeTransportTask(42),o=solveTransportTask(t);return {model:{sense:'min',nonnegative:true,supply:t.supply,demand:t.demand,costs:t.costs,capacities:t.capacities},allocation:o.exemplar,reportedObjective:o.objective,hintsUsed:false}};
 const item=(answer=good())=>prepareVerifiedAttempt({chatId,attemptId:id,seed:'42',answer,at:'2026-10-27T00:00:00.000Z'});
@@ -20,6 +21,6 @@ describe('R9 authoritative transport exam attempt state transition',()=>{
  it('blocks bad answers and missing array',()=>{for(const answer of [null,[],123])assert.throws(()=>prepareVerifiedAttempt({chatId,attemptId:id,seed:'42',answer}),/invalid_answer/);});
  it('enforces per-chat bounded growth',()=>{const {receipt,marker}=item();assert.throws(()=>appendOnceToChat({...blank(),transportAttempts:Array.from({length:300},(_,i)=>({...receipt,id:`other${i}`}))},receipt,marker),/attempt_limit_reached/);});
  it('does not persist full student MathProg in the receipt',()=>{const a=good();a.mathprog='var x; unwanted private submission';const receipt=item(a).receipt;assert.equal('answer' in receipt,false);assert.equal('mathprog' in receipt,false);});
- it('receipt has unproctored designation, not trusted independence proof',()=>{const r=item().receipt;assert.equal(r.scope,'formative_unproctored_self_reported_hints');});
+ it('receipt has unproctored designation, not trusted independence proof',()=>{const r=item().receipt;assert.equal(r.scope,'formative_unproctored_self_reported_hints');const t=makeGusekTask('tablet',42),s=solveGusekTask(t);const a={taskKind:'tablet',mathprog:trustedGusekModel(t),values:s.values,reportedObjective:s.objective,hintsUsed:false};const {receipt,marker}=item(a);assert.equal(receipt.dialect,'gusek_scalar_r13');assert.equal(receipt.taskId,'gusek-tablet-42');assert.equal(receipt.status,'FULL_CREDIT');assert.equal(receipt.points,1);assert.match(marker.content,/GUSEK PRACTICE/);assert.doesNotMatch(marker.content,/var epres/);const first=appendOnceToChat(blank(),receipt,marker),replay=appendOnceToChat(first.record,receipt,marker);assert.equal(replay.replayed,true);assert.equal(replay.record.messages.length,1);});
  it('can receive all-or-nothing grade despite arbitrary payload status claims',()=>{const a=good();a.status='optimal';a.points=100;assert.equal(item(a).receipt.points,1);});
 });
