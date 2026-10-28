@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import {GusekExam} from './gusek-exam';
+import {GmplEditor} from './gusek-gmpl-editor';
 import {readFreeWorkspaceDraft,saveFreeWorkspaceDraft} from '@/src/features/gusek/browser-drafts';
 import {DEFAULT_MODEL,DEFAULT_DATA,validateWorkbenchFile,glpkDiagnosticLine,lineOffset,sameRunInputs} from '@/src/features/gusek/workspace-files.mjs';
 
@@ -15,7 +16,6 @@ type RuntimeResult={
 };
 type RunReceipt={input:{model:string;data:string};result:RuntimeResult};
 const initialToken='';
-const editorClass='min-h-[22rem] w-full resize-y rounded-lg border border-neutral-300/50 bg-transparent p-3 font-mono text-sm leading-6 outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700';
 function exportFile(filename:FileName,contents:string){
  const objectUrl=URL.createObjectURL(new Blob([contents],{type:'text/plain;charset=utf-8'}));
  try{
@@ -164,12 +164,16 @@ function FreeWorkspace(){
       onClick={()=>setActive(name)}>{name}{name==='data.dat'&&!data.trim()?' (üres)':''}</button>)}
      <span className="ml-auto text-xs text-neutral-500">{new TextEncoder().encode(source).length} bájt</span>
     </div>
-    <textarea ref={modelEditor} aria-label="model.mod szerkesztő" data-testid="gusek-free-model-r14"
-     spellCheck={false} value={model} onChange={e=>setSource(e.target.value)} onKeyDown={keyDown}
-     className={editorClass+(active!=='model.mod'?' hidden':'')} hidden={active!=='model.mod'} />
-    <textarea ref={dataEditor} aria-label="data.dat szerkesztő" data-testid="gusek-free-data-r14"
-     spellCheck={false} value={data} onChange={e=>setSource(e.target.value)} onKeyDown={keyDown}
-     className={editorClass+(active!=='data.dat'?' hidden':'')} hidden={active!=='data.dat'} />
+    <div className="p-3">
+     <GmplEditor label="model.mod szerkesztő" testId="gusek-free-model-r14"
+      textareaRef={modelEditor} value={model} onChange={setSource}
+      hidden={active!=='model.mod'} onKeyDown={keyDown}
+      diagnosticLine={active==='model.mod'?diagnostic?.file==='model.mod'?diagnostic.line:null:null} />
+     <GmplEditor label="data.dat szerkesztő" testId="gusek-free-data-r14"
+      textareaRef={dataEditor} value={data} onChange={setSource}
+      hidden={active!=='data.dat'} onKeyDown={keyDown}
+      diagnosticLine={active==='data.dat'?diagnostic?.file==='data.dat'?diagnostic.line:null:null} />
+    </div>
     <p className="px-3 pb-2 text-xs text-neutral-500">Automatikus helyi piszkozat. Ctrl+S: mentési állapot. Nem kerül a Practice-előzményekbe.</p>
    </section>
    <section className="min-w-0 space-y-3 rounded-xl border p-4" aria-label="GLPK vezérlés és eredmény">
