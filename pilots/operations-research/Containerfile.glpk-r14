@@ -1,0 +1,5 @@
+# Optional local build, NOT automatic. Must pin and inspect the resulting image ID.
+# Fedora 44 glpk-utils provides the original GNU GLPK glpsol executable.
+FROM registry.fedoraproject.org/fedora:44
+RUN dnf -y --setopt=install_weak_deps=False install glpk-utils && dnf clean all
+CMD ["/usr/bin/glpsol","--version"]
