@@ -139,6 +139,10 @@ try{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-exam-r13"]')?.textContent?.includes('0/1'),{timeout:15000});
   const wrongVerdict=await page.$eval('[data-testid="gusek-exam-r13"]',el=>el.textContent);
   assert.match(wrongVerdict,/0\/1/);
+  const wrongGrade=await page.$eval('[data-testid="gusek-grade-r14z"]',el=>({
+   taskId:el.getAttribute('data-task-id'),points:el.getAttribute('data-grade-points')
+  }));
+  assert.deepEqual(wrongGrade,{taskId:task.id,points:'0'});
   // Restore the genuine OPTIMAL synthetic result using the existing explicit
   // transfer action, then the unmocked grade endpoint must award 1/1.
   await page.click('[data-testid="gusek-transfer-solution-r14"]');
@@ -153,6 +157,10 @@ try{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-exam-r13"]')?.textContent?.includes('TELJESEN HELYES'),{timeout:15000});
   const result=await page.$eval('[data-testid="gusek-exam-r13"]',el=>el.textContent);
   assert.match(result,/1\/1/);
+  const authoritative=await page.$eval('[data-testid="gusek-grade-r14z"]',el=>({
+   taskId:el.getAttribute('data-task-id'),points:el.getAttribute('data-grade-points')
+  }));
+  assert.deepEqual(authoritative,{taskId:task.id,points:'1'});
  });
  await check('SOURCE_EDIT_INVALIDATES_PREVIOUS_SOLUTION',async()=>{
   await page.click(modelInput);
