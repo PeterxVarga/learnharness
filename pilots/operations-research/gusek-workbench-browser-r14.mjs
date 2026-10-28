@@ -49,6 +49,24 @@ try{
   await page.click('[data-testid="gusek-editor-find-r14"] button');
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-editor-find-r14"]')?.textContent?.includes('Találat:'));
  });
+ await check('NAMED_PROJECT_SNAPSHOT_RESTORE',async()=>{
+  await page.type('input[aria-label="Projektpillanatkép neve"]','Szállítási próba');
+  await page.click('[data-testid="gusek-project-save-r14z"]');
+  await page.waitForFunction(()=>{
+   const select=document.querySelector('select[aria-label="Mentett helyi projektek"]');
+   return !!select&&select.value!=='';
+  },{timeout:10000});
+  await page.click(editor);
+  await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');
+  await page.keyboard.type('var replaced;');
+  assert.equal(await page.$eval(editor,e=>e.value),'var replaced;');
+  await page.click('[data-testid="gusek-project-open-r14z"]');
+  await page.waitForFunction(expected=>{
+   const editor=document.querySelector('[data-testid="gusek-free-model-r14"]');
+   return !!editor&&editor.value===expected;
+  },{timeout:10000},target);
+  assert.equal(await page.$eval(editor,e=>e.value),target);
+ });
  await check('LOCAL_DRAFT_PERSISTENCE',async()=>{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-draft-status-r14"]')?.textContent?.includes('Helyben mentve'),{timeout:10000});
   await page.reload({waitUntil:'networkidle2',timeout:30000});
