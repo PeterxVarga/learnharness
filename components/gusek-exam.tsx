@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
+import {GmplEditor} from './gusek-gmpl-editor';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
@@ -139,13 +140,17 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   </section>}
   {task&&<section className="space-y-3 rounded-xl border p-5">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
-    <textarea id="gusek-source" className="h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={source} spellCheck={false} onChange={e=>{setSource(e.target.value);setGrade(null);setNativeResult(null);}}/>
+    <GmplEditor id="gusek-source" testId="gusek-exam-source-r14"
+      label="GUSEK / MathProg modell (.mod)" value={source}
+      onChange={next=>{setSource(next);setGrade(null);setNativeResult(null);}} />
     <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
     {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
      <h3 className="font-semibold">GNU GLPK – eredeti MathProg-futtatás (R14)</h3>
      <label htmlFor="gusek-data" className="block text-sm">Feladatadatok (.dat) – vizsgamódban csak olvasható</label>
-     <textarea id="gusek-data" className="h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" spellCheck={false} value={dataFile} readOnly placeholder="A feladat nem igényel külön .dat fájlt." />
+     <GmplEditor id="gusek-data" testId="gusek-exam-data-r14"
+      label="Feladatadatok (.dat)" value={dataFile} readOnly
+      onChange={()=>{}} rows={5} placeholder="A feladat nem igényel külön .dat fájlt." />
      <p className="text-xs text-neutral-500">A feladat szerveroldali adatai nem módosíthatók. Saját adatokhoz válts a Szabad munkaterületre.</p>
      {nativeAvailable?<>
       <label htmlFor="gusek-native-token" className="block text-sm">Helyi futtatási token (nem mentjük az előzményekbe)</label>
