@@ -20,15 +20,27 @@ export function parseGlpkColumns(solution,problem,{solverStatus,objective,soluti
  const parts=header?.trim().split(/\s+/);
  if(!parts||parts[0]!=='s'||parts[1]!==solutionKind||parts.length!==(solutionKind==='bas'?7:6))
   return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
+ const rows=Number(parts[2]);
  const count=Number(parts[3]);
- if(!Number.isSafeInteger(count)||count<1||count>MAX_COLUMNS)
+ if(!Number.isSafeInteger(rows)||rows<0||rows>10000||
+    !Number.isSafeInteger(count)||count<1||count>MAX_COLUMNS)
   return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
  const names=new Map(),values=new Map(),namesSeen=new Set();
  let glpCount=null;
+ const endMarker='e o f';
+ if(sol.filter(x=>x.trim()===endMarker).length!==1||
+    glp.filter(x=>x.trim()===endMarker).length!==1||
+    sol.filter(Boolean).at(-1)?.trim()!==endMarker||
+    glp.filter(Boolean).at(-1)?.trim()!==endMarker)
+  return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
  for(const line of glp){
   if(line.startsWith('p ')){
    const p=line.trim().split(/\s+/);
-   if(p.length!==6||p[0]!=='p')return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
+   if(p.length!==6||p[0]!=='p'||!['lp','mip'].includes(p[1])||
+      !['min','max'].includes(p[2])||
+      (solutionKind==='mip'&&p[1]!=='mip')||
+      (solutionKind!=='mip'&&p[1]!=='lp')||
+      Number(p[3])!==rows)return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
    const n=Number(p[4]);
    if(!Number.isSafeInteger(n)||n!==count)return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
    if(glpCount!==null)return {status:'INVALID_MACHINE_OUTPUT',columns:[]};
