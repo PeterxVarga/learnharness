@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {describe,it} from 'node:test';
 import {proveEquivalentScalarModel,toGlpkJsProblem} from './gusek-equivalence-r14.mjs';
+import {makeGusekTask,trustedGusekModel,solveGusekTask,gradeGusekExam} from './gusek-exam-r13.mjs';
 const g={GLP_MIN:1,GLP_MAX:2,GLP_FR:3,GLP_LO:4,GLP_UP:5,GLP_FX:6,GLP_DB:7};
 const named=c=>new Map(Object.entries(c));
 const expected={
@@ -25,4 +26,26 @@ describe('R14 bounded equivalence and open-source GLPK JSON bridge',()=>{
  it('GLPK JSON adapter translates objective and rows, without solving',()=>{const {problem,objectiveOffset}=toGlpkJsProblem(source(),g);assert.equal(objectiveOffset,0);assert.equal(problem.objective.direction,g.GLP_MIN);assert.equal(problem.subjectTo[0].bnds.type,g.GLP_FX);assert.equal(problem.subjectTo[1].bnds.type,g.GLP_UP);assert.equal(problem.generals.length,2);assert.equal(problem.binaries.length,0);});
  it('GLPK JSON adapter preserves offset and integer binary, free and bounded domains',()=>{const m=source();m.vars.get('a').upper=1;m.vars.get('b').integer=false;m.vars.get('b').lower=-Infinity;m.objective.constant=14;const {problem,objectiveOffset}=toGlpkJsProblem(m,g);assert.equal(objectiveOffset,14);assert.deepEqual(problem.binaries,['a']);assert.deepEqual(problem.generals,[]);assert.equal(problem.bounds.find(x=>x.name==='b').type,g.GLP_FR);});
  it('GLPK bridge fails closed for unsupported input and constant-only row',()=>{assert.throws(()=>toGlpkJsProblem({ok:false},g),/invalid_source/);const m=source();m.constraints[0].coeff=new Map();assert.throws(()=>toGlpkJsProblem(m,g),/constant_only_constraint/);});
+ const graded=(kind,edit)=>{
+  const task=makeGusekTask(kind,42),opt=solveGusekTask(task),model=edit(trustedGusekModel(task),task);
+  return gradeGusekExam(kind,42,{taskKind:kind,mathprog:model,values:opt.values,reportedObjective:opt.objective,hintsUsed:false});
+ };
+ it('integrated transport grade accepts route cap as variable upper bound',()=>{
+  const grade=graded('transport',(model,task)=>model.replace('var Raktar1_Bolt3 >=0, integer;',`var Raktar1_Bolt3 >=0, <= ${task.capacities[0][2]}, integer;`).replace(/^s\\.t\\. route_cap:[^\\n]*;\\n?/m,''));
+  assert.equal(grade.points,1);
+ });
+ it('integrated tablet grade accepts explicit nonnegative constraint',()=>{
+  const grade=graded('tablet',model=>model.replace('var epres >=0;','var epres;').replace('s.t. osszetetel:','s.t. nonneg_epres: epres >= 0;\\ns.t. osszetetel:'));
+  assert.equal(grade.points,1);
+ });
+ it('integrated transport grade accepts split equality and weaker redundant route cap',()=>{
+  const grade=graded('transport',(model,task)=>model.replace(/s\\.t\\. supply_1: ([^;]+) = (\\d+);/,(_m,expr,n)=>`s.t. upper_balance: ${expr} <= ${n};\\ns.t. lower_balance: ${expr} >= ${n};`).concat(`\\ns.t. duplicate_weak: Raktar1_Bolt3 <= ${task.capacities[0][2]+10};`));
+  assert.equal(grade.points,1);
+ });
+ it('integrated grading still rejects altered capacity and integer relaxation',()=>{
+  const wrongCap=graded('transport',(model,task)=>model.replace(`Raktar1_Bolt3 <= ${task.capacities[0][2]};`,`Raktar1_Bolt3 <= ${task.capacities[0][2]-1};`));
+  const wrongDomain=graded('froccs',model=>model.replace('xKF >=0, integer','xKF >=0'));
+  assert.equal(wrongCap.points,0);assert.equal(wrongDomain.points,0);
+ });
+
 });
