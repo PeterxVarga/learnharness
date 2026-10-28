@@ -682,3 +682,48 @@ unreachable in the coding container). Current accessible, inline-
 highlighted textarea is a working dependency-free alternative,
 not a feature-identical replacement. Keep the PR DRAFT / NO MERGE
 until the one requested final qualification has completed.
+
+## R14Z integration follow-through: local projects, task recovery and stale-response fences
+
+This implementation batch hardens an actual learner session rather than
+adding another disconnected solver prototype:
+
+- **Practice resume**: each task has its own private IndexedDB draft,
+  scoped to chat (or standalone), task kind, exact seed and scalar/indexed
+  dialect. The saved fields are only model source, entered solution JSON,
+  objective and the learner's hints-used flag. The solver token, grade,
+  provider secrets and original chat transcript are excluded. New-task
+  loading restores a matching draft; failure falls back to a clean
+  server-supplied starter. All operations remain local.
+- **Stale response control**: task-load generations guard out-of-order
+  server responses. Edited models, answers, objectives, variants and hints
+  invalidate the current displayed grade. Late grade and native-solver
+  responses cannot reappear as if they belonged to the current edit.
+  Switching variants while a previous fetch is pending remains usable.
+- **Named projects**: the free Workbench can save, list, open and delete
+  local `.mod` + `.dat` project snapshots. Snapshots have validated
+  UUIDs and names, bounded source/data, and a 40-project storage cap.
+  A project snapshot is distinct from the one automatically saved
+  active workspace; neither can create a server-side score. Project
+  listing reveals names and timestamps, never source or solver output.
+- **Final browser contract**: the Practice acceptance script now proves
+  indexed source draft reload before solver transfer and the real
+  authoritative grade. The free Workbench browser script verifies that
+  a named project snapshot restores its original model after editing.
+- **Final verification gate** now expects 401 offline tests across 32
+  suites and 2757 npm tests, plus TypeScript, Next build, actual
+  rootless Podman GLPK and two Chromium flows. Browser automation keeps
+  Chromium sandbox enabled, and checks the full TAP test count rather
+  than the exit code alone.
+
+New pure source suites are 8 cases for Practice draft scoping and
+8 for project snapshot contracts. Both passed 8/8 in isolated JS
+tests against the current GitHub source. This is NOT a full Fedora,
+Chromium or Podman qualification. The user requested that substantial
+coding proceed without repeated intermediate Fedora checks.
+
+Open items: true CodeMirror 6 remains uninstalled because reliable
+package-lock regeneration is unavailable here; the working GMPL
+editor currently uses an inline highlighted textarea. Multi-tab
+browser synchronization, comprehensive real-GLPK adversarial testing
+and actual complete QA receipts are not yet proven. Keep PR draft.
