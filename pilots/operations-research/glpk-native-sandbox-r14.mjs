@@ -4,12 +4,12 @@
  * Disabled by default; requires an explicit immutable local image ID.
  */
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,openSync,closeSync,fstatSync,readFileSync,constants} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 const IMAGE_ID=/^sha256:[a-f0-9]{64}$/;
-const MODEL_MAX=65536, DATA_MAX=65536, MAX_OUTPUT=8192;
+const MODEL_MAX=65536, DATA_MAX=65536, MAX_OUTPUT=8192, MAX_LISTING=24_576;
 const cleanText=(s,max)=>typeof s==='string'&&s.length>0&&Buffer.byteLength(s,'utf8')<=max&&!s.includes('\0');
 const bounded=(s)=>typeof s==='string'?s.slice(0,MAX_OUTPUT):'';
 const result=(status,code,more={})=>({status,code,graded:false,points:null,...more});
@@ -46,6 +46,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
     stage=mkdtempSync(join(tmpdir(),'learnharness-r14n-'));
     writeFileSync(join(stage,'model.mod'),model,{mode:0o600,flag:'wx'});
     if(data)writeFileSync(join(stage,'data.dat'),data,{mode:0o600,flag:'wx'});
+    if(mode==='solve')mkdirSync(join(stage,'out'),{mode:0o700});
     const args=[
       'run','--rm','--pull=never','--network=none','--http-proxy=false',
       '--userns=keep-id','--read-only','--read-only-tmpfs=false',
@@ -54,10 +55,13 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       '--ipc=private','--image-volume=ignore',
       '--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m',
       '--ulimit=nofile=64:64','--ulimit=fsize=1048576:1048576',
-      '--volume='+stage+':/input:ro,Z','--workdir=/tmp','--timeout=12',
+      '--volume='+stage+':/input:ro,Z',
+      ...(mode==='solve'?['--volume='+join(stage,'out')+':/output:rw,Z']:[]),
+      '--workdir=/tmp','--timeout=12',
       imageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
       '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
-      '--tmlim','8','--seed','0'
+      '--tmlim','8','--memlim','192','--seed','0',
+      ...(mode==='solve'?['--output','/output/solution.txt']:[])
     ];
     const run=spawn('podman',args,{encoding:'utf8',timeout:20000,maxBuffer:65536,shell:false,env});
     if(run.error?.code==='ETIMEDOUT')return result('TIME_LIMIT','outer_timeout');
@@ -67,11 +71,27 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
     if(run.status!==0)return result('GLPK_ERROR','solver_or_runtime_error',{
       exitCode:run.status,diagnostic:bounded(run.stderr||run.stdout)
     });
+    // glpsol --output writes an optional human-readable primal/row listing.
+    // Do not follow links or read oversized files: MathProg's printf/table
+    // might have influenced the sandbox output. It is NEVER a grade proof.
+    let solutionListing=null;
+    if(mode==='solve'){
+      let fd;
+      try{
+        fd=openSync(join(stage,'out','solution.txt'),constants.O_RDONLY|constants.O_NOFOLLOW);
+        const st=fstatSync(fd);
+        if(st.isFile()&&st.size<=MAX_LISTING){
+          const raw=readFileSync(fd);
+          if(raw.length<=MAX_LISTING)solutionListing=raw.toString('utf8');
+        }
+      }catch{/* absence, symlink or oversized output is not a grade */}
+      finally{if(fd!==undefined)closeSync(fd);}
+    }
     // Solver console output is deliberately informational, NOT a trusted
     // proof of correctness: source can contain display/printf statements.
     return result('GLPK_COMPLETED','completed',{
       exitCode:0,mode,diagnostic:bounded(run.stdout),
-      solverOutputTrusted:false
+      solutionListing,solverOutputTrusted:false
     });
   }catch{
     return result('BLOCKED','staging_failed');
