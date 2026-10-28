@@ -111,6 +111,60 @@ describe('R14 async GLPK Podman controller (does not call real Podman)',()=>{
   const r=await runNativeGmplAsync({model,imageId:IMAGE,signal:controller.signal,execCommand:command});
   assert.equal(r.status,'CANCELLED');assert.equal(r.points,null);
  });
+ it('a failed Podman CLI cleans its exact, private cidfile container by ID',async()=>{
+  const cid='b'.repeat(64),commands=[],x=mockExec();let stage;
+  const wrapped=async(binary,args,opts)=>{
+   commands.push(args);
+   if(args[0]==='rm'){
+    assert.deepEqual(args,['rm','--force','--ignore',cid]);
+    assert.equal(opts.signal,undefined);
+    assert.ok(opts.timeout<=5000);
+    return {stdout:''};
+   }
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    assert.ok(args.includes('--cidfile='+stage+'/podman.cid'));
+    writeFileSync(stage+'/podman.cid',cid+'\n');
+    throw Object.assign(new Error('dead Podman CLI'),{signal:'SIGTERM'});
+   }
+   return x.exec(binary,args,opts);
+  };
+  const r=await runNativeGmplAsync({model,imageId:IMAGE,execCommand:wrapped});
+  assert.equal(r.status,'TIME_LIMIT');assert.equal(r.points,null);
+  assert.equal(commands.filter(a=>a[0]==='rm').length,1);
+  assert.equal(existsSync(stage),false);
+ });
+ it('malformed cidfile never becomes an arbitrary container-delete instruction',async()=>{
+  const x=mockExec();let stage;const commands=[];
+  const wrapped=async(binary,args,opts)=>{
+   commands.push(args);
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    writeFileSync(stage+'/podman.cid','../some-container\n');
+    throw Object.assign(new Error('abort'),{code:'ABORT_ERR'});
+   }
+   if(args[0]==='rm')throw Error('unexpected container delete');
+   return x.exec(binary,args,opts);
+  };
+  const r=await runNativeGmplAsync({model,imageId:IMAGE,execCommand:wrapped});
+  assert.equal(r.status,'CANCELLED');assert.equal(r.points,null);
+  assert.equal(commands.filter(a=>a[0]==='rm').length,0);
+  assert.equal(existsSync(stage),false);
+ });
+ it('normal --rm completion never invokes force delete even with a cidfile',async()=>{
+  const cid='c'.repeat(64),x=mockExec();let stage,forced=0;
+  const wrapped=async(binary,args,opts)=>{
+   if(args[0]==='rm'){forced++;return {stdout:''};}
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    writeFileSync(stage+'/podman.cid',cid+'\n');
+   }
+   return x.exec(binary,args,opts);
+  };
+  const r=await runNativeGmplAsync({model,imageId:IMAGE,execCommand:wrapped});
+  assert.equal(r.status,'GLPK_COMPLETED');
+  assert.equal(forced,0);assert.equal(existsSync(stage),false);
+ });
  it('an unresolved subprocess promise is awaited without blocking the event loop',async()=>{
   let resolveRun;let called=false;
   const gate=new Promise(resolve=>{resolveRun=resolve;});
