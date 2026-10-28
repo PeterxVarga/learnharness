@@ -50,6 +50,12 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
  const [draftState,setDraftState]=useState<'loading'|'restored'|'saved'|'unavailable'|'idle'>('idle');
+ function invalidateAnswer(){
+  // An answer revision supersedes any in-flight grade, without discarding
+  // the already computed GLPK evidence that the learner might re-transfer.
+  formEpoch.current++;
+  setBusy(false);setDraftState('idle');setGrade(null);
+ }
  function invalidateForm(){
   formEpoch.current++;
   setDraftState('idle');
@@ -296,7 +302,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
        onClick={()=>{
         const transfer=preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot});
         if(!transfer.ok){setNativeError('A GLPK-eredmény nem vehető át: '+transfer.code);return;}
-        formEpoch.current++;setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));setGrade(null);
+        invalidateAnswer();setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));
        }} className="rounded border px-3 py-2 text-sm disabled:opacity-50">
        Optimális GLPK-megoldás átvétele a beadáshoz
       </button>}
@@ -308,10 +314,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     </section>
     <GusekValuesGrid kind={kind} dialect={kind==='transport'?transportDialect:'scalar'}
      variableNames={task.variableNames} value={values} disabled={busy}
-     onChange={next=>{formEpoch.current++;setDraftState('idle');setValues(next);setGrade(null);}}/>
+     onChange={next=>{invalidateAnswer();setValues(next);}}/>
     <label htmlFor="gusek-objective" className="block font-semibold">{task.objectiveSense==='max'?'Maximális bevétel':'Minimális célfüggvényérték'}</label>
-    <input id="gusek-objective" inputMode="decimal" className="w-full rounded border bg-transparent p-2" value={objective} onChange={e=>{formEpoch.current++;setObjective(e.target.value);setGrade(null);}}/>
-    <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{formEpoch.current++;setHints(e.target.checked);setGrade(null);}}/> Használtam segítséget</label>
+    <input id="gusek-objective" inputMode="decimal" className="w-full rounded border bg-transparent p-2" value={objective} onChange={e=>{invalidateAnswer();setObjective(e.target.value);}}/>
+    <label className="flex gap-2 text-sm"><input type="checkbox" checked={hints} onChange={e=>{invalidateAnswer();setHints(e.target.checked);}}/> Használtam segítséget</label>
     <button disabled={busy||binding==='checking'||binding==='failed'} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Teljes megoldás ellenőrzése</button>
   </section>}
   {task&&<p data-testid="gusek-practice-draft-status-r14z" className="text-xs text-neutral-500 xl:col-span-2">Piszkozat: {draftState==='restored'?'helyi mentés visszaállítva':draftState==='saved'?'helyben mentve':draftState==='unavailable'?'a helyi mentés nem elérhető':'mentés folyamatban'}</p>}
