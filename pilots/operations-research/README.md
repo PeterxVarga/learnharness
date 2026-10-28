@@ -499,3 +499,20 @@ cases, and browser Practice). Earlier R14 scripts pinned to older
 commits are obsolete. The user explicitly requested no more
 incremental Fedora test rounds. Keep the stacked PR draft.
 
+## R14W: dual-mode Workbench code batch (2026-10-28)
+
+The GUSEK Workbench now has a **single entry component**:
+\`components/gusek-workbench.tsx\`, reached from both \`/pilot/gusek\`
+and the existing Practice chat integration. It contains two modes:
+- **Vizsgagyakorlás** mounts the existing R13/R14 indexed task editor, authoritative 1/0/null grader, chat history and teacher-coaching behavior unchanged.
+- **Szabad munkaterület** offers model.mod/data.dat tabs, bounded file import and file download, an example scalar GNU MathProg model, GLPK check/solve using the existing explicitly-enabled local token-protected endpoint, solver-status/console/solution listing panels, and an error-line jump from glpsol diagnostics. No grading, chat source persistence, or provider calls.
+
+The two panes stay mounted when toggling so an unfinished practice answer is not lost by switching modes. The free workspace uses browser-native IndexedDB to save only the bounded .mod and .dat strings, not solution values, tokens, history or model-provider credentials. An isolated local draft can survive page reload; failure to access IndexedDB leaves the editor usable but reports local-save unavailability. No cross-device sync is implied. Input/output file size is bounded at 64 KiB each and no arbitrary filesystem paths are accepted.
+
+Free-workspace native results are tagged to the exact in-memory input snapshot. If either source file changes, the UI warns that the displayed GLPK result is stale. GLPK model/data error diagnostics can jump to a local editor line for known staged filenames only; arbitrary file paths are ignored.
+
+**Qualification scope and gaps**: the new pure \`workspace-files.mjs\` test suite has 14 cases (14/14 passed through an isolated JS execution of GitHub source and tests, not the Fedora runtime). The aggregate source gate is now **332 expected offline tests in 26 suites**, with **2688 expected npm cases** (not executed on this SHA). The final Next.js/TypeScript, real IndexedDB reload, browser split layout, Podman/GLPK and adversarial isolation tests are **pending**, by prior user decision for one comprehensive final Fedora qualification. All prior scripts pinned to old R14 SHAs are superseded.
+
+**Explicitly not yet implemented:** CodeMirror 6 and GMPL syntax highlighting/advanced editor affordances, line-accurate diagnostic markers in CodeMirror, structured machine-variable table and safe transfer of optimal values into Practice, a non-blocking bounded local solver queue, and browser end-to-end acceptance of the Workbench. CodeMirror is not introduced as a floating dependency without a reproducible package-lock update; that belongs to the next cohesive code batch.
+
+Do not merge until final acceptance. The original R13 qualified draft and main branch remain untouched.
