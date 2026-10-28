@@ -30,6 +30,7 @@ const errorsHu:Record<string,string>={
 };
 export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void}){
  const [kind,setKind]=useState<Kind>('transport'),[seed,setSeed]=useState('42'),[task,setTask]=useState<Task|null>(null);
+ const [transportDialect,setTransportDialect]=useState<'scalar'|'indexed'>('scalar');
  const [source,setSource]=useState(''),[values,setValues]=useState(''),[objective,setObjective]=useState(''),[hints,setHints]=useState(false);
  const [dataFile,setDataFile]=useState(''),[nativeToken,setNativeToken]=useState('');
  const [nativeAvailable,setNativeAvailable]=useState(false),[nativeBusy,setNativeBusy]=useState(false);
@@ -58,8 +59,15 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
    const r=await fetch(`/api/pilot/gusek?kind=${kind}&seed=${seed}`,{cache:'no-store'}),x=await r.json();
    if(!r.ok)throw Error(x.error??'Feladat nem érhető el.');
    const t=x.task as Task;
-   setTask(t);setSource('# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n');
-   setValues(starter(t.variableNames));setObjective('');setHints(false);setDataFile('');setNativeResult(null);setNativeError('');pending.current=null;
+   const indexed=kind==='transport'&&transportDialect==='indexed';
+   const preset=x.indexed as {starter?:string;dataTemplate?:string}|undefined;
+   if(indexed&&(!preset?.starter||!preset.dataTemplate))throw Error('Indexelt feladatminta nem érhető el.');
+   setTask(t);
+   setSource(indexed?preset!.starter!:'# GUSEK / GNU MathProg modell (.mod)\n# var, s.t., minimize/maximize; a solve; és end; opcionális.\n\n');
+   setValues(indexed?JSON.stringify(Object.fromEntries(
+    Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>[`x[${i+1},${j+1}]`,0])).flat()
+   ),null,2):starter(t.variableNames));
+   setObjective('');setHints(false);setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeError('');pending.current=null;
   }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
  }
  async function runNative(mode:'solve'|'check'){
@@ -106,6 +114,14 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
     <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);setTask(null);setGrade(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
+    {kind==='transport'&&<label className="text-sm">MathProg felírás
+     <select data-testid="gusek-transport-dialect-r14" aria-label="MathProg felírás" value={transportDialect}
+      onChange={e=>{setTransportDialect(e.target.value as 'scalar'|'indexed');setTask(null);setGrade(null);setNativeResult(null);}}
+      className="mt-1 block rounded border bg-background p-2">
+      <option value="scalar">Skalár változók (R13)</option>
+      <option value="indexed">Indexelt x[i,j] + .dat (R14)</option>
+     </select>
+    </label>}
     <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{setSeed(e.target.value);setTask(null);setGrade(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
@@ -121,7 +137,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching}:{chatId?:str
   {task&&<section className="space-y-3 rounded-xl border p-5">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
     <textarea id="gusek-source" className="h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={source} spellCheck={false} onChange={e=>{setSource(e.target.value);setGrade(null);setNativeResult(null);}}/>
-    <p className="text-xs text-neutral-500">A vizsgapontozó jelenleg skalár modelleket ellenőriz. A natív GLPK mód ettől külön működik: indexelt GNU MathProg modelleket is lefordíthat és megoldhat, de a konzolkimenete <strong>nem</strong> bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
+    <p className="text-xs text-neutral-500">A pontozó a három szintetikus skalár vizsgatípust és a <strong>3×3 indexelt szállítási modell egy ellenőrzött MathProg-résznyelvét</strong> támogatja. Az általános indexelt GNU MathProg továbbra is nem értékelhető lehet. A natív GLPK diagnosztika külön működik, a konzolkimenet nem bizonyít helyes feladatmodellezést és nem ad automatikus pontot.</p>
+    {task.kind==='transport'&&transportDialect==='indexed'&&<p data-testid="gusek-indexed-guidance-r14" className="text-xs text-neutral-500">Az indexelt mintában a célfüggvényt és a két egyensúlyi feltételt neked kell megírnod. A .dat a feladat ellenőrzött adatait tartalmazza; a pontozás mindig a szerveroldali feladatot használja, nem a kézzel módosított .dat tartalmát. A változóértékeket x[1,1]…x[3,3] kulcsokkal add meg.</p>}
     <section data-testid="gusek-native-r14" className="space-y-3 rounded-lg border p-3" aria-label="Natív GNU GLPK futtatás">
      <h3 className="font-semibold">GNU GLPK – eredeti MathProg-futtatás (R14)</h3>
      <label htmlFor="gusek-data" className="block text-sm">Opcionális adatfájl (.dat)</label>
