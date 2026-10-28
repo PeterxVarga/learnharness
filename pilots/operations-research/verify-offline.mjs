@@ -33,7 +33,7 @@ const suites = [
   { name: 'r13-gusek-model', file: 'gusek-r13.test.mjs', count: 22 },
   { name: 'r13-gusek-http', file: 'gusek-http-r13.test.mjs', count: 6, flags: ['--experimental-strip-types'] },
   { name: 'r14-scalar-equivalence', file: 'gusek-equivalence-r14.test.mjs', count: 16 },
-  { name: 'r14n-native-glpsol-sandbox', file: 'glpk-native-sandbox-r14.test.mjs', count: 14 },
+  { name: 'r14n-native-glpsol-sandbox', file: 'glpk-native-sandbox-r14.test.mjs', count: 16 },
   { name: 'r14-native-http-security', file: 'gusek-native-api-r14.test.mjs', count: 16, flags: ['--experimental-strip-types'] },
 ];
 const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts','../../components/gusek-exam.tsx','../../app/pilot/gusek/page.tsx'];
