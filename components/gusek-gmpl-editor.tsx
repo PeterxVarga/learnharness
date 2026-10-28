@@ -130,7 +130,9 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
    </div>
    <textarea ref={attach} id={id} aria-label={label} data-testid={testId} readOnly={readOnly}
     rows={rows} value={value} spellCheck={false} placeholder={placeholder}
-    onChange={e=>{onChange(e.target.value);setCursor(e.target.selectionStart);}}
+    onChange={e=>{const next=e.target.value;
+     if(next.includes('\0')||new TextEncoder().encode(next).length>65536)return;
+     onChange(next);setCursor(e.target.selectionStart);}}
     onSelect={e=>setCursor(e.currentTarget.selectionStart)}
     onScroll={e=>{if(gutter.current)gutter.current.scrollTop=e.currentTarget.scrollTop;}}
     onKeyDown={handleKey}
