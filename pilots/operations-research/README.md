@@ -336,3 +336,46 @@ Do not enable execution of arbitrary learner MathProg under the existing
 `qualify-glpsol-r5.mjs`: it intentionally runs **trusted synthetic** fixtures
 only. Full GUSEK execution needs a distinct sandbox qualification, not just
 `sudo dnf install glpk-utils`.
+
+## R14N — Native GNU MathProg in rootless Podman
+
+The first R14N implementation adds **real GNU GLPK/GLPSOL processing** for
+standalone GNU MathProg `.mod` files and optional separate `.dat` data files.
+It does **not** award grades and is not connected to a public API. R13/R14A
+Practice scoring remains independent and is not inferred from solver log text.
+
+**Open source donor:** Fedora `glpk-utils` provides unmodified `glpsol`
+from GNU GLPK (GPL-3.0-or-later). An optional local container is described
+by `Containerfile.glpk-r14`; building it is a deliberate operator action.
+`glpk.js` remains an optional JSON-level adapter, **not** a replacement for
+GNU MathProg translation.
+
+Native execution is fail-closed: `runNativeGmpl()` requires a local
+`sha256:<64 hex>` image ID; refuses rootful or unavailable Podman;
+uses `--pull=never --network=none --http-proxy=false --userns=keep-id`,
+read-only rootfs and input bind mount, no capabilities, no-new-privileges,
+256 MiB memory, 1 CPU, 32 PIDs, 12s container and 20s parent timeout.
+Only temporary staged inputs are exposed; no repo, home, credentials or
+provider configuration are mounted. GLPK writes only to its internal
+restricted tmpfs. Output is capped. Failed starts and timeouts are not
+interpreted as grades. Unknown GLPK syntax is a diagnostic, not automatic
+0 points. Execution of potentially unsafe `include`, `printf`, `table`
+and similar MathProg features remains confined to the sandbox, not
+treated as a reason to bypass it.
+
+**To build locally, explicitly:** in the operations research folder
+`podman build -f Containerfile.glpk-r14 -t localhost/learnharness-glpk:r14 .`.
+This pulls Fedora packages, costs disk space and is NOT done by tests.
+Inspect `podman image inspect --format '{{.Id}}' localhost/learnharness-glpk:r14`
+and set that exact digest as `LH_GLPK_IMAGE_ID`. The CLI invocation is
+`node pilots/operations-research/run-glpk-r14.mjs --model /path/example.mod [--data /path/example.dat] [--check]`.
+The CLI is for a local owner-controlled test only; output provides
+diagnostics and `graded:false`, not a certified optimum/grade.
+
+The **R14N qualification gate** is 13 new no-external-call safety tests.
+R14 total expected offline suite count is **257 tests / 21 suites**,
+full `npm test` expected **2613 tests**. The actual rootless Podman
+execution, cross-checking GLPK's optimum with an independent solver, and
+browser integration are **not qualified** merely by these tests.
+Do not merge or expose the solver route until the real Fedora qualification,
+a malicious MathProg isolation probe, and user-facing acceptance have passed.
