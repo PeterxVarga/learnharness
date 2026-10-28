@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {describe,it} from 'node:test';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync,readFileSync,writeFileSync,symlinkSync} from 'node:fs';
 import {runNativeGmpl} from './glpk-native-sandbox-r14.mjs';
 const image='sha256:'+'a'.repeat(64);
 const model='var x >= 0; maximize total: x; s.t. limit: x <= 3; solve; end;';
@@ -24,7 +24,9 @@ const setup=({rootless=true,exists=true,executionStatus=0,error=null}={})=>{
    assert.ok(args.includes('--image-volume=ignore'));
    assert.ok(args.includes('--http-proxy=false'));
    assert.ok(args.includes('--timeout=12'));
-   assert.equal(args.at(-1),'0');
+   assert.ok(args.includes('--seed'));assert.equal(args[args.indexOf('--seed')+1],'0');
+   assert.ok(args.includes('--memlim'));assert.equal(args[args.indexOf('--memlim')+1],'192');
+   if(args.includes('--output'))assert.equal(args[args.indexOf('--output')+1],'/output/solution.txt');
    assert.ok(!args.includes('--privileged'));
    assert.ok(!args.includes('--network=host'));
    return {status:executionStatus,stdout:'GLPK summary; UNVERIFIED',stderr:'GLPK error',error};
@@ -64,6 +66,35 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
      if(oldSecret===undefined)delete process.env.LH_TEST_R14_SECRET;else process.env.LH_TEST_R14_SECRET=oldSecret;
      if(oldRemote===undefined)delete process.env.CONTAINER_HOST;else process.env.CONTAINER_HOST=oldRemote;
    }
+ });
+ it('returns bounded GLPK printed solution listing, never a certified grade',()=>{
+   const x=setup(),base=x.spawn;
+   const mock=(binary,args,opts)=>{
+     if(args[0]==='run'){
+       const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
+       assert.ok(mount);const dir=mount.slice('--volume='.length).split(':/output:')[0];
+       writeFileSync(dir+'/solution.txt','Problem: model\\nObjective: total = 3 (MAXimum)\\nColumn name Activity\\nx 3\\n');
+     }
+     return base(binary,args,opts);
+   };
+   const r=runNativeGmpl({model,imageId:image,spawn:mock});
+   assert.match(r.solutionListing,/Objective: total = 3/);
+   assert.equal(r.graded,false);assert.equal(r.points,null);
+   assert.ok(!existsSync(x.stage));
+ });
+ it('does not follow a symlinked solver output into host files',()=>{
+   const x=setup(),base=x.spawn;
+   const mock=(binary,args,opts)=>{
+     if(args[0]==='run'){
+       const mount=args.find(v=>v.startsWith('--volume=')&&v.includes(':/output:'));
+       const dir=mount.slice('--volume='.length).split(':/output:')[0];
+       symlinkSync('/etc/passwd',dir+'/solution.txt');
+     }
+     return base(binary,args,opts);
+   };
+   const r=runNativeGmpl({model,imageId:image,spawn:mock});
+   assert.equal(r.solutionListing,null);assert.equal(r.graded,false);
+   assert.ok(!existsSync(x.stage));
  });
  it('an unavailable Podman binary is blocked, never falls back to host glpsol',()=>{const x=setup();const custom=(binary,args,opts)=>args[0]==='info'?{error:Object.assign(new Error('not found'),{code:'ENOENT'}),status:null}:x.spawn(binary,args,opts);const r=runNativeGmpl({model,imageId:image,spawn:custom});assert.equal(r.code,'rootless_podman_unavailable');});
 });
