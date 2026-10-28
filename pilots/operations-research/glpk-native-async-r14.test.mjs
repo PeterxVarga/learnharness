@@ -76,6 +76,41 @@ describe('R14 async GLPK Podman controller (does not call real Podman)',()=>{
   assert.equal(r.status,'GLPK_COMPLETED');assert.equal(r.solverStatus,'UNKNOWN');
   assert.equal(r.columnStatus,'NOT_TRANSFERABLE');assert.deepEqual(r.columns,[]);
  });
+ it('does not spawn any process when the request was already cancelled',async()=>{
+  const controller=new AbortController(),x=mockExec();controller.abort();
+  const r=await runNativeGmplAsync({model,imageId:IMAGE,signal:controller.signal,execCommand:x.exec});
+  assert.equal(r.status,'CANCELLED');assert.equal(r.points,null);
+  assert.equal(x.calls.length,0);
+ });
+ it('cancels an active native run, cleans staged inputs, and never awards points',async()=>{
+  const controller=new AbortController();let stage=null;
+  const x=mockExec(),wait=async(binary,args,opts)=>{
+   if(args[0]==='run'){
+    stage=args.find(a=>a.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
+    assert.equal(opts.signal,controller.signal);
+    return new Promise((resolve,reject)=>{
+     if(opts.signal.aborted)return reject(Object.assign(new Error('Aborted'),{code:'ABORT_ERR'}));
+     opts.signal.addEventListener('abort',()=>reject(Object.assign(new Error('Aborted'),{code:'ABORT_ERR'})),{once:true});
+    });
+   }
+   return x.exec(binary,args,opts);
+  };
+  const pending=runNativeGmplAsync({model,imageId:IMAGE,signal:controller.signal,execCommand:wait});
+  for(let n=0;n<20&&!stage;n++)await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(stage);controller.abort();
+  const r=await pending;assert.equal(r.status,'CANCELLED');assert.equal(r.points,null);
+  assert.equal(existsSync(stage),false);
+ });
+ it('an abort during image inspection returns cancelled rather than an image failure',async()=>{
+  const controller=new AbortController();
+  const x=mockExec();
+  const command=async(binary,args,opts)=>{
+   if(args[0]==='image'){controller.abort();throw Object.assign(new Error('Abort'),{code:'ABORT_ERR'});}
+   return x.exec(binary,args,opts);
+  };
+  const r=await runNativeGmplAsync({model,imageId:IMAGE,signal:controller.signal,execCommand:command});
+  assert.equal(r.status,'CANCELLED');assert.equal(r.points,null);
+ });
  it('an unresolved subprocess promise is awaited without blocking the event loop',async()=>{
   let resolveRun;let called=false;
   const gate=new Promise(resolve=>{resolveRun=resolve;});
