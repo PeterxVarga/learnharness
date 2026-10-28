@@ -13,7 +13,7 @@ const native={schema:'learnharness.r14z.native-final.v1',status:'PASS',
  scalar:{status:'OPTIMAL'},indexed:{status:'OPTIMAL',variables:9},
  universityTasks:['transport','froccs','tablet'].map(kind=>({kind,status:'OPTIMAL',points:1}))};
 const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',
- checks:Array.from({length:10},(_,i)=>'W'+i)},
+ checks:Array.from({length:11},(_,i)=>'W'+i)},
  {schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks:Array.from({length:15},(_,i)=>'P'+i),
   mockedNativeOnly:true,realPracticeGrade:true},
  {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:Array.from({length:6},(_,i)=>'L'+i),
