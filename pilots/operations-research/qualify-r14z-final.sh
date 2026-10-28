@@ -190,6 +190,10 @@ STEP="browser_practice"
 timeout --kill-after=15s 240s node pilots/operations-research/gusek-practice-browser-r14.mjs >"$EVIDENCE/browser-practice.log" 2>&1 || {
  tail -n 60 "$EVIDENCE/browser-practice.log"; exit 1;
 }
+STEP="browser_live_native"
+timeout --kill-after=15s 240s node pilots/operations-research/gusek-live-native-browser-r14z.mjs >"$EVIDENCE/browser-live-native.log" 2>&1 || {
+ tail -n 60 "$EVIDENCE/browser-live-native.log"; exit 1;
+}
 STEP="final_git"
 [[ "$(git rev-parse HEAD)" == "$PIN" ]] || { echo "BLOCKED_HEAD_CHANGED"; exit 2; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { echo "BLOCKED_DIRTY_AFTER_CHECK"; exit 2; }
