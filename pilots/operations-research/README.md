@@ -289,3 +289,50 @@ The Practice header offers an **explicit first-user** Hungarian operations resea
 **Offline regression expectation:** 196 tests across 17 suites (prior 179 + 5 Practice-course tests + 12 native source-contract checks). The 12 R12 checks are source-bound integration contracts, **not** a substitute for a compiled TSX or real browser. Their 16 supporting GitHub blob-level checks were performed before commit. The full 196-test suite, `npm test`, `npm run typecheck`, `npm run build`, actual browser walkthrough, native `glpsol`, and live AI-provider explanation are all **NOT YET VERIFIED**. Fedora remains offline; don't promote this draft PR or claim a certified MVP until those gates are observed.
 
 For Fedora: use `bash scripts/qualify-release-r10-fedora.sh <R12_EXACT_SHA>` and inspect the generated receipts. Do not use GitHub Actions; do not run arbitrary learner-authored MathProg with GLPK. A trusted `/usr/bin/glpsol` is required for native solver qualification. Existing chat transcripts, raw learner source privacy, and all-or-nothing scoring must remain unchanged.
+
+## R14A — Scalar MathProg equivalence + open-source GLPK bridge (DRAFT)
+
+R14A builds on the R13 accepted Fedora MVP without replacing its constrained parser
+or grading contract. The `gusek-equivalence-r14.mjs` module gives a *positive*
+equivalence proof only for scalar LP/MILP models with identical named variables,
+objective, integrality, and canonical linear half-spaces. It accepts scaled or
+reordered rows, split equality constraints, a cap moved from `s.t.` into a
+variable's declared upper bound, an explicit nonnegativity constraint replacing
+a declaration bound, and redundant weaker constraints with the same normal.
+For anything it cannot prove, the old verifier remains the grading fallback.
+This is NOT an arbitrary mathematical-equivalence oracle and can reject
+different but correct formulations. Arbitrary new variable names, indexed
+set/param/sum generalization, nonlinear statements, file IO, and general
+GUSEK grammar are **not qualified**.
+
+The accompanying `toGlpkJsProblem(model,glpk)` is a **pure, non-executing**
+adapter from the already parsed scalar AST to the JSON LP schema used by
+[jvail/glpk.js](https://github.com/jvail/glpk.js) (GPL-3.0). It supplies
+variable bounds, integer/binary domains, objective direction, and constraints,
+returning a separate constant objective offset. No new dependency is installed,
+no WASM is loaded, and no learner `.mod` source is sent to a solver.
+
+Open-source candidates and rationale:
+- [GNU GLPK](https://www.gnu.org/software/glpk/): authoritative MathProg
+  translator and LP/MIP solver; GPL-3. Fedora CLI is in `glpk-utils`.
+- [glpk.js](https://github.com/jvail/glpk.js): JSON-level GLPK WebAssembly,
+  GPL-3. It does **not** parse arbitrary MathProg; the R14A bridge uses the
+  published JSON contract only. An isolated resource-capped worker and
+  result/oracle verification are prerequisites to actual solving.
+- [HiGHS](https://highs.dev/): MIT-licensed LP/MIP alternative for independent
+  numerical cross-checks; does not replace GLPK's MathProg grammar.
+The LearnHarness repository is AGPL-3.0-only; GNU's GPL FAQ explicitly permits
+linking AGPLv3 and GPLv3 modules. Review downstream distribution obligations
+before shipping third-party solver binaries.
+
+New suite `gusek-equivalence-r14.test.mjs`: 16 deterministic regressions,
+also run by `npm test`. The offline verifier contract grows to **244 tests /
+20 suites**. R13 was already qualified at SHA
+`5130777b87e7eb29fb1221a9f3786de6d31043a6` (228/228 offline,
+2584/2584 npm, Next build, localhost HTTP, Practice browser acceptance).
+R14A source changes need their **own** exact-SHA Fedora and browser qualification.
+
+Do not enable execution of arbitrary learner MathProg under the existing
+`qualify-glpsol-r5.mjs`: it intentionally runs **trusted synthetic** fixtures
+only. Full GUSEK execution needs a distinct sandbox qualification, not just
+`sudo dnf install glpk-utils`.
