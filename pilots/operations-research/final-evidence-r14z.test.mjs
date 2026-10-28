@@ -16,7 +16,16 @@ const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',
  checks:Array.from({length:11},(_,i)=>'W'+i)},
  {schema:'learnharness.r14z.practice-browser.v1',status:'PASS',checks:Array.from({length:15},(_,i)=>'P'+i),
   mockedNativeOnly:true,realPracticeGrade:true},
- {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:Array.from({length:16},(_,i)=>'L'+i),
+ {schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks:[
+  'LIVE_NATIVE_UI_READY',
+  ...['transport','froccs','tablet'].flatMap(kind=>[
+   kind+'_SEEDED_TASK_LOADED',
+   kind+'_EXACT_TRUSTED_SOURCE_ENTERED',
+   kind+'_REAL_GLPK_OPTIMAL_COLUMNS',
+   kind+'_EXPLICIT_TRANSFER_TO_NAMED_GRID',
+   kind+'_REAL_INDEPENDENT_FULL_CREDIT'
+  ])
+ ],
   realNativeGlpk:true,realPracticeGrade:true,nativeCalls:3,gradeCalls:3,
   scenarios:['transport','froccs','tablet'].map(kind=>({kind,taskId:'gusek-'+kind+'-42',nativeCalls:1,gradeCalls:1,points:1}))}];
 const fixture=()=>({head:H,status:'PASS',step:'final_receipt',logs,offline,native,browsers});
@@ -79,5 +88,6 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[browsers[2].scenarios[0],browsers[2].scenarios[0],browsers[2].scenarios[2]]}]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[{...browsers[2].scenarios[0],points:0},...browsers[2].scenarios.slice(1)]}]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],checks:[]}]}).status,'BLOCKED');
+  assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],checks:[...browsers[2].checks.slice(0,15),'STALE_TEST_LABEL']}]}).status,'BLOCKED');
  });
 });
