@@ -87,7 +87,11 @@ export async function saveNamedGusekProject(
  const id=crypto.randomUUID();
  const project=makeGusekProject({id,name,model,data});
  const key=projectStoreKey(project.id)!;
- await inWriteOrder(()=>withStore('readwrite',store=>store.put(project,key)));
+ await inWriteOrder(async()=>{
+  const count=summarizeProjects(await withStore<unknown[]>('readonly',store=>store.getAll())).length;
+  if(count>=40)throw new Error('Legfeljebb 40 helyi projektpillanatkép menthető.');
+  await withStore('readwrite',store=>store.put(project,key));
+ });
  return {id:project.id,name:project.name,createdAt:project.createdAt};
 }
 export async function listNamedGusekProjects():Promise<Array<{id:string;name:string;createdAt:number}>>{
