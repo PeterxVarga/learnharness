@@ -2,6 +2,7 @@
  * Storage is intentionally scoped to the browser profile, not a server account.
  */
 import {makeWorkspaceDraft,readWorkspaceDraft} from './workspace-files.mjs';
+import {makePracticeDraft,readPracticeDraft,practiceDraftKey} from './practice-draft-r14z.mjs';
 
 const DB_NAME='learnharness-gusek-workbench';
 const STORE='drafts';
@@ -53,4 +54,27 @@ export async function saveFreeWorkspaceDraft(model:string,data:string):Promise<v
 }
 export async function clearFreeWorkspaceDraft():Promise<void>{
  await inWriteOrder(()=>withStore('readwrite',store=>store.delete(KEY)));
+}
+
+/** Private per-chat/seed/dialect drafts. Unknown chat keys fail closed. */
+export async function readGusekPracticeDraft(
+ chatId:string|null,kind:string,seed:string,dialect:string
+):Promise<{model:string;values:string;objective:string;hintsUsed:boolean}|null>{
+ const key=practiceDraftKey(chatId,kind,seed,dialect);
+ if(!key)return null;
+ await lastWrite;
+ const stored=await withStore<unknown>('readonly',store=>store.get(key));
+ const draft=readPracticeDraft(stored,{kind,seed,dialect});
+ return draft?{model:draft.model,values:draft.values,objective:draft.objective,hintsUsed:draft.hintsUsed}:null;
+}
+export async function saveGusekPracticeDraft(
+ chatId:string|null,input:{
+  taskId:string;kind:string;seed:string;dialect:string;
+  model:string;values:string;objective:string;hintsUsed:boolean
+ }
+):Promise<void>{
+ const key=practiceDraftKey(chatId,input.kind,input.seed,input.dialect);
+ if(!key)throw new Error('invalid_practice_draft_key');
+ const draft=makePracticeDraft(input);
+ await inWriteOrder(()=>withStore('readwrite',store=>store.put(draft,key)));
 }
