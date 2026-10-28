@@ -5,19 +5,20 @@
 const VALID_NAME=/^(?:[A-Za-z_][A-Za-z0-9_]{0,63}|x\[[1-3],[1-3]\])$/;
 const NUM=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/;
 const MAX_JSON=8192;
+const isVariableName=name=>typeof name==='string'&&VALID_NAME.test(name)&&!['__proto__','prototype','constructor'].includes(name);
 export function expectedGridNames(kind,variableNames,dialect='scalar'){
  if(!['transport','froccs','tablet'].includes(kind))return null;
  if(kind==='transport'&&dialect==='indexed')
   return Array.from({length:3},(_,i)=>Array.from({length:3},(_,j)=>'x['+(i+1)+','+(j+1)+']')).flat();
  if(dialect!=='scalar'||!Array.isArray(variableNames)||variableNames.length!==
   (kind==='transport'?9:kind==='froccs'?10:2)||
-  !variableNames.every(n=>typeof n==='string'&&VALID_NAME.test(n))||
+  !variableNames.every(isVariableName)||
   new Set(variableNames).size!==variableNames.length)return null;
  return [...variableNames];
 }
 export function readGridAnswer(json,names){
  if(typeof json!=='string'||json.length>MAX_JSON||!Array.isArray(names)||names.length<1||
-  names.length>30||new Set(names).size!==names.length||names.some(n=>!VALID_NAME.test(n)))
+  names.length>30||new Set(names).size!==names.length||names.some(n=>!isVariableName(n)))
   return {ok:false,code:'invalid_grid_input',cells:[]};
  let source;
  try{source=JSON.parse(json);}catch{return {ok:false,code:'invalid_json',cells:[]};}
