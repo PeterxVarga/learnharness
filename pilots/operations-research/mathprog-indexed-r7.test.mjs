@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {describe,it} from 'node:test';
+import {assessIndexedMathProg,gradeIndexedMathProg,EXAMPLE_INDEXED_MODEL,trustedIndexedData} from './mathprog-indexed-r7.mjs';
+import {makeTransportTask,solveTransportTask} from './transport-exam-r3.mjs';
+const correct=(seed=42)=>{const t=makeTransportTask(seed),o=solveTransportTask(t);return {mathprog:EXAMPLE_INDEXED_MODEL,allocation:o.exemplar,reportedObjective:o.objective,hintsUsed:false};};
+const grade=(change,seed=42)=>{const a=correct(seed);change(a);return gradeIndexedMathProg(seed,a);};
+describe('R7 bounded indexed MathProg model and binary exam scoring',()=>{
+ it('accepts the canonical 3x3 model and complete optimum',()=>{for(let s=0;s<30;s++){const g=gradeIndexedMathProg(s,correct(s));assert.equal(g.points,1,`seed=${s}`);assert.equal(g.status,'FULL_CREDIT');}});
+ it('accepts harmless reorder of declarations and comments',()=>{const a=correct();let ls=a.mathprog.split('\n');ls.unshift('# sample course comment');[ls[1],ls[2]]=[ls[2],ls[1]];a.mathprog=ls.join('\n');assert.equal(gradeIndexedMathProg(42,a).points,1);});
+ it('accepts a reversed product term in objective',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace('cost[i,j] * x[i,j]','x[i,j] * cost[i,j]'));assert.equal(g.points,1);});
+ it('accepts supply <= and demand >= in balanced problem',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace('= supply[i]','<= supply[i]').replace('= demand[j]','>= demand[j]'));assert.equal(g.points,1);});
+ it('accepts capacity as explicit indexed constraint rather than variable upper bound',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace('>= 0, <= cap[i,j]','>= 0').replace('solve;','s.t. route_cap{i in I, j in J}: x[i,j] <= cap[i,j];\nsolve;'));assert.equal(g.points,1);});
+ it('rejects missing capacity under supported template with zero',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace(', <= cap[i,j]',''));assert.equal(g.points,0);assert.ok(g.errors.includes('source_missing_route_capacity'));});
+ it('rejects an omitted demand constraint and never awards partial points',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace(/^s\.t\. demand_balance[^\n]*\n/m,''));assert.equal(g.points,0);assert.equal('partialCredit' in g,false);});
+ it('rejects an omitted objective and all nine variables requirement',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace(/^minimize[^\n]*\n/m,''));assert.equal(g.points,0);});
+ it('rejects fake model-supplied score and nonoptimal plan',()=>{const a=correct();a.claimedPoints=999;a.status='optimal';a.reportedObjective+=1;const g=gradeIndexedMathProg(42,a);assert.equal(g.points,0);});
+ it('rejects a missing or hinted independence claim',()=>{assert.equal(grade(a=>delete a.hintsUsed).points,0);assert.equal(grade(a=>a.hintsUsed=true).points,0);});
+ it('rejects malformed source, missing solve/end, and duplicate declarations',()=>{for(const bad of [s=>s.slice(0,-4),s=>s.replace('set J;',''),s=>s.replace('set J;','set J;\nset J;')]){const g=grade(a=>a.mathprog=bad(a.mathprog));assert.equal(g.points,0);}});
+ it('unsupported symbolic expressions never falsely earn 0 points',()=>{for(const tweak of [s=>s.replace('cost[i,j] * x[i,j]','(cost[i,j]+2)*x[i,j]'),s=>s.replace('sum{i in I,j in J}', 'sum{(i,j) in IxJ}'),s=>s.replace('solve;','data;\nsolve;')]){const g=grade(a=>a.mathprog=tweak(a.mathprog));assert.equal(g.status,'UNASSESSABLE');assert.equal(g.points,null);}});
+ it('refuses model IO and executable statements without evaluating',()=>{for(const code of ['include "../secret.mod";','printf "HI";','table x OUT "CSV";']){const g=grade(a=>a.mathprog=a.mathprog.replace('solve;',`${code}\nsolve;`));assert.equal(g.status,'UNASSESSABLE');}});
+ it('rejects duplicate or non-equivalent constraints conservatively',()=>{const g=grade(a=>a.mathprog=a.mathprog.replace('sum{j in J} x[i,j]','sum{j in J} x[j,i]'));assert.equal(g.status,'UNASSESSABLE');});
+ it('trusted .dat is reproducible for each seed',()=>{const x=trustedIndexedData(42);assert.equal(x,trustedIndexedData(42));assert.match(x,/param cost: 1 2 3 :=/);assert.match(x,/param cap: 1 2 3 :=/);assert.ok(!/undefined|NaN/.test(x));});
+ it('100 seeds pass static source validation independent of score',()=>{for(let s=0;s<100;s++){const t=makeTransportTask(s);const a=assessIndexedMathProg(t,EXAMPLE_INDEXED_MODEL);assert.equal(a.ok,true);}});
+ it('large and invalid text is never evaluated or credited',()=>{assert.equal(grade(a=>a.mathprog='x'.repeat(17_000)).points,null);assert.equal(grade(a=>a.mathprog={}).points,null);});
+ it('unbalanced trusted model fails validation, not a fabricated pass',()=>{const t={...makeTransportTask(42),demand:[0,0,0]};const a=assessIndexedMathProg(t,EXAMPLE_INDEXED_MODEL);assert.equal(a.ok,false);});
+});

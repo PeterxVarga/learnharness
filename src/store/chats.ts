@@ -9,12 +9,13 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { appendOnceToChat } from "../../pilots/operations-research/attempt-service-r9.mjs";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, TurnUsage, TransportAttemptReceipt } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
-import type { LhMessage } from "../core/native-messages.ts";
+import type { LhMessage, LhMarkerMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 
@@ -84,7 +85,7 @@ function listChats(): ChatSummary[] {
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
 			.filter((r): r is ChatRecord => r !== null)
-			.map(({ messages, tree, turns, extractions, ...summary }) => {
+			.map(({ messages, tree, turns, extractions, transportAttempts: _privateTransportAttempts, ...summary }) => {
 				// Per-record isolation (Wave B): a record whose messages fail the
 				// projection (e.g. pre-Wave-B UIMessage-format scratch — the
 				// zero-back-compat wipe makes these "corrupt") must not blank the
@@ -135,6 +136,15 @@ function saveMessages(id: string, messages: LhMessage[]): void {
  * turn id: each REQUEST carries its own id, so a replay of the same turn's
  * persist appends once, while continuation turns (which share a response
  *  message id) each keep their usage. */
+function appendTransportAttempt(id: string, receipt: TransportAttemptReceipt, marker: LhMarkerMessage): { receipt: TransportAttemptReceipt; replayed: boolean } {
+  const record = getChat(id);
+  if (!record) throw new Error("chat_not_found");
+  const outcome = appendOnceToChat(record, receipt, marker);
+  if (!outcome.replayed) writeChat(outcome.record as ChatRecord);
+  return { receipt: outcome.receipt as TransportAttemptReceipt, replayed: outcome.replayed };
+}
+
+/** R9 receipt and trusted marker persist in the same chat JSON write. */
 function appendTurnUsage(id: string, entry: TurnUsage): void {
 	const record = getChat(id);
 	if (!record) throw new Error(`Chat not found: ${id}`);
@@ -210,6 +220,7 @@ export const chatStore: ChatStore = {
 	getChat,
 	listChats,
 	saveMessages,
+  appendTransportAttempt,
 	saveTree,
 	saveSettings,
 	renameChat,

@@ -9,7 +9,7 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
-import type { LhMessage } from "./native-messages.ts";
+import type { LhMessage, LhMarkerMessage } from "./native-messages.ts";
 import type {
 	ChatRecord,
 	ChatSettings,
@@ -28,6 +28,8 @@ import type {
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
 
+import type { TransportAttemptReceipt } from "./contracts/chat.ts";
+
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
 export interface ChatStore {
@@ -42,6 +44,7 @@ export interface ChatStore {
 	/** Persist the full native message list (the record IS the agent
 	 * state — Wave B, owner-approved 2026-09-26). */
 	saveMessages(id: string, messages: LhMessage[]): void;
+  appendTransportAttempt(id: string, receipt: TransportAttemptReceipt, marker: LhMarkerMessage): { receipt: TransportAttemptReceipt; replayed: boolean };
 	/** Persist the session plan tree (plan tools call this in execute). */
 	saveTree(id: string, tree: PlanTree): void;
 	/** Append one usage entry to the record's turn log (the money channel,

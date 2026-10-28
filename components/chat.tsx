@@ -53,6 +53,9 @@ import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
+import { TransportExam } from "@/components/transport-exam";
+import { GusekExam } from "@/components/gusek-exam";
+import { createPracticeCourseStarter } from "@/src/agent/courses/operations-research-hu";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
@@ -244,6 +247,8 @@ export function Chat({
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
 	const sourceTextParts = useMemo(() => firstSourceTextParts(messages), [messages]);
+	const [transportExamOpen, setTransportExamOpen] = useState(false);
+	const [gusekExamOpen,setGusekExamOpen] = useState(false);
 
 	// The reattach settled terminal → the sync-and-continue seam (below).
 	setReattachSettled(() => reattachSettledRef.current());
@@ -1196,7 +1201,7 @@ export function Chat({
 		    dock overlays the column bottom (outside the scroller); a spacer in
 		    the transcript reserves its height. */}
 		<div className="flex h-dvh">
-			<div className="flex min-w-0 flex-1 flex-col">
+			<div className="relative flex min-w-0 flex-1 flex-col">
 				{/* The top bar is its own block (owner, top-fade round 4): in flow
 				    above the scroller on the plain page background — no gradient. Its
 				    bottom outline (border-b border-border) matches the one that
@@ -1297,7 +1302,33 @@ export function Chat({
 					{/* Practice (owner, 2026-10-04): the coverage ring hides —
 				    practice never extracts, so an ever-filling ring with no
 				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
+					{kind === "practice" && !nativeMessages.some(m => m.role === "user") && (
+            <button type="button" data-testid="or-course-activate-r12"
+              disabled={busy || compacting || Boolean(activeProblem)}
+              onClick={() => { void send({ type: "text", text: createPracticeCourseStarter() }); }}
+              className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
+              Operációkutatás gyakorlása
+            </button>
+          )}
+          {kind === "practice" && (
+            <button type="button" data-testid="gusek-exam-link-r13"
+              disabled={Boolean(activeProblem) || busy || compacting}
+              aria-expanded={gusekExamOpen}
+              onClick={() => { setTransportExamOpen(false); setGusekExamOpen(open=>!open); }}
+              className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
+              {gusekExamOpen ? "GUSEK gyakorló bezárása" : "GUSEK (.mod) vizsgagyakorló"}
+            </button>
+          )}
+          {kind === "practice" && (
+            <button type="button" data-testid="transport-exam-link"
+              disabled={Boolean(activeProblem) || busy || compacting}
+              aria-expanded={transportExamOpen}
+              onClick={() => { setGusekExamOpen(false); setTransportExamOpen(open => !open); }}
+              className="lh-no-drag rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
+              {transportExamOpen ? "Vizsgagyakorló bezárása" : "Szállítási vizsgagyakorló"}
+            </button>
+          )}
+          {kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
 					{/* Practice sessions: no phase arc — a quiet Practice tag
 					    instead of the phase chip. */}
 					{kind === "practice" ? (
@@ -1315,7 +1346,38 @@ export function Chat({
 					)}
 				</TopBar>
 
-				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
+        {kind === "practice" && gusekExamOpen && (
+          <section data-testid="native-gusek-exam-r13" aria-label="GUSEK vizsgagyakorló" className="absolute inset-0 z-30 overflow-y-auto bg-background">
+            <div className="sticky top-0 z-10 border-b bg-background px-5 py-3">
+              <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => {setGusekExamOpen(false);void syncFromServer();}}>Vissza a Practice beszélgetéshez</button>
+            </div>
+            <GusekExam chatId={chatId} embedded onRequestCoaching={() => {
+              setGusekExamOpen(false);
+              void (async () => {
+                await syncFromServer();
+                await send({ type: "text", text: "Kérem az utolsó szerver által ellenőrzött GUSEK-vizsgakísérletem hibájának célzott magyar magyarázatát. A pontszámot ne módosítsd; új feladatot csak kérésemre adj." });
+              })();
+            }} />
+          </section>
+        )}
+				{kind === "practice" && transportExamOpen && (
+          <section data-testid="native-transport-exam-r12" aria-label="Operációkutatás – vizsgagyakorló" className="absolute inset-0 z-30 overflow-y-auto bg-background">
+            <div className="sticky top-0 z-10 border-b bg-background px-5 py-3">
+              <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => { setTransportExamOpen(false); void syncFromServer(); }}>Vissza a Practice beszélgetéshez</button>
+            </div>
+            <TransportExam chatId={chatId} embedded onRequestCoaching={() => {
+              setTransportExamOpen(false);
+              // The attempt marker is appended server-side. Adopt the fresh record
+              // BEFORE posting the learner's coaching request to prevent a stale
+              // client transcript from racing with the authoritative receipt.
+              void (async () => {
+                await syncFromServer();
+                await send({ type: "text", text: "Kérem az utolsó, szerver által ellenőrzött szállítási vizsgakísérlet hibáinak célzott magyar magyarázatát. Az értékelést ne módosítsd; új feladatot csak külön kérésemre adj." });
+              })();
+            }} />
+          </section>
+        )}
+        <SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />

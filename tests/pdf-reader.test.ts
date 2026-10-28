@@ -236,3 +236,53 @@ describe("pdf-reader loop (faux engine)", () => {
 		assert.deepEqual(result.pagesConsulted, []);
 	});
 });
+
+describe("pdf-reader strict provenance regression (faux engine)", () => {
+	it("pdf_extract pages=all credits the pages actually extracted", async () => {
+		const engine = fauxEngine([
+			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "all" }, { id: "extract-all" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("The three-page document was consulted (p. 1), (p. 2), (p. 3).")]),
+		]);
+		const result = await runPdfReaderAgent({ path: FIXTURE, question: "summarize the document" }, { engine });
+		assert.deepEqual(result.pagesRead, [1, 2, 3]);
+		assert.deepEqual(result.pagesConsulted, [1, 2, 3]);
+		assert.match(result.brief, /Pages consulted: 1, 2, 3/);
+	});
+
+	it("rejects an unconsulted citation, retries once, and only delivers the correction", async () => {
+		const engine = fauxEngine([
+			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1" }, { id: "extract-one" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("Unsupported but confident (p. 99). Pages consulted: 99")]),
+			fauxAssistantMessage([fauxText("Supported from the extracted first page (p. 1). Pages consulted: 1, 99")]),
+		]);
+		const result = await runPdfReaderAgent({ path: FIXTURE, question: "what was on page 1?" }, { engine });
+		assert.doesNotMatch(result.brief, /p\. 99/);
+		assert.deepEqual(result.pagesConsulted, [1]);
+		assert.match(result.brief, /Pages consulted: 1$/);
+	});
+
+	it("fails closed after repeated invented citations", async () => {
+		const engine = fauxEngine([
+			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1" }, { id: "extract-one" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("Invented answer (p. 99).")]),
+			fauxAssistantMessage([fauxText("Still invented (p. 42).")]),
+		]);
+		const result = await runPdfReaderAgent({ path: FIXTURE, question: "fact check" }, { engine });
+		assert.match(result.brief, /^PDF failed: ungrounded source brief/);
+		assert.deepEqual(result.pagesConsulted, [1]);
+	});
+});
+
+
+describe("pdf-reader bounded retry fail-closed regressions", () => {
+	it("never delivers a rejected citation when the iteration budget expires", async () => {
+		const engine = fauxEngine([
+			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1" }, { id: "extract-budget" })], { stopReason: "toolUse" }),
+			fauxAssistantMessage([fauxText("Invented source (p. 99).")]),
+		]);
+		const result = await runPdfReaderAgent({ path: FIXTURE, question: "what happened?" }, { engine, maxIterations: 2 });
+		assert.match(result.brief, /^PDF failed: iteration limit/);
+		assert.doesNotMatch(result.brief, /Invented source/);
+		assert.deepEqual(result.pagesConsulted, [1]);
+	});
+});

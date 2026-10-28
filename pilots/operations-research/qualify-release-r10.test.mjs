@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {describe,it} from 'node:test';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {EXPECTED_SUITES,EXPECTED_TESTS,parseArgs,validateOfflineReceipt,overallStatus,REQUIRED_STEPS,qualify} from './qualify-release-r10.mjs';
+const sha='a'.repeat(64),head='a'.repeat(40);
+const complete=()=>({status:'PASS',totalTests:228,suites:Object.entries(EXPECTED_SUITES).map(([name,passed])=>({name,passed})),sourceSha256:Object.fromEntries(Array.from({length:28},(_,i)=>['f'+i,sha]))});
+const passes=()=>Object.fromEntries(REQUIRED_STEPS.map(key=>[key,{status:'PASS'}]));
+describe('R10 exact-commit release gate',()=>{
+ it('suite count really sums to 228',()=>assert.equal(EXPECTED_TESTS,228));
+ it('accepts only exact 19-suite 228/228 evidence',()=>assert.equal(validateOfflineReceipt(complete()),true));
+ it('rejects forged success with 117',()=>{const x=complete();x.totalTests=117;assert.equal(validateOfflineReceipt(x),false);});
+ it('rejects a swapped suite or false suite count',()=>{const x=complete();x.suites[1].name='invented';assert.equal(validateOfflineReceipt(x),false);const y=complete();y.suites[1].passed=5;assert.equal(validateOfflineReceipt(y),false);});
+ it('rejects duplicate suites and bad SHA source',()=>{const x=complete();x.suites[1].name=x.suites[0].name;assert.equal(validateOfflineReceipt(x),false);const y=complete();y.sourceSha256.f1='wrong';assert.equal(validateOfflineReceipt(y),false);});
+ it('requires real source manifest',()=>{const x=complete();delete x.sourceSha256;assert.equal(validateOfflineReceipt(x),false);});
+ it('all mandatory checks must pass',()=>assert.equal(overallStatus(passes()),'PASS'));
+ it('missing evidence never passes',()=>{const x=passes();delete x.native_glpsol;assert.equal(overallStatus(x),'BLOCKED');x.native_glpsol={status:'BLOCKED'};assert.equal(overallStatus(x),'BLOCKED');});
+ it('failing single gate yields FAIL',()=>{const x=passes();x.next_build.status='FAIL';assert.equal(overallStatus(x),'FAIL');});
+ it('requires explicit exact commit, no implicit floating branch',()=>{assert.deepEqual(parseArgs(['--repo','/tmp/r','--expected-head',head]),{repo:'/tmp/r',expectedHead:head,output:null,fullBuild:false,native:false});for(const a of [[],['--repo','/tmp/x'],['--expected-head',head],['--repo','/x','--expected-head','main'],['--repo','/x','--expected-head',head,'--native','--native'],['--repo','/x','--expected-head',head,'--mod','student.mod']])assert.throws(()=>parseArgs(a));});
+ it('accepts full-build and native explicitly',()=>{const x=parseArgs(['--repo','/r','--expected-head',head,'--native','--full-build','--output','/out']);assert.equal(x.native,true);assert.equal(x.fullBuild,true);assert.equal(x.output,'/out');});
+ it('cannot emit PASS for fake repository without pinned commit',()=>{const d=mkdtempSync(join(tmpdir(),'lh-r10-test-'));try{const r=qualify({repo:d,expectedHead:head,output:d+'-evidence'});assert.equal(r.status,'FAIL');assert.equal(r.steps.git_pin.status,'FAIL');assert.ok(readFileSync(d+'-evidence/r10-receipt.json','utf8').includes('SHA_MISMATCH')||r.steps.git_pin.exitCode!==0);}finally{rmSync(d,{force:true,recursive:true});rmSync(d+'-evidence',{force:true,recursive:true});}});
+});

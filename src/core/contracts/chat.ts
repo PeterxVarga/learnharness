@@ -26,6 +26,14 @@ import type { EmissionStats } from "./graph.ts";
  *  reads as teach); "practice" marks an adaptive-practice session — the
  *  practice agent, its two tools, no extraction, no graph writes. */
 export type ChatKind = "teach" | "practice";
+export interface TransportAttemptReceipt {
+  schema: "learnharness.transport-attempt.r9";
+  id: string; chatId: string; taskId: string; seed: number; submittedAt: string;
+  status: "FULL_CREDIT" | "ZERO_CREDIT" | "UNASSESSABLE";
+  points: 0 | 1 | null; maxPoints: 1; correct: boolean | null;
+  errors: string[]; dialect: "json" | "expanded" | "indexed" | "gusek_scalar_r13"; answerSha256: string;
+  scope: "formative_unproctored_self_reported_hints";
+}
 
 export interface ChatRecord {
 	id: string;
@@ -52,6 +60,8 @@ export interface ChatRecord {
 	extractions?: ExtractionRunUsage[];
 	/** Per-chat model/thinking overrides for the conversation agents. */
 	settings?: ChatSettings;
+  /** Append-only R9 deterministic formative exam evidence. */
+  transportAttempts?: TransportAttemptReceipt[];
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build

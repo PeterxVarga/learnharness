@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {describe,it} from 'node:test';
+import {GET,POST} from '../../app/api/pilot/transport/route.ts';
+import {EXAMPLE_INDEXED_MODEL} from './mathprog-indexed-r7.mjs';
+import {makeTransportTask,solveTransportTask} from './transport-exam-r3.mjs';
+const URL='http://localhost/api/pilot/transport';
+const answer=(seed=42)=>{const t=makeTransportTask(seed),o=solveTransportTask(t);return {mathprogDialect:'indexed',mathprog:EXAMPLE_INDEXED_MODEL,allocation:o.exemplar,reportedObjective:o.objective,hintsUsed:false};};
+const post=(a,seed='42')=>POST(new Request(URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({seed,answer:a})}));
+describe('R7 HTTP trusted binary scoring for indexed MathProg',()=>{
+ it('GET keeps all task public but solver secret',async()=>{const d=await GET(new Request(URL+'?seed=42')).json();assert.equal('optimalAllocations' in d.task,false);assert.equal('exemplar' in d.task,false);});
+ it('fully correct indexed source and plan receives complete mark',async()=>{const d=await(await post(answer())).json();assert.equal(d.status,'FULL_CREDIT');assert.equal(d.points,1);assert.equal(d.correct,true);});
+ it('auto-detects indexed source without a dialect hint',async()=>{const a=answer();delete a.mathprogDialect;assert.equal((await(await post(a)).json()).points,1);});
+ it('false claimed result or subtly wrong objective receives zero',async()=>{const a=answer();a.reportedObjective+=1;a.claimedPoints=1;a.solverStatus='optimal';const d=await(await post(a)).json();assert.equal(d.points,0);assert.equal(d.status,'ZERO_CREDIT');});
+ it('missing capacity in supported dialect receives zero',async()=>{const a=answer();a.mathprog=a.mathprog.replace(', <= cap[i,j]','');const d=await(await post(a)).json();assert.equal(d.status,'ZERO_CREDIT');assert.ok(d.errors.includes('source_missing_route_capacity'));});
+ it('unsupported full-MathProg construct cannot be called a wrong answer',async()=>{const a=answer();a.mathprog=a.mathprog.replace('solve;','param extra := 2;\nsolve;');const d=await(await post(a)).json();assert.equal(d.status,'UNASSESSABLE');assert.equal(d.points,null);assert.equal(d.correct,null);});
+ it('malicious include directive cannot execute or earn any mark',async()=>{const a=answer();a.mathprog='include "../../private.mod";\n'+a.mathprog;const d=await(await post(a)).json();assert.equal(d.points,null);assert.equal(d.status,'UNASSESSABLE');});
+ it('hinted or unmarked response cannot establish independent point',async()=>{const a=answer();a.hintsUsed=true;assert.equal((await(await post(a)).json()).points,0);delete a.hintsUsed;assert.equal((await(await post(a)).json()).points,0);});
+ it('explicit expanded mode continues to be supported',async()=>{const a=answer();a.mathprogDialect='expanded';const d=await(await post(a)).json();assert.equal(d.points,null);});
+ it('unknown dialect has no score',async()=>{const a=answer();a.mathprogDialect='experimental';const d=await(await post(a)).json();assert.equal(d.points,null);assert.equal(d.status,'UNASSESSABLE');});
+ it('all responses remain no-store',async()=>{for(const r of [GET(new Request(URL+'?seed=42')),await post(answer()),await post({...answer(),mathprog:'x'})])assert.equal(r.headers.get('cache-control'),'no-store, private');});
+});
