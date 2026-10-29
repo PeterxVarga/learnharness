@@ -1190,3 +1190,58 @@ genuine Chromium/Podman run, merge, deployment or Actions
 run occurred during this development batch. Draft PR #2 remains
 open and unmerged; operator-controlled final acceptance is the
 only remaining path to a genuinely qualified release.
+
+## R14Z operator readiness: the no-mutation Fedora preflight
+
+**Decision:** after many unexecuted feature and integration batches,
+the highest-return work is now the REAL Fedora acceptance rather
+than accumulating further synthetic source tests.
+
+The connected Fedora Desktop Commander device was checked on
+2026-10-29 and is **offline**. The isolated coding container also
+cannot resolve github.com over DNS; this is NOT the Fedora machine.
+GitHub commit status currently has no CI checks for the R14Z head.
+Accordingly NO full Next.js, native GLPK, npm or Chromium PASS is
+claimed from this environment.
+
+A new `preflight-r14z.sh` provides an operator-run, **read-only**
+one-command readiness report before expensive installation/builds.
+It does not call `npm ci`, alter the worktree, pull Podman images,
+execute any learner model, use a server token or access a remote
+provider. It checks the exact pinned 40-hex HEAD, branch and clean
+Git tree, nonroot operator, Node.js 20.9+, required CLI programs,
+**at least 2 GiB free** on the project volume and **512 MiB free**
+on /tmp, exact local immutable Podman image and rootless state,
+absolute executable Chromium, and a valid free loopback port.
+
+Usage after updating the local checkout to the intended exact SHA
+and supplying the local image and Chrome environment:
+
+```bash
+bash pilots/operations-research/preflight-r14z.sh "$(git rev-parse HEAD)"
+```
+
+Only when that outputs
+`R14Z_PREFLIGHT=PASS_NO_MUTATION`, operator can execute the
+previously built **one-shot** qualification for that same SHA:
+
+```bash
+bash pilots/operations-research/qualify-r14z-final.sh "$(git rev-parse HEAD)"
+```
+
+The final script still requires explicit
+`LH_GLPK_IMAGE_ID=sha256:<64-hex>` and
+`LH_R14_CHROMIUM=/absolute/path` environment variables; neither
+the preflight nor the final script installs those dependencies or
+makes up their IDs. The final run is NOT executed by this commit.
+
+**Critical known environmental risk:** the Fedora root filesystem
+was previously reported almost full. Actual available disk capacity
+is not currently checked on Fedora, so this preflight may correctly
+block before the 2-GiB build phase. Do not claim capacity is currently
+low without the new local probe.
+
+R14 remains an unmerged draft PR. Real final verification still
+needs **469 offline cases / 37 suites**, **2825 npm cases**, and
+**42 browser checks**, including the 16-step genuinely native
+transport, fröccs and tablet path.
