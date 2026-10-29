@@ -18,7 +18,7 @@ export function GusekValuesGrid({kind,dialect,variableNames,value,onChange,disab
  function edit(name:string,raw:string){
   if(!names||disabled)return;
   const outcome=editGridAnswer(value,names,name,raw);
-  if(!outcome.ok){setPasteNotice('Nem sikerült módosítani az értéket.');return;}
+  if(!outcome.ok||typeof outcome.json!=='string'){setPasteNotice('Nem sikerült módosítani az értéket.');return;}
   onChange(outcome.json);setPasteNotice('');
  }
  function paste(e:ClipboardEvent<HTMLInputElement>,name:string){
@@ -27,7 +27,7 @@ export function GusekValuesGrid({kind,dialect,variableNames,value,onChange,disab
   if(!/[\t\n\r]/.test(source))return;
   const outcome=pasteGridAnswer(value,names,name,source);
   e.preventDefault();
-  if(!outcome.ok){setPasteNotice('Nem megfelelő táblázat: csak véges számok és legfeljebb '+names.length+' változó illeszthető be.');return;}
+  if(!outcome.ok||typeof outcome.json!=='string'){setPasteNotice('Nem megfelelő táblázat: csak véges számok és legfeljebb '+names.length+' változó illeszthető be.');return;}
   onChange(outcome.json);
   setPasteNotice(outcome.imported+' változóérték beillesztve. Az eredményt még be kell adnod.');
  }

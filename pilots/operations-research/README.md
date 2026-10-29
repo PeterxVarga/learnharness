@@ -1369,3 +1369,23 @@ No runtime execution, scoring, policy or solver logic changes. Full
 qualification remains pending; run `npm run typecheck` alone first and
 resolve any further compiler diagnostics before repeating the complete
 R14Z gate.
+
+## R14Z seven TypeScript integration errors — 2026-10-29
+
+The owner's actual Fedora `npm run typecheck` against `56028a5`
+reported seven type errors after the independent native GLPK PASS.
+This chunk covers the four affected implementation files:
+
+- Annotate the pre-existing async runner arguments in ESM, allowing
+  the TypeScript HTTP route to pass `model` without unsafe casts.
+- Restrict editor tab selection and diagnostic jumping to the two
+  permitted file names (`model.mod`, `data.dat`).
+- Require a string from both JS grid adapters before propagating JSON.
+- Preserve the solver-to-Practice proof guard and require a successful
+  transfer shape plus finite objective before editing answer inputs.
+
+No grader, solver policy, sandbox constraints, provider calls,
+runtime scoring or full-suite count changed. This is source-only
+qualification work, not a claimed TypeScript PASS. Run only the
+cheap `npm run typecheck` first on the new exact commit; defer the
+full qualification until compiler and production build are green.

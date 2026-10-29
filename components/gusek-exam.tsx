@@ -72,7 +72,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
- useEffect(()=>{if(nativeDiagnostic)setFileTab(nativeDiagnostic.file);},[nativeResult]);
+ useEffect(()=>{
+  const file=nativeDiagnostic?.file;
+  if(file==='model.mod'||file==='data.dat')setFileTab(file);
+ },[nativeResult]);
  useEffect(()=>{let live=true;fetch('/api/pilot/gusek/native',{cache:'no-store'})
   .then(r=>r.ok?r.json():null).then(x=>{if(live)setNativeAvailable(x?.available===true);})
   .catch(()=>{if(live)setNativeAvailable(false);});return()=>{live=false;};},[]);
@@ -318,7 +321,13 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
        disabled={!preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot}).ok}
        onClick={()=>{
         const transfer=preparePracticeTransfer({result:nativeResult,task,dialect:transportDialect,model:source,data:dataFile,snapshot:nativeSnapshot});
-        if(!transfer.ok){setNativeError('A GLPK-eredmény nem vehető át: '+transfer.code);return;}
+        // Keep the existing independent transfer guard authoritative.
+        // Require a complete, finite success shape before changing inputs.
+        if(!transfer.ok||!('values' in transfer)||!('objective' in transfer)||
+           !transfer.values||typeof transfer.objective!=='number'||
+           !Number.isFinite(transfer.objective)){
+         setNativeError('A GLPK-eredmény nem vehető át: '+(transfer.code??'invalid_transfer'));return;
+        }
         invalidateAnswer();setValues(JSON.stringify(transfer.values,null,2));setObjective(String(transfer.objective));
        }} className="rounded border px-3 py-2 text-sm disabled:opacity-50">
        Optimális GLPK-megoldás átvétele a beadáshoz

@@ -186,10 +186,12 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
  }
  function diagnosticJump(){
   if(!diagnostic)return;
-  setActive(diagnostic.file);
+  const file=diagnostic.file;
+  if(file!=='model.mod'&&file!=='data.dat')return;
+  setActive(file);
   requestAnimationFrame(()=>{
-   const area=diagnostic.file==='model.mod'?modelEditor.current:dataEditor.current;
-   jumpToLine(area,diagnostic.file==='model.mod'?model:data,diagnostic.line);
+   const area=file==='model.mod'?modelEditor.current:dataEditor.current;
+   jumpToLine(area,file==='model.mod'?model:data,diagnostic.line);
   });
  }
  async function runNative(mode:RunMode){

@@ -54,6 +54,10 @@ function readCreatedContainerId(stage){
  }catch{return null;}
  finally{if(fd!==undefined)closeSync(fd);}
 }
+/** Explicit options contract for TypeScript callers of the ESM sandbox.
+ * Arguments remain runtime-validated before any Podman operation.
+ * @param {{model?: string, data?: string, mode?: string, imageId?: string, signal?: AbortSignal, execCommand?: typeof exec}} [options]
+ */
 export async function runNativeGmplAsync({model,data='',mode='solve',imageId,signal,execCommand=exec}={}){
  if(signal?.aborted)return reply('CANCELLED','request_cancelled');
  if(typeof model!=='string'||model.length<1||Buffer.byteLength(model)>65536||model.includes('\0')||
