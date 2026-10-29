@@ -49,15 +49,18 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
+ const gradeRequestEpoch=useRef<number|null>(null);
  const [draftState,setDraftState]=useState<'loading'|'restored'|'saved'|'unavailable'|'idle'>('idle');
  function invalidateAnswer(){
   // An answer revision supersedes any in-flight grade, without discarding
   // the already computed GLPK evidence that the learner might re-transfer.
   formEpoch.current++;
+  gradeRequestEpoch.current=null;
   setBusy(false);setDraftState('idle');setGrade(null);
  }
  function invalidateForm(){
   formEpoch.current++;
+  gradeRequestEpoch.current=null;
   setDraftState('idle');
   nativeAbort.current?.abort();
   nativeAbort.current=null;
@@ -187,8 +190,9 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   if(e.shiftKey)void check();else void runNative('solve');
  }
  async function check(){
-  if(!task||busy||binding==='failed'||binding==='checking')return;
+  if(!task||busy||gradeRequestEpoch.current!==null||binding==='failed'||binding==='checking')return;
   const startedAt=formEpoch.current;
+  gradeRequestEpoch.current=startedAt;
   setBusy(true);setGrade(null);setError('');
   try{
    if(!objective.trim()||!Number.isFinite(Number(objective)))throw Error('Add meg a kiszámított célfüggvényértéket.');
@@ -204,7 +208,12 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
    if(startedAt===formEpoch.current)setGrade(out);
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
-  finally{if(startedAt===formEpoch.current)setBusy(false);}
+  finally{
+   if(gradeRequestEpoch.current===startedAt){
+    gradeRequestEpoch.current=null;
+    setBusy(false);
+   }
+  }
  }
  return <div data-testid="gusek-exam-r13" className="mx-auto grid max-w-[1520px] gap-4 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(280px,0.92fr)_minmax(0,2fr)]">
   <header className="space-y-2 xl:col-span-2"><p className="text-xs uppercase tracking-widest text-neutral-500">LearnHarness · GUSEK / GNU MathProg Workbench</p>
