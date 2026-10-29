@@ -38,6 +38,8 @@ TMP_AVAILABLE_KB="$(df -Pk /tmp | awk 'END{print $4}')"
 }
 EVIDENCE="$(mktemp -d "/tmp/learnharness-r14z-final-XXXXXXXX")"
 chmod 700 "$EVIDENCE"
+# Print the evidence location before any later failure/explicit exit.
+echo "R14Z_EVIDENCE_DIR=$EVIDENCE"
 SERVER_PID=""
 STEP="preflight"
 cleanup(){
@@ -68,7 +70,6 @@ server.once('error',()=>{console.error('BLOCKED_PORT_ALREADY_IN_USE');process.ex
 server.listen({host:'127.0.0.1',port,exclusive:true},()=>server.close());
 JS
 echo "R14Z_FINAL_HEAD=$PIN"
-echo "R14Z_EVIDENCE_DIR=$EVIDENCE"
 echo "=== exact source, dependencies and build ==="
 STEP="npm_ci"
 timeout --kill-after=15s 1200s npm ci --no-audit --no-fund >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
