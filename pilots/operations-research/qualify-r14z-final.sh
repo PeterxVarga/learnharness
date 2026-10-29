@@ -165,6 +165,18 @@ console.log(JSON.stringify({
 }));
 JS
 echo "R14Z_REAL_GLPK=PASS"
+echo "=== dependency-free offline verifier (before expensive npm/build) ==="
+STEP="offline"
+timeout --kill-after=15s 360s node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
+node --input-type=module - "$EVIDENCE/offline.json" <<'JS'
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
+assert.equal(receipt.status,'PASS');
+assert.equal(receipt.totalTests,469);
+assert.equal(receipt.suites.length,37);
+console.log('R14Z_OFFLINE=PASS_469_IN_37');
+JS
 echo "=== exact source, dependencies and build ==="
 STEP="npm_ci"
 timeout --kill-after=15s 1200s npm ci --no-audit --no-fund >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
@@ -187,17 +199,6 @@ try{
  assert.equal(page.url(),'about:blank');
  console.log('R14Z_CHROMIUM_BOOTSTRAP=PASS');
 }finally{await browser.close();}
-JS
-STEP="offline"
-timeout --kill-after=15s 360s node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
-node --input-type=module - "$EVIDENCE/offline.json" <<'JS'
-import {readFileSync} from 'node:fs';
-import assert from 'node:assert/strict';
-const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
-assert.equal(receipt.status,'PASS');
-assert.equal(receipt.totalTests,469);
-assert.equal(receipt.suites.length,37);
-console.log('R14Z_OFFLINE=PASS_469_IN_37');
 JS
 STEP="npm_test"
 timeout --kill-after=15s 1200s npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }

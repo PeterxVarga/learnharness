@@ -1412,3 +1412,32 @@ qualification has run on this new commit. Neither TypeScript strictness nor
 the final clean-Git evidence gate was weakened; real source edits still
 fail the release fence. This generated file remains on disk and is
 recreated/revised by Next commands, but will no longer be a Git change.
+
+## R14Z offline security fixture lifetime and fail-fast qualification — 2026-10-29
+
+The actual Fedora full run on `3d656943` passed clean pinned source,
+preflight, immutable rootless GNU GLPK, `npm ci`, strict TypeScript,
+Next.js production build, and Chromium smoke. It stopped during the
+dependency-free 469-test verifier at two of the 16 native diagnostic
+HTTP tests: missing/malformed tokens and extra/wrong fields unexpectedly
+received 503 instead of 403/400.
+
+The cause is in test setup only: `env(config, cb)` synchronously
+returned `cb()` from inside a `try/finally`. Since `cb()` is async,
+`finally` restored the configuration before awaited `POST` resumed;
+the production endpoint correctly reported "not configured" (503).
+The fixture now uses `async function env` with `return await cb()`
+so cleanup happens only after the entire callback finishes, including
+errors/rejections. Existing security assertions remain strict; no
+unauthorized request or malformed body is accepted by the actual API.
+In-place assertions prevent the early env reset from recurring; the
+exact offline suite counts remain 16 and 469.
+
+The one-shot release script now runs the dependency-free offline verifier
+before expensive `npm ci`, typecheck, build and Chromium smoke. This
+keeps the same 469-tests-in-37-suites requirement, SHA receipt, and
+later 2825 npm / 42 browser tests, while failing earlier on isolated
+fixture regressions. Nothing is claimed PASS on the new source until
+the operator runs it. The recommended next test is only the complete
+469-case dependency-free offline verifier, which can catch any remaining
+failures at a fraction of the cost of full qualification.

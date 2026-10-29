@@ -6,12 +6,14 @@ const TOKEN='a'.repeat(64);
 const OTHER='b'.repeat(64);
 const IMAGE='sha256:'+'c'.repeat(64);
 const URI='http://localhost:3000/api/pilot/gusek/native';
-function env(config,cb){
+async function env(config,cb){
+ // Hold the complete operator opt-in environment until the asynchronous
+ // test promise SETTLES, including across POST body reads and awaits.
  const keys=['LH_GLPK_ENABLE_LOCAL','LH_GLPK_IMAGE_ID','LH_GLPK_RUN_TOKEN'];
  const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
  for(const k of keys)delete process.env[k];
  for(const [k,v] of Object.entries(config))process.env[k]=v;
- try{return cb();}
+ try{return await cb();}
  finally{for(const k of keys){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}}
 }
 const ready={LH_GLPK_ENABLE_LOCAL:'1',LH_GLPK_IMAGE_ID:IMAGE,LH_GLPK_RUN_TOKEN:TOKEN};
@@ -24,13 +26,20 @@ describe('R14 native GLPK diagnostic route -- opt-in, local auth, no score autho
   const r=get(),j=await r.json();assert.equal(r.status,200);assert.equal(j.available,false);assert.equal(j.scoreAuthority,false);assert.equal('imageId' in j,false);assert.equal('token' in j,false);
  }));
  it('GET reports available only when the feature, image and token are configured',async()=>env(ready,async()=>{
+  // Promise boundary regression: asynchronous test code must retain the
+  // environment, rather than observing its caller's immediate cleanup.
+  await Promise.resolve();
+  assert.equal(process.env.LH_GLPK_RUN_TOKEN,TOKEN);
   const j=await get().json();assert.equal(j.available,true);assert.equal(j.scoreAuthority,false);
  }));
  it('GET is blocked on a nonlocal host',async()=>env(ready,async()=>assert.equal(get('example.com').status,403)));
  it('GET refuses forwarded host metadata',async()=>env(ready,async()=>assert.equal(get('localhost:3000',{'x-forwarded-host':'evil.com'}).status,403)));
  it('POST fails closed without explicit opt-in',async()=>env({},async()=>assert.equal((await POST(request())).status,503)));
  it('POST refuses absent or malformed token',async()=>env(ready,async()=>{
-  for(const token of ['', 'short','nothex'.repeat(11)])assert.equal((await POST(request({token}))).status,403);
+  for(const token of ['', 'short','nothex'.repeat(11)]){
+   assert.equal(process.env.LH_GLPK_ENABLE_LOCAL,'1','config must survive prior awaited POST');
+   assert.equal((await POST(request({token}))).status,403);
+  }
  }));
  it('POST refuses incorrect 64-byte token',async()=>env(ready,async()=>assert.equal((await POST(request({token:OTHER}))).status,403)));
  it('POST rejects cross-site Origin even with a valid token',async()=>env(ready,async()=>assert.equal((await POST(request({origin:'http://attacker.example'}))).status,403)));
