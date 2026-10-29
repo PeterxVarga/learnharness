@@ -38,6 +38,23 @@ TMP_AVAILABLE_KB="$(df -Pk /tmp | awk 'END{print $4}')"
 }
 EVIDENCE="$(mktemp -d "/tmp/learnharness-r14z-final-XXXXXXXX")"
 chmod 700 "$EVIDENCE"
+SERVER_PID=""
+STEP="preflight"
+cleanup(){
+ local status=$?
+ trap - EXIT
+ if [[ -n "$SERVER_PID" ]]; then
+  # The final gate owns the process it started, not any pre-existing server.
+  kill "$SERVER_PID" 2>/dev/null || true
+  wait "$SERVER_PID" 2>/dev/null || true
+ fi
+ if ((status!=0)); then
+  node pilots/operations-research/final-evidence-r14z.mjs "$EVIDENCE" "$PIN" FAIL "$STEP" >/dev/null 2>&1 || true
+ fi
+ return "$status"
+}
+trap cleanup EXIT
+trap 'echo "R14Z_FAIL_STEP=$STEP"; echo "EVIDENCE_DIR=$EVIDENCE" >&2' ERR
 PORT="$(printenv LH_R14_FINAL_PORT || printf 33770)"
 [[ "$PORT" =~ ^[0-9]{4,5}$ ]] && ((10#$PORT>=1024 && 10#$PORT<=65535)) || {
  echo "BLOCKED_INVALID_PORT"; exit 2;
@@ -50,22 +67,6 @@ const server=net.createServer();
 server.once('error',()=>{console.error('BLOCKED_PORT_ALREADY_IN_USE');process.exitCode=2;});
 server.listen({host:'127.0.0.1',port,exclusive:true},()=>server.close());
 JS
-SERVER_PID=""
-STEP="preflight"
-cleanup(){
- local status=$?
- trap - EXIT
- if [[ -n "$SERVER_PID" ]]; then
-  kill "$SERVER_PID" 2>/dev/null || true
-  wait "$SERVER_PID" 2>/dev/null || true
- fi
- if ((status!=0)); then
-  node pilots/operations-research/final-evidence-r14z.mjs "$EVIDENCE" "$PIN" FAIL "$STEP" >/dev/null 2>&1 || true
- fi
- return "$status"
-}
-trap cleanup EXIT
-trap 'echo "R14Z_FAIL_STEP=$STEP"; echo "EVIDENCE_DIR=$EVIDENCE" >&2' ERR
 echo "R14Z_FINAL_HEAD=$PIN"
 echo "R14Z_EVIDENCE_DIR=$EVIDENCE"
 echo "=== exact source, dependencies and build ==="
@@ -182,7 +183,9 @@ echo "=== Next.js + two final browser flows ==="
 STEP="server"
 TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
 export LH_GLPK_RUN_TOKEN="$TOKEN" LH_GLPK_ENABLE_LOCAL=1
-npm run start -- -H 127.0.0.1 -p "$PORT" >"$EVIDENCE/next-server.log" 2>&1 &
+# Launch Next directly, not under npm's extra shell/process wrapper:
+# cleanup must signal precisely the process owned by this qualification.
+node ./node_modules/next/dist/bin/next start -H 127.0.0.1 -p "$PORT" >"$EVIDENCE/next-server.log" 2>&1 &
 SERVER_PID="$!"
 URL="http://127.0.0.1:$PORT/pilot/gusek"
 READY=0
