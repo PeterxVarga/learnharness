@@ -18,6 +18,9 @@ if(!executablePath?.startsWith('/')||!/^[a-f0-9]{64}$/.test(token??''))
  throw Error('explicit_chromium_and_native_token_required');
 
 const checks=[],network={native:0,grade:0},scenarios=[];
+const observed={native:[],grade:[]};
+let expectedCurrent=null;
+const verifiedResponses={native:[],grade:[]};
 const check=async(name,fn)=>{await fn();checks.push(name);};
 const kinds=['transport','froccs','tablet'];
 const browser=await puppeteer.launch({
@@ -30,9 +33,52 @@ try{
   try{
    const u=new URL(request.url());
    if(u.origin!==new URL(url).origin||request.method()!=='POST')return;
-   if(u.pathname==='/api/pilot/gusek/native')network.native++;
-   if(u.pathname==='/api/pilot/gusek')network.grade++;
+   const raw=request.postData()??'';
+   let body;try{body=JSON.parse(raw);}catch{body=null;}
+   if(u.pathname==='/api/pilot/gusek/native'){
+    network.native++;
+    observed.native.push({
+     matchingModel:body?.model===expectedCurrent?.model,
+     mode:body?.mode==='solve',data:body?.data==='',
+     tokenAuthorized:request.headers()['x-lh-glpk-token']===token
+    });
+   }
+   if(u.pathname==='/api/pilot/gusek'){
+    network.grade++;
+    observed.grade.push({
+     matchingKind:body?.kind===expectedCurrent?.kind,
+     matchingSeed:body?.seed==='42',
+     matchingModel:body?.answer?.mathprog===expectedCurrent?.model,
+     finiteValues:body?.answer?.values&&typeof body.answer.values==='object'&&
+      expectedCurrent?.variableNames?.every(k=>Number.isFinite(body.answer.values[k])),
+     finiteObjective:Number.isFinite(body?.answer?.reportedObjective)
+    });
+   }
   }catch{/* Observe only: never intercept or rewrite any request. */}
+ });
+ page.on('response',response=>{
+  try{
+   const request=response.request(),u=new URL(response.url());
+   if(u.origin!==new URL(url).origin||request.method()!=='POST')return;
+   const bucket=u.pathname==='/api/pilot/gusek/native'?'native':
+    u.pathname==='/api/pilot/gusek'?'grade':null;
+   if(!bucket)return;
+   verifiedResponses[bucket].push((async()=>{
+    try{
+     const body=await response.json();
+     if(bucket==='native')return {
+      http:response.status(),schema:body?.schema,status:body?.status,
+      solverStatus:body?.solverStatus,columnStatus:body?.columnStatus,
+      graded:body?.graded,points:body?.points,
+      names:Array.isArray(body?.columns)?body.columns.map(c=>c.name):[],
+      validValues:Array.isArray(body?.columns)&&
+       body.columns.every(c=>Number.isFinite(c?.value))
+     };
+     return {http:response.status(),schema:body?.schema,taskId:body?.taskId,
+      points:body?.points,maxPoints:body?.maxPoints};
+    }catch{return {http:response.status(),invalidJson:true};}
+   })());
+  }catch{/* No interception and no full response body in receipt. */}
  });
  await page.goto(url,{waitUntil:'networkidle2',timeout:30000});
  await check('LIVE_NATIVE_UI_READY',async()=>{
@@ -52,6 +98,7 @@ try{
   const task=makeGusekTask(kind,42);
   const model=trustedGusekModel(task)+'\nsolve;\nend;\n';
   const startNative=network.native,startGrade=network.grade;
+  expectedCurrent={kind,model,variableNames:task.variableNames};
   await page.select('select[aria-label="Feladattípus"]',kind);
   await page.evaluate(()=>{
    const button=[...document.querySelectorAll('button')].find(
@@ -84,6 +131,21 @@ try{
     document.querySelector('[data-testid="gusek-transfer-solution-r14"]')?.disabled===false,
     {timeout:45000});
    assert.equal(network.native,startNative+1,kind+': exactly one native HTTP call');
+   assert.deepEqual(observed.native.at(-1),{
+    matchingModel:true,mode:true,data:true,tokenAuthorized:true
+   },kind+': real native request payload and local token');
+   const proofs=await Promise.all(verifiedResponses.native.slice(startNative));
+   assert.equal(proofs.length,1,kind+': exactly one GLPK HTTP response');
+   const proof=proofs[0];
+   assert.equal(proof.http,200);
+   assert.equal(proof.schema,'learnharness.glpk-native-diagnostic.r14');
+   assert.equal(proof.status,'GLPK_COMPLETED');
+   assert.equal(proof.solverStatus,'OPTIMAL');
+   assert.equal(proof.columnStatus,'OPTIMAL_COLUMNS');
+   assert.equal(proof.graded,false);
+   assert.equal(proof.points,null);
+   assert.equal(proof.validValues,true);
+   assert.deepEqual([...proof.names].sort(),[...task.variableNames].sort());
    const output=await page.$eval('[data-testid="gusek-native-result-r14"]',el=>el.textContent);
    assert.match(output,/OPTIMAL/);
   });
@@ -118,6 +180,14 @@ try{
    }));
    assert.deepEqual(grade,{taskId:task.id,points:'1'});
    assert.equal(network.grade,startGrade+1,kind+': exactly one real grade POST');
+   const outbound=observed.grade.at(-1);
+   assert.ok(outbound&&Object.values(outbound).every(Boolean),kind+': exact grade payload');
+   const proof=(await Promise.all(verifiedResponses.grade.slice(startGrade)));
+   assert.equal(proof.length,1,kind+': exactly one grader response');
+   assert.deepEqual(proof[0],{
+    http:200,schema:'learnharness.gusek-grade.r13',
+    taskId:task.id,points:1,maxPoints:1
+   },kind+': independent server grade response');
   });
   scenarios.push({kind,taskId:task.id,nativeCalls:network.native-startNative,
    gradeCalls:network.grade-startGrade,points:1});
@@ -127,6 +197,11 @@ try{
  process.stdout.write(JSON.stringify({
   schema:'learnharness.r14z.live-browser.v1',status:'PASS',checks,scenarios,
   realNativeGlpk:true,realPracticeGrade:true,
+  verifiedNativeResponses:verifiedResponses.native.length,
+  verifiedGradeResponses:verifiedResponses.grade.length,
+  verifiedExactRequestBodies:observed.native.length===3&&observed.grade.length===3&&
+   observed.native.every(x=>Object.values(x).every(Boolean))&&
+   observed.grade.every(x=>Object.values(x).every(Boolean)),
   nativeCalls:network.native,gradeCalls:network.grade
  })+'\n');
 }finally{await browser.close();}
