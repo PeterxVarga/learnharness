@@ -1245,3 +1245,42 @@ R14 remains an unmerged draft PR. Real final verification still
 needs **469 offline cases / 37 suites**, **2825 npm cases**, and
 **42 browser checks**, including the 16-step genuinely native
 transport, fröccs and tablet path.
+
+## R14Z Fedora prerequisite unblock — observed 2026-10-29
+
+The first real read-only preflight on a locally prepared R14 worktree
+(older pinned HEAD `25223910d7717d61fcfaca3bdd1236f9b42f3b71`)
+reported: exact Git HEAD/branch, clean tree, Node, disk and loopback
+port all PASS, but **no Chromium executable and no local GLPK container
+image were found**. The final Bash verdict line used an invalid
+`((RESULT===0))` expression; it is now corrected to
+`(( RESULT == 0 ))`. The failed check did not execute any GLPK or
+Next.js suite, and should not be interpreted as a PASS.
+
+To satisfy these prerequisites on Fedora (operator-run only):
+
+1. Install Fedora's distro-managed `chromium` package through
+   `sudo dnf install chromium`, then resolve its actual absolute
+   executable location via `command -v chromium-browser` or
+   `command -v chromium`.
+2. Build `pilots/operations-research/Containerfile.glpk-r14z`
+   with **rootless Podman**. Its explicit recipe installs Debian 13's
+   `glpk-utils` package, which provides `/usr/bin/glpsol`.
+   Runtime access is already bounded by the server's
+   `--pull=never --network=none` and the exact image
+   `sha256:<hex>` environment pin. The Debian base **tag itself
+   is not cryptographically pinned**; the built final image ID is
+   selected immutably for this single qualification. This source
+   recipe and the preflight are included in the offline source
+   digest list, in addition to the exact commit requirement.
+3. Export `LH_GLPK_IMAGE_ID` from the locally built image's full
+   Podman inspect `.Id` and `LH_R14_CHROMIUM` from the installed
+   binary path, then rerun the corrected preflight **on the new exact
+   branch HEAD**, never on a dirty patched source tree.
+
+The build/install actions modify only the Fedora-managed system
+packages and the rootless Podman image storage. They must be
+explicitly run by the owner, not silently claimed as performed
+here. No new npm dependencies, paid provider calls, GitHub Actions
+or application deployment are required to provision these
+prerequisites.
