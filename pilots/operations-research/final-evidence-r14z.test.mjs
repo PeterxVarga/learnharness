@@ -7,7 +7,7 @@ const logs=Object.fromEntries([
  'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ].map(name=>[name,{bytes:9,sha256:S}]));
 const offline={schema:'learnharness.operations-research.offline-verification.v1',
- status:'PASS',totalTests:468,suites:Array.from({length:37},()=>({name:'x',passed:1}))};
+ status:'PASS',totalTests:469,suites:Array.from({length:37},()=>({name:'x',passed:1}))};
 const native={schema:'learnharness.r14z.native-final.v1',status:'PASS',
  translationOnly:'GLPK_COMPLETED',syntaxError:'GLPK_ERROR',
  scalar:{status:'OPTIMAL'},indexed:{status:'OPTIMAL',variables:9},
@@ -54,7 +54,7 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
   assert.equal(validateFinalR14z({...fixture(),step:'browser_practice'}).status,'BLOCKED');
  });
  it('rejects incorrect offline status, count and suite cardinality',()=>{
-  for(const changed of [{status:'FAIL'},{totalTests:467},{suites:[]}])
+  for(const changed of [{status:'FAIL'},{totalTests:468},{suites:[]}])
    assert.equal(validateFinalR14z({...fixture(),offline:{...offline,...changed}}).status,'BLOCKED');
  });
  it('rejects missing verified scalar or indexed optimum',()=>{
