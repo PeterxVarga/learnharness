@@ -1076,3 +1076,58 @@ attested end-to-end results. The PR remains draft, unmerged and
 undeployed; no GitHub Actions or user Fedora execution was triggered.
 CodeMirror 6 remains a separate integration gap because its
 dependencies could not yet be reproducibly locked.
+
+## R14Z-RC4: project-safe native runs, duplicate submission fences and final preflight
+
+This batch remains on the existing `pilot/operations-research-r14`
+stacked DRAFT PR and focuses on **existing release blockers**
+rather than feature proliferation.
+
+1. **Editor dependency decision**. Current `package.json` and
+   `package-lock.json` agree exactly at their top-level dependencies,
+   and no CodeMirror 6 or Lezer package is present in either. The
+   container cannot resolve `registry.npmjs.org`, so a truthful
+   reproducible CodeMirror 6 installation or corresponding
+   package-lock update cannot be made here. We keep the existing
+   bounded GMPL editor with search, completion, indent, syntax
+   highlighting and diagnostics; CodeMirror 6 is an explicit
+   still-open enhancement, not an imaginary installed library.
+2. **Free-Workbench run generations**. Every source edit, imported
+   file, named project opening, new workspace or explicit Practice
+   copy invalidates and aborts the prior native GLPK request. A
+   previously active HTTP response or finalizer may not overwrite
+   the current run, result, error, or busy indicators. A stale async
+   named-project read cannot replace a model edited while the read
+   was pending. Current saved project snapshots remain independent
+   of the live source, and prior GLPK results can be inspected as
+   explicitly stale when appropriate.
+3. **Synchronous duplicate-execution gates**. The free GLPK control
+   checks an in-flight controller ref in addition to React's
+   `running` state; rapid double activation cannot issue two
+   requests in the same state batch. The Practice grade action
+   uses a request-generation guard to prevent simultaneous duplicate
+   grading POSTs; form edits and task switches invalidate old grade
+   generations, and an older response cannot unlock or grade
+   a newer submission.
+4. **One-shot server preflight**. The final Fedora script now
+   validates its port is in the actual 1024–65535 range, refuses
+   an already occupied loopback port before starting Next.js, detects
+   early server exit, and requires a real seeded
+   `/api/pilot/gusek?kind=tablet&seed=42` response with the
+   expected schema and exact `gusek-tablet-42` task. A stray
+   HTTP-200 page or old process no longer serves as readiness proof.
+   This only runs in the owner-controlled final gate.
+5. **Source-level internal checks**. The existing 14 release-receipt
+   contract cases passed isolated JS execution after the previous
+   3-kind live-browser upgrade, and the current lockfile root
+   dependency contract is consistent. This is **not** TypeScript,
+   native GLPK, Next.js build or Chromium execution evidence.
+
+**Latest final required targets** remain **468 offline cases / 37 suites**,
+**2824 npm cases**, and **42 browser checks** across the free
+Workbench (11), synthetic-native but real-grade Practice (15),
+and fully unmocked three-kind browser-to-GLPK-to-grade (16).
+These targets are NOT full-suite PASS receipts. Keep DRAFT /
+NO MERGE / NO DEPLOY and run the complete operator-controlled
+Fedora qualification only once after the release candidate is
+finished and the specified preflight prerequisites are met.
