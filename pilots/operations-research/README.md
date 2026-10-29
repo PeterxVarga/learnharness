@@ -1320,3 +1320,18 @@ has committed, rather than relying only on the textarea's imperatively set
 value. No scorer, native sandbox permissions, provider policy or grading
 contract is broadened. No end-to-end PASS is claimed until the owner-run final
 gate completes on a new, exact clean Git HEAD.
+
+## R14Z machine evidence diagnostic hardening — 2026-10-29
+
+The first real Fedora qualification passed preflight and executed native GLPK,
+but the synthetic scalar solver status was UNKNOWN. The source-only fix
+in this commit attaches bounded, non-sensitive machine-file existence/length
+metadata to both native execution paths: missing, empty, symlinked, oversized,
+unreadable, or present. No raw solver output or secrets are logged. The final
+one-shot scalar gate emits this metadata on failure while retaining its strict
+failure assertion. No solver UNKNOWN is ever promoted to OPTIMAL.
+
+A new small, synthetic-only `diagnose-glpk-r14z.mjs` command is SHA-covered by
+the offline verifier and can be run **once** on the actual Fedora worker to
+distinguish filesystem/namespace issues from a parser/header issue before
+repeating expensive tests. The operator has not run this new source yet.

@@ -16,6 +16,21 @@ const cleanText=(s,max)=>typeof s==='string'&&s.length>0&&Buffer.byteLength(s,'u
 const bounded=(s)=>typeof s==='string'?s.slice(0,MAX_OUTPUT):'';
 const result=(status,code,more={})=>({status,code,graded:false,points:null,...more});
 const allowedMode=new Set(['check','solve']);
+/** Bounded, no-symlink machine file evidence; no raw contents in diagnostics. */
+function readMachineFile(stage,name,max=49152){
+ let fd;
+ try{
+  fd=openSync(join(stage,'out',name),constants.O_RDONLY|constants.O_NOFOLLOW);
+  const st=fstatSync(fd);
+  if(!st.isFile())return {value:null,state:'not_regular',bytes:null};
+  if(st.size>max)return {value:null,state:'oversized',bytes:st.size};
+  const data=readFileSync(fd);
+  if(data.length>max)return {value:null,state:'oversized',bytes:data.length};
+  return {value:data.toString('utf8'),state:data.length?'present':'empty',bytes:data.length};
+ }catch(e){
+  return {value:null,state:e?.code==='ENOENT'?'missing':e?.code==='ELOOP'?'symlink':'unreadable',bytes:null};
+ }finally{if(fd!==undefined)closeSync(fd);}
+}
 function readCreatedContainerId(stage){
  let fd;
  try{
@@ -91,55 +106,24 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
     // glpsol --output writes an optional human-readable primal/row listing.
     // Do not follow links or read oversized files: MathProg's printf/table
     // might have influenced the sandbox output. It is NEVER a grade proof.
-    let solutionListing=null;
-    if(mode==='solve'){
-      let fd;
-      try{
-        fd=openSync(join(stage,'out','solution.txt'),constants.O_RDONLY|constants.O_NOFOLLOW);
-        const st=fstatSync(fd);
-        if(st.isFile()&&st.size<=MAX_LISTING){
-          const raw=readFileSync(fd);
-          if(raw.length<=MAX_LISTING)solutionListing=raw.toString('utf8');
-        }
-      }catch{/* absence, symlink or oversized output is not a grade */}
-      finally{if(fd!==undefined)closeSync(fd);}
-    }
-    // Read GLPK's machine solution header separately from printable output.
-    // Only known, bounded solution shapes are recognized; never a score.
-    let solutionMeta=readGlpkSolutionStatus(null);
-    if(mode==='solve'){
-      let fd;
-      try{
-        fd=openSync(join(stage,'out','solution.raw'),constants.O_RDONLY|constants.O_NOFOLLOW);
-        const st=fstatSync(fd);
-        if(st.isFile()&&st.size<=MAX_LISTING){
-          const raw=readFileSync(fd);
-          if(raw.length<=MAX_LISTING)solutionMeta=readGlpkSolutionStatus(raw.toString('utf8'));
-        }
-      }catch{/* missing/untrusted file yields UNKNOWN */}
-      finally{if(fd!==undefined)closeSync(fd);}
-    }
-    // Variable names from --wglp, activities from --write. Both must match
-    // the same GLPK run. Missing/oversized/symlink outputs fail closed.
-    const safeRead=name=>{
-      let fd;
-      try{
-        fd=openSync(join(stage,'out',name),constants.O_RDONLY|constants.O_NOFOLLOW);
-        const st=fstatSync(fd);
-        if(!st.isFile()||st.size>49152)return null;
-        const raw=readFileSync(fd);
-        return raw.length<=49152?raw.toString('utf8'):null;
-      }catch{return null;}
-      finally{if(fd!==undefined)closeSync(fd);}
-    };
+    const machine=mode==='solve'?{
+      solution:readMachineFile(stage,'solution.raw'),
+      problem:readMachineFile(stage,'problem.glp'),
+      listing:readMachineFile(stage,'solution.txt',MAX_LISTING)
+    }:null;
+    const solutionListing=machine?.listing.value??null;
+    const solutionMeta=readGlpkSolutionStatus(machine?.solution.value??null);
     const variables=mode==='solve'
-      ?parseGlpkColumns(safeRead('solution.raw'),safeRead('problem.glp'),solutionMeta)
+      ?parseGlpkColumns(machine.solution.value,machine.problem.value,solutionMeta)
       :{status:'NOT_TRANSFERABLE',columns:[]};
+    const machineEvidence=machine?Object.fromEntries(
+      Object.entries(machine).map(([name,{state,bytes}])=>[name,{state,bytes}])
+    ):null;
     return result('GLPK_COMPLETED','completed',{
       exitCode:0,mode,diagnostic:bounded(run.stdout),
       solutionListing,...solutionMeta,
       columns: variables.columns,columnStatus:variables.status,
-      solverOutputTrusted:false
+      machineEvidence,solverOutputTrusted:false
     });
   }catch{
     return result('BLOCKED','staging_failed');

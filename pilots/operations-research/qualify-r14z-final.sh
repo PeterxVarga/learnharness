@@ -98,6 +98,14 @@ const single=await runNativeGmplAsync({
  imageId,model:'var x >= 0; maximize obj: x; s.t. upper: x <= 3; solve; end;'
 });
 assert.equal(single.status,'GLPK_COMPLETED');
+if(single.solverStatus!=='OPTIMAL'||single.columnStatus!=='OPTIMAL_COLUMNS'){
+  // Synthetic source only. No model text, tokens, paths, or solver stdout.
+  process.stderr.write('R14Z_SCALAR_MACHINE_EVIDENCE='+JSON.stringify({
+   status:single.status,code:single.code,statusCode:single.statusCode,
+   solverStatus:single.solverStatus,solutionKind:single.solutionKind,
+   columnStatus:single.columnStatus,machineEvidence:single.machineEvidence
+  })+'\n');
+}
 assert.equal(single.solverStatus,'OPTIMAL');
 assert.equal(single.objective,3);
 assert.equal(single.columnStatus,'OPTIMAL_COLUMNS');

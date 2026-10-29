@@ -60,6 +60,9 @@ describe('R14 async GLPK Podman controller (does not call real Podman)',()=>{
   const r=await runNativeGmplAsync({model,imageId:IMAGE,execCommand:x.exec});
   assert.equal(r.status,'GLPK_COMPLETED');assert.equal(r.solverStatus,'OPTIMAL');
   assert.equal(r.objective,4);assert.equal(r.columnStatus,'OPTIMAL_COLUMNS');
+  assert.equal(r.machineEvidence.solution.state,'present');
+  assert.equal(r.machineEvidence.problem.state,'present');
+  assert.equal(r.machineEvidence.listing.state,'present');
   assert.deepEqual(r.columns,[{name:'x',value:4}]);
   assert.equal(r.points,null);assert.equal(existsSync(x.stage),false);
  });
@@ -78,6 +81,9 @@ describe('R14 async GLPK Podman controller (does not call real Podman)',()=>{
   const r=await runNativeGmplAsync({model,imageId:IMAGE,execCommand:x.exec});
   assert.equal(r.status,'GLPK_COMPLETED');assert.equal(r.solverStatus,'UNKNOWN');
   assert.equal(r.columnStatus,'NOT_TRANSFERABLE');assert.deepEqual(r.columns,[]);
+  assert.equal(r.statusCode,'invalid_solution_file');
+  assert.equal(r.machineEvidence.solution.state,'missing');
+  assert.equal(r.machineEvidence.problem.state,'missing');
  });
  it('does not spawn any process when the request was already cancelled',async()=>{
   const controller=new AbortController(),x=mockExec();controller.abort();

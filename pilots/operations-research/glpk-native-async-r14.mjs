@@ -26,16 +26,20 @@ function localEnvironment(){
  env.PATH='/usr/bin:/bin';env.LANG='C.UTF-8';
  return env;
 }
-function readBounded(stage,name,max=49152){
+/** Bounded, no-symlink machine file evidence; no raw contents in diagnostics. */
+function readMachineFile(stage,name,max=49152){
  let fd;
  try{
   fd=openSync(join(stage,'out',name),constants.O_RDONLY|constants.O_NOFOLLOW);
   const st=fstatSync(fd);
-  if(!st.isFile()||st.size>max)return null;
-  const content=readFileSync(fd);
-  return content.length<=max?content.toString('utf8'):null;
- }catch{return null;}
- finally{if(fd!==undefined)closeSync(fd);}
+  if(!st.isFile())return {value:null,state:'not_regular',bytes:null};
+  if(st.size>max)return {value:null,state:'oversized',bytes:st.size};
+  const data=readFileSync(fd);
+  if(data.length>max)return {value:null,state:'oversized',bytes:data.length};
+  return {value:data.toString('utf8'),state:data.length?'present':'empty',bytes:data.length};
+ }catch(e){
+  return {value:null,state:e?.code==='ENOENT'?'missing':e?.code==='ELOOP'?'symlink':'unreadable',bytes:null};
+ }finally{if(fd!==undefined)closeSync(fd);}
 }
 function readCreatedContainerId(stage){
  // Podman's --cidfile is private to this run. Never accept an arbitrary
@@ -107,15 +111,23 @@ export async function runNativeGmplAsync({model,data='',mode='solve',imageId,sig
     diagnostic:bounded(e?.stderr||e?.stdout)
    });
   }
-  const status=mode==='solve'?readGlpkSolutionStatus(readBounded(stage,'solution.raw')):readGlpkSolutionStatus(null);
+  const machine=mode==='solve'?{
+   solution:readMachineFile(stage,'solution.raw'),
+   problem:readMachineFile(stage,'problem.glp'),
+   listing:readMachineFile(stage,'solution.txt',24576)
+  }:null;
+  const status=readGlpkSolutionStatus(machine?.solution.value??null);
   const parsed=mode==='solve'
-   ?parseGlpkColumns(readBounded(stage,'solution.raw'),readBounded(stage,'problem.glp'),status)
+   ?parseGlpkColumns(machine.solution.value,machine.problem.value,status)
    :{status:'NOT_TRANSFERABLE',columns:[]};
+  const machineEvidence=machine?Object.fromEntries(
+   Object.entries(machine).map(([name,{state,bytes}])=>[name,{state,bytes}])
+  ):null;
   return reply('GLPK_COMPLETED','completed',{
    mode,exitCode:0,diagnostic:bounded(result.stdout),
-   solutionListing:mode==='solve'?readBounded(stage,'solution.txt',24576):null,
+   solutionListing:machine?.listing.value??null,
    ...status,columnStatus:parsed.status,columns:parsed.columns,
-   solverOutputTrusted:false
+   machineEvidence,solverOutputTrusted:false
   });
  }catch(e){return signal?.aborted?reply('CANCELLED','request_cancelled'):fail(e,'staging_failed');}
  finally{
