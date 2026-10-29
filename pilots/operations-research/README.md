@@ -1131,3 +1131,62 @@ These targets are NOT full-suite PASS receipts. Keep DRAFT /
 NO MERGE / NO DEPLOY and run the complete operator-controlled
 Fedora qualification only once after the release candidate is
 finished and the specified preflight prerequisites are met.
+
+## R14Z-RC5: authenticated HTTP proof and stable final one-shot release
+
+This is a release-integration and correctness batch, not a new
+feature lane. It supersedes the older R14Z expected-count references
+in this README.
+
+- **Real-native browser receipts strengthened**: For each of the
+  seeded scalar transport, fröccs and tablet scenarios, the live
+  Puppeteer test checks the exact outbound model/data/mode and
+  operator-token authorization (without storing or printing secrets),
+  then separately parses and verifies the actual HTTP 200 native
+  response. Required native fields include the real
+  `learnharness.glpk-native-diagnostic.r14` schema, completed/
+  optimal machine solution, all exact learner decision-variable names,
+  finite named values and `graded:false, points:null`. The test
+  also checks the real authoritative POST answer body, received
+  `learnharness.gusek-grade.r13` schema, exact source/task ID
+  and binary 1/1 independent score for each kind.
+- **Fail-closed release proof**: the local SHA-256 evidence gate
+  requires three verified native HTTP responses, three verified
+  grade HTTP responses and exact outbound-body proof in addition
+  to the existing 16 ordered live browser acceptance checks,
+  3 distinct real native POSTs and 3 grade POSTs. A no-op UI,
+  substituted fixture or mismatched model/seed/response cannot
+  produce a valid PASS receipt.
+- **Concurrency and late-project guard**: free Workbench edits,
+  imports, new workspaces, named project opens and Practice
+  experiment copies invalidate native request generations.
+  A late native HTTP result/finalizer or stale asynchronous
+  named-project load cannot overwrite an intervening model edit
+  or another run.
+- **One-shot operator-run Fedora script**: the FAIL receipt trap is
+  registered as soon as the private evidence directory exists,
+  before local port checks; that evidence directory is printed
+  immediately on creation. Next.js is launched directly through
+  `node ./node_modules/next/dist/bin/next start` rather than
+  the extra `npm run start` process wrapper. Cleanup signals
+  the exact Next process started by the script.
+- **CodeMirror 6 status**: `package.json` and the lockfile are
+  consistent, but neither includes CodeMirror/Lezer. Registry
+  access is unavailable in this code-execution environment.
+  No invented lockfile, unpinned dependencies or false
+  CodeMirror-completion claim. The functioning bounded GMPL
+  editor remains for this release candidate.
+
+New source-only evidence contract: **15/15 passed** in isolated
+JavaScript evaluation; live-browser source passed JS syntax
+checking. The latest frozen **expected** release counts are
+**469 offline cases in 37 suites**, **2825 npm cases**, and
+**42 browser acceptance steps** (11 free, 15 synthetic-native
+Practice/real grade, 16 real-native three-kind browser journeys).
+These are *targets*, not observed full Fedora release results.
+
+No native Fedora execution, complete Next/TypeScript build,
+genuine Chromium/Podman run, merge, deployment or Actions
+run occurred during this development batch. Draft PR #2 remains
+open and unmerged; operator-controlled final acceptance is the
+only remaining path to a genuinely qualified release.
