@@ -27,6 +27,7 @@ const browsers=[{schema:'learnharness.r14.workbench-browser.v1',status:'PASS',
   ])
  ],
   realNativeGlpk:true,realPracticeGrade:true,nativeCalls:3,gradeCalls:3,
+  verifiedNativeResponses:3,verifiedGradeResponses:3,verifiedExactRequestBodies:true,
   scenarios:['transport','froccs','tablet'].map(kind=>({kind,taskId:'gusek-'+kind+'-42',nativeCalls:1,gradeCalls:1,points:1}))}];
 const fixture=()=>({head:H,status:'PASS',step:'final_receipt',logs,offline,native,browsers});
 describe('R14Z final-qualification receipt contract (no real Fedora execution)',()=>{
@@ -82,6 +83,15 @@ describe('R14Z final-qualification receipt contract (no real Fedora execution)',
  it('requires a genuine native browser invocation and a real grade submission',()=>{
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],nativeCalls:0}]}).status,'BLOCKED');
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],gradeCalls:0}]}).status,'BLOCKED');
+ });
+ it('real native request and independent grading response proofs are all mandatory',()=>{
+  for(const change of [
+   {verifiedNativeResponses:2},
+   {verifiedGradeResponses:2},
+   {verifiedExactRequestBodies:false}
+  ])assert.equal(validateFinalR14z({...fixture(),browsers:[
+   browsers[0],browsers[1],{...browsers[2],...change}
+  ]}).status,'BLOCKED');
  });
  it('a live run from the wrong task or wrong cardinality cannot qualify',()=>{
   assert.equal(validateFinalR14z({...fixture(),browsers:[browsers[0],browsers[1],{...browsers[2],scenarios:[...browsers[2].scenarios.slice(0,2),{...browsers[2].scenarios[2],taskId:'gusek-tablet-41'}]}]}).status,'BLOCKED');
