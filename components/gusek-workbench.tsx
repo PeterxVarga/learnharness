@@ -193,7 +193,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
   });
  }
  async function runNative(mode:RunMode){
-  if(!nativeAvailable||running)return;
+  if(!nativeAvailable||running||cancelRef.current)return;
   setMessage('');
   if(!/^[a-f0-9]{64}$/.test(token)){setMessage('Adj meg egy 64 karakteres, helyi GLPK futtatási tokent.');return;}
   if(!model.trim()){setMessage('A model.mod nem lehet üres.');return;}
