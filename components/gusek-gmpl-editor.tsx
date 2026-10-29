@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState,useMemo} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,useMemo} from 'react';
 import type {KeyboardEvent,Ref} from 'react';
 import {tokenizeGmplLine,makeGmplEdit,indentGmplSelection,commentGmplSelection,
  nextSearchMatch,completionForGmpl,lineNumberAt} from '@/src/features/gusek/gmpl-editor-core.mjs';
@@ -32,6 +32,9 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
  const [replacement,setReplacement]=useState('');
  const [cursor,setCursor]=useState(0);
  const [searchStatus,setSearchStatus]=useState('');
+ // Restore programmatic caret placement only for a committed editor value.
+ // A stale animation frame can otherwise reorder fast typing after Enter.
+ const pendingSelection=useRef<{value:string;from:number;to:number}|null>(null);
  const lines=useMemo(()=>value.split('\n'),[value]);
  // The fallback always shows editable source as plain text when highlighting
  // would require an excessively large DOM or line exceeds lexer limits.
@@ -43,14 +46,25 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
   else if(textareaRef&&typeof textareaRef==='object')textareaRef.current=node;
  }
  function selection(from:number,to:number=from){
-  requestAnimationFrame(()=>{
-   const t=local.current;
-   if(!t)return;t.focus();t.setSelectionRange(from,to);
-   const before=value.slice(0,from).split('\n').length-1;
-   t.scrollTop=Math.max(0,(before-3)*24);
-   if(gutter.current)gutter.current.scrollTop=t.scrollTop;
-   if(highlightLayer.current)highlightLayer.current.scrollTop=t.scrollTop;
-  });
+  const t=local.current;
+  if(!t)return;
+  t.focus();t.setSelectionRange(from,to);
+  const before=t.value.slice(0,from).split('\n').length-1;
+  t.scrollTop=Math.max(0,(before-3)*24);
+  if(gutter.current)gutter.current.scrollTop=t.scrollTop;
+  if(highlightLayer.current)highlightLayer.current.scrollTop=t.scrollTop;
+ }
+ useLayoutEffect(()=>{
+  const pending=pendingSelection.current;
+  if(!pending)return;
+  pendingSelection.current=null;
+  // Later typing or an unrelated source update must never inherit this caret.
+  if(value===pending.value)selection(pending.from,pending.to);
+ },[value]);
+ function commitEdit(next:{value:string},from:number,to:number=from){
+  pendingSelection.current={value:next.value,from,to};
+  onChange(next.value);
+  setCursor(to);
  }
  useEffect(()=>{
   if(!Number.isSafeInteger(diagnosticLine)||!diagnosticLine||diagnosticLine<1)return;
@@ -63,7 +77,7 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
   if(readOnly)return;
   const next=makeGmplEdit(value,from,to,insert);
   if(!next)return;
-  onChange(next.value);setCursor(next.cursor);selection(next.cursor);
+  commitEdit(next,next.cursor);
  }
  function handleKey(e:KeyboardEvent<HTMLTextAreaElement>){
   onKeyDown?.(e);
@@ -75,14 +89,14 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
   if(readOnly)return;
   if((e.ctrlKey||e.metaKey)&&e.key==='/'){
    e.preventDefault();const next=commentGmplSelection(value,from,to);
-   if(next){onChange(next.value);selection(next.selectionStart,next.selectionEnd);}
+   if(next)commitEdit(next,next.selectionStart,next.selectionEnd);
    return;
   }
   if(e.key==='Tab'&&!e.ctrlKey&&!e.metaKey){
    e.preventDefault();
    if(to>from||e.shiftKey){
     const next=indentGmplSelection(value,from,to,{outdent:e.shiftKey});
-    if(next){onChange(next.value);selection(next.selectionStart,next.selectionEnd);}
+    if(next)commitEdit(next,next.selectionStart,next.selectionEnd);
    }else edit(from,to,'  ');
    return;
   }
@@ -146,6 +160,8 @@ export function GmplEditor({id,value,onChange,label,textareaRef,readOnly=false,h
      rows={rows} value={value} spellCheck={false} placeholder={placeholder}
      onChange={e=>{const next=e.target.value;
       if(next.includes('\0')||new TextEncoder().encode(next).length>65536)return;
+      // Normal input takes precedence over any earlier custom edit selection.
+      pendingSelection.current=null;
       onChange(next);setCursor(e.target.selectionStart);}}
      onSelect={e=>setCursor(e.currentTarget.selectionStart)}
      onScroll={e=>{

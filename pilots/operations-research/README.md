@@ -1469,3 +1469,27 @@ The previous production build is suitable for a bounded,
 browser-only operator probe at the same pinned runtime version,
 with the new browser harness, before repeating the lengthy
 all-in-one release. Browser PASS is NOT yet claimed on this commit.
+
+## R14Z fast GMPL typing caret race fix — 2026-10-29
+
+The targeted Chromium probe on `59b9680` passed workbench entry and
+file tabs, confirming the previous navigation fix. The next check,
+typing a real five-line GMPL model at 1ms keyboard delay, failed:
+the initial `s` of `solve;` moved behind `end;` without being lost.
+This proves a source edit-ordering problem, not simply a flaky
+network-idleness condition.
+
+Source analysis identified the custom Enter/Tab/comment edit's
+`requestAnimationFrame` caret reposition: the following character can
+arrive before a queued frame, after which that stale frame puts the
+cursor behind the newly typed character. Fix: programmatic edit cursor
+positions are applied only after the exact new controlled React value
+has committed, in `useLayoutEffect`, while any regular textarea input
+cancels pending programmatic selection. Search/diagnostic selections
+are immediate, not deferred into subsequent keystrokes.
+
+The existing rapid real-keyboard, exact-value browser assertion remains
+unchanged. GLPK, grading authority and source limits are untouched.
+Because this changes the application component, a fresh production
+build and browser-only probe are needed. A full R14Z PASS is not yet
+claimed.
