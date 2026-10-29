@@ -1335,3 +1335,24 @@ A new small, synthetic-only `diagnose-glpk-r14z.mjs` command is SHA-covered by
 the offline verifier and can be run **once** on the actual Fedora worker to
 distinguish filesystem/namespace issues from a parser/header issue before
 repeating expensive tests. The operator has not run this new source yet.
+
+## R14Z GLPK machine comment separator fix — 2026-10-29
+
+The owner's *actual* Fedora scalar probe returned
+`GLPK_COMPLETED` but `missing_solution_header` with machine outputs present
+(`solution.raw`: 176 bytes, `problem.glp`: 107 bytes, printable listing: 1106 bytes).
+Rootless execution and file mounting therefore worked. Source inspection
+identified that the status parser filtered `c text` comment lines but
+**did not filter the standalone `c` comment separator** emitted by
+`glpsol --write`. That separator precedes the `s bas ...` record and
+causes a false `UNKNOWN` result.
+
+The parser now filters both forms while still refusing unknown headers,
+malformed solutions and all non-OPTIMAL results. Existing test case counts
+are preserved: realistic comment-bearing GLPK LP solution fixtures and an
+integrated status-to-named-columns roundtrip were added **within** the
+existing assertions, along with negative regressions. No grading authority,
+sandbox limits, secret handling or provider policy changed. The next action
+is a single cheap owner-run Fedora native scalar probe on the new exact
+source pin. This commit has not passed that live probe yet; do not repeat
+the expensive full qualification until the probe actually says PASS.

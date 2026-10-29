@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {describe,it} from 'node:test';
 import {parseGlpkColumns} from './glpk-columns-r14.mjs';
+import {readGlpkSolutionStatus} from './glpk-solution-status-r14.mjs';
 const problem='p mip min 2 3 6\nn j 1 x[1,1]\nn j 2 x[1,2]\nn j 3 x[2,1]\ne o f\n';
 const machine='c GLPK solution\ns mip 2 3 o 57\nj 1 2\nj 2 0\nj 3 4\ne o f\n';
 const meta={solverStatus:'OPTIMAL',objective:57,solutionKind:'mip'};
@@ -44,6 +45,15 @@ describe('R14 original GLPK machine output column mapping',()=>{
   const s='s bas 2 3 f f 57\nj 1 b 2 0\nj 2 l 0 0\nj 3 u 4 -0.25\ne o f\n';
   const lpProblem=problem.replace('p mip min','p lp min');
   assert.equal(parse(s,lpProblem,{...meta,solutionKind:'bas'}).columns[2].value,4);
+  // Real-style machine comments + single-line c separator must survive
+  // the status-to-columns handoff, not just a direct mocked OPTIMAL.
+  const withComments='c Problem: sample\nc Status: OPTIMAL\nc\n'+s;
+  const status=readGlpkSolutionStatus(withComments);
+  assert.equal(status.solverStatus,'OPTIMAL');
+  assert.equal(status.objective,57);
+  assert.deepEqual(parse(withComments,lpProblem,status).columns,[
+   {name:'x[1,1]',value:2},{name:'x[1,2]',value:0},{name:'x[2,1]',value:4}
+  ]);
  });
  it('maps interior-point output',()=>{
   const s='s ipt 2 3 o 57\nj 1 2 0\nj 2 0 0\nj 3 4 0\ne o f\n';

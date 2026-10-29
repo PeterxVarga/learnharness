@@ -10,8 +10,11 @@ const states=Object.freeze({
 export function readGlpkSolutionStatus(raw){
  const unknown=code=>({solverStatus:'UNKNOWN',objective:null,solutionKind:null,statusCode:code});
  if(typeof raw!=='string'||raw.length>65536)return unknown('invalid_solution_file');
- // Do not parse stdout or printable --output: both can contain MathProg printf.
- const lines=raw.split(/\r?\n/).filter(s=>s&&!s.startsWith('c '));
+ // GLPK --write emits BOTH "c explanation" and a standalone "c"
+ // separator before the s bas/mip/ipt record. Do not mistake that
+ // documented comment separator for an unexpected solver header.
+ // Parse only the bounded machine file, never stdout or --output.
+ const lines=raw.split(/\r?\n/).filter(s=>s.length>0&&!/^c(?:[ \t]|$)/.test(s));
  if(!lines.length||!/^s (?:mip|ipt|bas) /.test(lines[0]))return unknown('missing_solution_header');
  const parts=lines[0].trim().split(/\s+/);
  const kind=parts[1];
