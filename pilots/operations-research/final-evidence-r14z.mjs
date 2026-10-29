@@ -59,6 +59,9 @@ export function validateFinalR14z({head,status,step,logs,offline,native,browsers
     browsers[2].checks.some((name,index)=>name!==LIVE_BROWSER_CHECKS[index])||
     browsers[2].realNativeGlpk!==true||browsers[2].realPracticeGrade!==true||
     browsers[2].nativeCalls!==3||browsers[2].gradeCalls!==3||
+    browsers[2].verifiedNativeResponses!==3||
+    browsers[2].verifiedGradeResponses!==3||
+    browsers[2].verifiedExactRequestBodies!==true||
     !Array.isArray(browsers[2].scenarios)||browsers[2].scenarios.length!==3||
     !['transport','froccs','tablet'].every((kind,index)=>{
       const x=browsers[2].scenarios[index];
