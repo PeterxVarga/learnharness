@@ -14,7 +14,7 @@ const LOGS=Object.freeze([
  'npm-ci.log','offline.json','npm-test.log','typecheck.log','build.log',
  'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ]);
-const EXPECTED={offline:468,suites:37,npm:2824};
+const EXPECTED={offline:469,suites:37,npm:2825};
 const LIVE_BROWSER_CHECKS=[
  'LIVE_NATIVE_UI_READY',
  ...['transport','froccs','tablet'].flatMap(kind=>[
