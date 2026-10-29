@@ -43,7 +43,7 @@ PORT="$(printenv LH_R14_FINAL_PORT || printf 33770)"
  echo "BLOCKED_INVALID_PORT"; exit 2;
 }
 # Refuse to mistake an unrelated process already serving this port for Next.js.
-node - "$PORT" <<'JS'
+node --input-type=module - "$PORT" <<'JS'
 import net from 'node:net';
 const port=Number(process.argv[2]);
 const server=net.createServer();
