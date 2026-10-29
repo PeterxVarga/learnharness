@@ -302,7 +302,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
        <p className="text-sm font-semibold">{nativeFeedback.title}</p>
        <p className="text-xs">{nativeFeedback.detail}</p>
        <p className="text-xs text-neutral-600 dark:text-neutral-300">{nativeFeedback.nextAction}</p>
-      </div>
+      </div>}
       {nativeResult.mode==='solve'&&<p data-testid="gusek-native-status-r14" className="text-sm">Megoldás állapota: <strong>{nativeResult.solverStatus??'UNKNOWN'}</strong>{nativeResult.solverStatus==='OPTIMAL'&&Number.isFinite(nativeResult.objective)?` · GLPK célfüggvény: ${nativeResult.objective}`:''}</p>}
       {nativeResult.solverStatus==='FEASIBLE_NOT_PROVEN_OPTIMAL'&&<p className="text-xs text-amber-700">A GLPK talált lehetséges megoldást, de az optimumot nem bizonyította.</p>}
       {nativeResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A megadott modellhez nincs lehetséges megoldás. Ez nem jelenti, hogy a feladat helyes modelljét írtad fel.</p>}

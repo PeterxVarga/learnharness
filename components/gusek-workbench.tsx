@@ -315,18 +315,18 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
       <p className="text-sm font-semibold">{feedback.title}</p>
       <p className="text-xs">{feedback.detail}</p>
       <p className="text-xs text-neutral-600 dark:text-neutral-300">{feedback.nextAction}</p>
-     </div>
+     </div>}
      {stale?<p className="text-sm text-amber-700">A fájlok a futtatás óta módosultak. Az eredmény egy korábbi változathoz tartozik.</p>:null}
      <p className="text-sm">GLPK megoldási állapot: <strong>{currentResult.solverStatus??'UNKNOWN'}</strong></p>
      {currentResult.solverStatus==='OPTIMAL'&&typeof currentResult.objective==='number'&&
       <p className="text-sm">Célfüggvény: {currentResult.objective}</p>}
-     {currentResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A modellre nem talált megengedett megoldást.</p>
+     {currentResult.solverStatus==='INFEASIBLE'&&<p className="text-xs text-amber-700">A modellre nem talált megengedett megoldást.</p>}
      {currentResult.columns&&currentResult.columns.length>0&&<div className="max-h-60 overflow-auto rounded border p-2" data-testid="gusek-free-columns-r14">
       <p className="mb-2 text-sm font-semibold">Strukturált változók ({currentResult.columns.length})</p>
       <table className="w-full text-xs"><thead><tr><th className="text-left">Név</th><th className="text-right">Érték</th></tr></thead>
        <tbody>{currentResult.columns.map(c=><tr key={c.name} className="border-t"><td className="break-all font-mono">{c.name}</td><td className="text-right font-mono">{c.value}</td></tr>)}</tbody>
       </table>
-     </div>}}
+     </div>}
      {currentResult.solverStatus==='FEASIBLE_NOT_PROVEN_OPTIMAL'&&<p className="text-xs text-amber-700">Lehetséges megoldás, de nincs bizonyított optimum.</p>}
      <p className="text-xs text-neutral-500">A GLPK-kimenet nem vizsgapont és nem modellhelyességi bizonyíték.</p>
     </div>}

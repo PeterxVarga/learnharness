@@ -1356,3 +1356,16 @@ sandbox limits, secret handling or provider policy changed. The next action
 is a single cheap owner-run Fedora native scalar probe on the new exact
 source pin. This commit has not passed that live probe yet; do not repeat
 the expensive full qualification until the probe actually says PASS.
+
+## R14Z JSX delimiter repair — 2026-10-29
+
+The owner's Fedora qualification on `f58182b` reported real native
+GLPK PASS, then four TypeScript parser errors during the early typecheck.
+The Practice solver feedback block had an unmatched JSX conditional.
+The Free Workspace solver feedback, infeasibility and named-columns JSX
+blocks contained two missing expression terminators and an extra brace.
+This commit makes only these four delimiter corrections in two components.
+No runtime execution, scoring, policy or solver logic changes. Full
+qualification remains pending; run `npm run typecheck` alone first and
+resolve any further compiler diagnostics before repeating the complete
+R14Z gate.
