@@ -1441,3 +1441,31 @@ fixture regressions. Nothing is claimed PASS on the new source until
 the operator runs it. The recommended next test is only the complete
 469-case dependency-free offline verifier, which can catch any remaining
 failures at a fraction of the cost of full qualification.
+
+## R14Z browser navigation falsification and bounded fix — 2026-10-29
+
+The real full Fedora release on `3619939` passed all native GLPK,
+469 dependency-free tests, npm ci, strict TypeScript, production build,
+Chromium launch, and **all 2825** npm tests, then timed out on the
+workbench Puppeteer script's **first navigation** to `/pilot/gusek`.
+The Next task API health probe had succeeded, but that probes a
+different route and cannot establish browser page readiness.
+
+All three browser scripts used `waitUntil: 'networkidle2'`, and two
+also used it for reload. Per Puppeteer's documented lifecycle, this
+requires a sustained period of <=2 active network requests, not
+successful document hydration or interactive controls. It can time
+out despite a usable app, but a server-side hang is still an
+alternative explanation until the original server log is inspected.
+These five navigation/reload calls now await `domcontentloaded`,
+**require HTTP 200** and **wait for the actual GUSEK workbench DOM**.
+The existing real button/edit/click, draft, independent-grading and
+native-GLPK checks remain unchanged and still gate PASS; there is
+no longer an artificial network-idleness requirement.
+
+Browser scripts and documentation only changed: no application
+runtime, source model, native sandbox, or grading code changed.
+The previous production build is suitable for a bounded,
+browser-only operator probe at the same pinned runtime version,
+with the new browser harness, before repeating the lengthy
+all-in-one release. Browser PASS is NOT yet claimed on this commit.

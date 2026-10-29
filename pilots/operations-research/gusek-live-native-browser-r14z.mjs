@@ -80,7 +80,11 @@ try{
    })());
   }catch{/* No interception and no full response body in receipt. */}
  });
- await page.goto(url,{waitUntil:'networkidle2',timeout:30000});
+ // A quiet network is not proof that Next.js hydrated the GUSEK UI.
+ // Require real document HTTP success, then exercise the rendered controls.
+ const documentResponse=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+ assert.equal(documentResponse?.status(),200,'gusek_document_must_return_http_200');
+ await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
  await check('LIVE_NATIVE_UI_READY',async()=>{
   assert.ok(await page.$('[data-testid="gusek-workbench-r14"]'));
   await page.waitForSelector('[data-testid="gusek-native-r14"]',{timeout:15000});

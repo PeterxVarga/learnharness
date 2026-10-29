@@ -54,7 +54,11 @@ try{
   }
   void request.abort('blockedbyclient');
  });
- await page.goto(url,{waitUntil:'networkidle2',timeout:30000});
+ // A quiet network is not proof that Next.js hydrated the GUSEK UI.
+ // Require real document HTTP success, then exercise the rendered controls.
+ const documentResponse=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+ assert.equal(documentResponse?.status(),200,'gusek_document_must_return_http_200');
+ await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
  await check('NATIVE_ONLY_MOCK_ON',async()=>{
   assert.ok(await page.$('[data-testid="gusek-workbench-r14"]'));
  });
@@ -80,7 +84,9 @@ try{
  });
  await check('SEEDED_PRACTICE_DRAFT_SURVIVES_RELOAD',async()=>{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-practice-draft-status-r14z"]')?.textContent?.includes('helyben mentve'),{timeout:12000});
-  await page.reload({waitUntil:'networkidle2',timeout:30000});
+  const reloadResponse=await page.reload({waitUntil:'domcontentloaded',timeout:30000});
+  assert.equal(reloadResponse?.status(),200,'gusek_reloaded_document_must_return_http_200');
+  await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
   await page.select('[data-testid="gusek-transport-dialect-r14"]','indexed');
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-dialect')==='indexed');
   await page.evaluate(()=>{

@@ -16,7 +16,11 @@ const browser=await puppeteer.launch({executablePath,headless:true,args:['--disa
 try{
  const page=await browser.newPage();
  await page.setViewport({width:1440,height:900});
- await page.goto(url,{waitUntil:'networkidle2',timeout:30000});
+ // A quiet network is not proof that Next.js hydrated the GUSEK UI.
+ // Require real document HTTP success, then exercise the rendered controls.
+ const documentResponse=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+ assert.equal(documentResponse?.status(),200,'gusek_document_must_return_http_200');
+ await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
  await check('WORKBENCH_ENTRY',async()=>{
   await page.waitForSelector('[data-testid="gusek-workbench-r14"]');
   assert.equal(await page.$('[data-testid="gusek-mode-practice-r14"]')!==null,true);
@@ -69,7 +73,9 @@ try{
  });
  await check('LOCAL_DRAFT_PERSISTENCE',async()=>{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-draft-status-r14"]')?.textContent?.includes('Helyben mentve'),{timeout:10000});
-  await page.reload({waitUntil:'networkidle2',timeout:30000});
+  const reloadResponse=await page.reload({waitUntil:'domcontentloaded',timeout:30000});
+  assert.equal(reloadResponse?.status(),200,'gusek_reloaded_document_must_return_http_200');
+  await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
   await page.click('[data-testid="gusek-mode-free-r14"]');
   await page.waitForSelector(editor);
   assert.equal(await page.$eval(editor,e=>e.value),target);
