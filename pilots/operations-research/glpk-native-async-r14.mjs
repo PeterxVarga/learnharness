@@ -57,6 +57,9 @@ export async function runNativeGmplAsync({model,data='',mode='solve',imageId,sig
   return reply('BLOCKED','invalid_model_or_data');
  if(!['solve','check'].includes(mode))return reply('BLOCKED','invalid_mode');
  if(!imagePattern.test(imageId??''))return reply('BLOCKED','image_id_not_pinned');
+ // Podman identifies local images with bare 64-hex IDs; the public contract
+ // retains a sha256:-prefixed pin, never a mutable image tag.
+ const rawImageId=imageId.slice(7);
  const env=localEnvironment();
  const opts={encoding:'utf8',timeout:5000,maxBuffer:32768,shell:false,env,signal};
  try{
@@ -64,8 +67,8 @@ export async function runNativeGmplAsync({model,data='',mode='solve',imageId,sig
   if(info.stdout?.trim()!=='true')return reply('BLOCKED','rootless_podman_unavailable');
  }catch(e){return signal?.aborted?reply('CANCELLED','request_cancelled'):reply('BLOCKED','rootless_podman_unavailable');}
  try{
-  const image=await execCommand('podman',['image','inspect','--format','{{.Id}}',imageId],opts);
-  if(image.stdout?.trim()!==imageId)return reply('BLOCKED','immutable_image_unavailable');
+  const image=await execCommand('podman',['image','inspect','--format','{{.Id}}',rawImageId],opts);
+  if(image.stdout?.trim()!==rawImageId)return reply('BLOCKED','immutable_image_unavailable');
  }catch(e){return signal?.aborted?reply('CANCELLED','request_cancelled'):reply('BLOCKED','immutable_image_unavailable');}
  if(signal?.aborted)return reply('CANCELLED','request_cancelled');
  let stage;
@@ -85,7 +88,7 @@ export async function runNativeGmplAsync({model,data='',mode='solve',imageId,sig
    '--volume='+stage+':/input:ro,Z',
    ...(mode==='solve'?['--volume='+join(stage,'out')+':/output:rw,Z']:[]),
    '--workdir=/tmp','--timeout=12',
-   imageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
+   rawImageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
    '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
    '--tmlim','8','--memlim','192','--seed','0',
    ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw','--wglp','/output/problem.glp']:[])

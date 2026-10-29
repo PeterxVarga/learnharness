@@ -22,7 +22,9 @@ done
 [[ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" == true ]] || {
  echo "BLOCKED_ROOTLESS_PODMAN"; exit 2;
 }
-[[ "$(podman image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null)" == "$IMAGE" ]] || {
+# Pin validation is sha256:hex, while Podman's inspect .Id is bare hex.
+RAW_IMAGE_ID="${IMAGE#sha256:}"
+[[ "$(podman image inspect --format '{{.Id}}' "$RAW_IMAGE_ID" 2>/dev/null)" == "$RAW_IMAGE_ID" ]] || {
  echo "BLOCKED_PINNED_IMAGE_MISSING"; exit 2;
 }
 export NEXT_TELEMETRY_DISABLED=1 ELECTRON_SKIP_BINARY_DOWNLOAD=1

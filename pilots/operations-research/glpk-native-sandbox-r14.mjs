@@ -37,6 +37,8 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
   if(!allowedMode.has(mode))return result('BLOCKED','invalid_mode');
   if(!IMAGE_ID.test(imageId??''))return result('BLOCKED','image_id_not_pinned');
   if(typeof spawn!=='function')return result('BLOCKED','invalid_runtime');
+  // Use Podman's full bare 64-hex image ID after validating the sha256:hex pin.
+  const rawImageId=imageId.slice(7);
   // No fallback to host glpsol if rootless containers cannot be qualified.
   // Do not pass the app's BYOK/API credentials or remote-Podman settings
   // to any Podman child process. Keep only rootless local session metadata.
@@ -51,8 +53,8 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
   const info=spawn('podman',['info','--format','{{.Host.Security.Rootless}}'],opts);
   if(info.error||info.status!==0||info.stdout?.trim()!=='true')
     return result('BLOCKED','rootless_podman_unavailable');
-  const pin=spawn('podman',['image','inspect','--format','{{.Id}}',imageId],opts);
-  if(pin.error||pin.status!==0||pin.stdout?.trim()!==imageId)
+  const pin=spawn('podman',['image','inspect','--format','{{.Id}}',rawImageId],opts);
+  if(pin.error||pin.status!==0||pin.stdout?.trim()!==rawImageId)
     return result('BLOCKED','immutable_image_unavailable');
   let stage;
   let interrupted=false;
@@ -72,7 +74,7 @@ export function runNativeGmpl({model,data='',mode='solve',imageId,spawn=spawnSyn
       '--volume='+stage+':/input:ro,Z',
       ...(mode==='solve'?['--volume='+join(stage,'out')+':/output:rw,Z']:[]),
       '--workdir=/tmp','--timeout=12',
-      imageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
+      rawImageId,'/usr/bin/glpsol',...(mode==='check'?['--check']:[]),
       '--model','/input/model.mod',...(data?['--data','/input/data.dat']:[]),
       '--tmlim','8','--memlim','192','--seed','0',
       ...(mode==='solve'?['--output','/output/solution.txt','--write','/output/solution.raw','--wglp','/output/problem.glp']:[])

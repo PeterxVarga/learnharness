@@ -9,13 +9,14 @@ const setup=({rootless=true,exists=true,executionStatus=0,error=null}={})=>{
  const spawn=(binary,args,opts)=>{
    assert.equal(binary,'podman');assert.equal(opts.shell,false);calls.push(args);
    if(args[0]==='info')return {status:rootless?0:1,stdout:rootless?'true\n':'false\n'};
-   if(args[0]==='image')return {status:exists?0:1,stdout:exists?image+'\n':''};
+   if(args[0]==='image'){assert.equal(args.at(-1),image.slice(7));return {status:exists?0:1,stdout:exists?(exists==='mismatch'?'b'.repeat(64):image.slice(7))+'\n':''};}
    assert.equal(args[0],'run');
    stage=args.find(x=>x.startsWith('--volume='))?.slice('--volume='.length).split(':/input:')[0];
    assert.ok(stage&&existsSync(stage));
    assert.equal(readFileSync(stage+'/model.mod','utf8'),model);
    assert.ok(args.includes('--network=none'));
    assert.ok(args.includes('--pull=never'));
+   assert.ok(args.includes(image.slice(7)));assert.ok(!args.includes(image));
    assert.ok(args.includes('--read-only'));
    assert.ok(args.includes('--cap-drop=all'));
    assert.ok(args.includes('--userns=keep-id'));
@@ -38,7 +39,7 @@ describe('R14N rootless native GNU MathProg isolated runtime',()=>{
  it('refuses missing or oversized model without spawning',()=>{const {spawn,calls}=setup();for(const m of ['', 'x'.repeat(70000),'x\0'])assert.equal(runNativeGmpl({model:m,imageId:image,spawn}).status,'BLOCKED');assert.equal(calls.length,0);});
  it('refuses huge data and wrong mode before spawning',()=>{const {spawn,calls}=setup();assert.equal(runNativeGmpl({model,data:'a'.repeat(70000),imageId:image,spawn}).code,'invalid_model_or_data');assert.equal(runNativeGmpl({model,mode:'arbitrary',imageId:image,spawn}).code,'invalid_mode');assert.equal(calls.length,0);});
  it('fails closed when rootless Podman is missing',()=>{const x=setup({rootless:false});assert.equal(runNativeGmpl({model,imageId:image,spawn:x.spawn}).code,'rootless_podman_unavailable');assert.equal(x.calls.length,1);});
- it('fails closed if immutable image is missing',()=>{const x=setup({exists:false});assert.equal(runNativeGmpl({model,imageId:image,spawn:x.spawn}).code,'immutable_image_unavailable');assert.equal(x.calls.length,2);});
+ it('fails closed if immutable image is missing',()=>{const x=setup({exists:false});assert.equal(runNativeGmpl({model,imageId:image,spawn:x.spawn}).code,'immutable_image_unavailable');assert.equal(x.calls.length,2);const swapped=setup({exists:'mismatch'});assert.equal(runNativeGmpl({model,imageId:image,spawn:swapped.spawn}).code,'immutable_image_unavailable');});
  it('runs checked no-network read-only bounded container, never an OS shell',()=>{const x=setup();const r=runNativeGmpl({model,imageId:image,spawn:x.spawn});assert.equal(r.status,'GLPK_COMPLETED');assert.equal(r.graded,false);assert.equal(r.points,null);assert.equal(r.solverOutputTrusted,false);assert.equal(x.calls.length,3);assert.ok(!existsSync(x.stage));});
  it('separate model and data are private temporary inputs',()=>{const x=setup();const d='data; param cap := 4; end;';const read=x.spawn;let checked=false;const inject=(binary,args,opts)=>{if(args[0]==='run'){const stage=args.find(a=>a.startsWith('--volume=')).slice(9).split(':/input:')[0];assert.equal(readFileSync(stage+'/data.dat','utf8'),d);assert.ok(args.includes('--data'));checked=true;}return read(binary,args,opts);};const r=runNativeGmpl({model,data:d,imageId:image,spawn:inject});assert.equal(r.status,'GLPK_COMPLETED');assert.equal(checked,true);assert.ok(!existsSync(x.stage));});
  it('check mode adds actual GLPK translation-only flag',()=>{const x=setup();const r=runNativeGmpl({model,mode:'check',imageId:image,spawn:x.spawn});assert.equal(r.mode,'check');assert.ok(x.calls[2].includes('--check'));});

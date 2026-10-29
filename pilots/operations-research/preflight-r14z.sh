@@ -39,7 +39,9 @@ if [[ "$IMAGE" =~ ^sha256:[a-f0-9]{64}$ ]];then
  pass IMMUTABLE_IMAGE_ID_FORMAT
  if command -v podman >/dev/null 2>&1;then
   if [[ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" == true ]];then pass ROOTLESS_PODMAN;else block ROOTLESS_PODMAN_UNAVAILABLE;fi
-  if [[ "$(podman image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null)" == "$IMAGE" ]];then pass PINNED_IMAGE_LOCAL;else block PINNED_IMAGE_NOT_PRESENT;fi
+  # Podman exposes .Id as 64 bare hex characters; the operator pin stays sha256:hex.
+  RAW_IMAGE_ID="${IMAGE#sha256:}"
+  if [[ "$(podman image inspect --format '{{.Id}}' "$RAW_IMAGE_ID" 2>/dev/null)" == "$RAW_IMAGE_ID" ]];then pass PINNED_IMAGE_LOCAL;else block PINNED_IMAGE_NOT_PRESENT;fi
  fi
 else
  block LH_GLPK_IMAGE_ID_NOT_EXACT

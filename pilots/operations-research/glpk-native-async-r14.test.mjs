@@ -10,11 +10,12 @@ function mockExec({rootless=true,image=true,fail=null,hold=null,output=true}={})
   assert.equal(binary,'podman');assert.equal(opts.shell,false);
   assert.equal(opts.env.LH_GLPK_RUN_TOKEN,undefined);calls.push({args,opts});
   if(args[0]==='info'){if(!rootless)throw new Error('rootless denied');return {stdout:'true\n'};}
-  if(args[0]==='image'){if(!image)throw new Error('image missing');return {stdout:IMAGE+'\n'};}
+  if(args[0]==='image'){if(!image)throw new Error('image missing');assert.equal(args.at(-1),IMAGE.slice(7));return {stdout:(image==='mismatch'?'b'.repeat(64):IMAGE.slice(7))+'\n'};}
   assert.equal(args[0],'run');
   assert.ok(args.includes('--network=none'));
   assert.ok(args.includes('--read-only'));
   assert.ok(args.includes('--pull=never'));
+  assert.ok(args.includes(IMAGE.slice(7)));assert.ok(!args.includes(IMAGE));
   assert.ok(args.includes('--cap-drop=all'));
   assert.ok(args.includes('--timeout=12'));
   stage=args.find(x=>x.startsWith('--volume=')&&x.includes(':/input:')).slice('--volume='.length).split(':/input:')[0];
@@ -44,6 +45,8 @@ describe('R14 async GLPK Podman controller (does not call real Podman)',()=>{
  it('blocks missing immutable image without fallback',async()=>{
   const x=mockExec({image:false});
   assert.equal((await runNativeGmplAsync({model,imageId:IMAGE,execCommand:x.exec})).code,'immutable_image_unavailable');
+  const swapped=mockExec({image:'mismatch'});
+  assert.equal((await runNativeGmplAsync({model,imageId:IMAGE,execCommand:swapped.exec})).code,'immutable_image_unavailable');
  });
  it('check mode is async and does not expose scoring',async()=>{
   const x=mockExec();

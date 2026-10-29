@@ -1284,3 +1284,20 @@ explicitly run by the owner, not silently claimed as performed
 here. No new npm dependencies, paid provider calls, GitHub Actions
 or application deployment are required to provision these
 prerequisites.
+
+## R14Z Fedora image ID compatibility hotfix — 2026-10-29
+
+The Fedora operator successfully installed Chromium 156 and built the rootless
+Debian 13 GLPK 5.0 image. The preflight/qualifier did **not** run because
+Podman `image inspect --format '{{.Id}}'` returns a bare 64-hex image ID,
+while the release's exported `LH_GLPK_IMAGE_ID` deliberately requires
+`sha256:<64-hex>`. Comparing the two spellings byte-for-byte would
+incorrectly reject the immutable image. Both shell gates and both native
+GLPK runtimes now validate the strict prefixed operator pin, then pass
+and compare its bare 64-hex image ID to Podman. No tag fallback, network,
+privileged execution or host glpsol fallback is introduced.
+
+Existing sync/async mock tests now emulate real Podman bare IDs and reject
+substituted image IDs without increasing the fixed test count. This change
+is **source-only** until the owner reruns the preflight and genuine Fedora
+qualification; no PASS is claimed for the still-unexecuted full suites.
