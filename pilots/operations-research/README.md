@@ -1301,3 +1301,22 @@ Existing sync/async mock tests now emulate real Podman bare IDs and reject
 substituted image IDs without increasing the fixed test count. This change
 is **source-only** until the owner reruns the preflight and genuine Fedora
 qualification; no PASS is claimed for the still-unexecuted full suites.
+
+## R14Z single-run integration hardening — 2026-10-29
+
+Before the costly final Fedora qualification, the operator requested fewer
+repeated test runs. This source-only integration pass does not run npm, GLPK
+or Chromium. The pinned one-shot release script is reordered to fail early on
+real rootless Podman/GLPK (which needs no npm dependencies), then npm install,
+TypeScript, production build and a tiny headless Chromium launch before the
+469 offline and 2825 npm test cases. The three browser acceptance journeys
+and their exact expected counts are unchanged. The new bounded
+`browser-bootstrap.log` is included in the final SHA-256 evidence contract.
+
+Practice's native solver now has a synchronous ref-backed double-submit guard.
+The browser tests wait for committed React kind/dialect state before starting
+new seeded tasks, and the live native journey checks the controlled source
+has committed, rather than relying only on the textarea's imperatively set
+value. No scorer, native sandbox permissions, provider policy or grading
+contract is broadened. No end-to-end PASS is claimed until the owner-run final
+gate completes on a new, exact clean Git HEAD.

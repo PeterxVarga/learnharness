@@ -161,7 +161,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  }
  async function runNative(mode:'solve'|'check'){
   // Diagnostic-only execution: NEVER writes to the authoritative score ledger.
-  if(!nativeAvailable||nativeBusy||!task)return;
+  // Ref is updated synchronously: a double activation cannot bypass state batching.
+  if(!nativeAvailable||nativeBusy||nativeAbort.current||!task)return;
   const controller=new AbortController();nativeAbort.current=controller;
   const startedAt=formEpoch.current;
   setNativeBusy(true);setNativeCancelling(false);setNativeResult(null);setNativeError('');
@@ -225,7 +226,9 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    <p className="text-sm text-neutral-500">A beadott .mod szöveget a rendszer <strong>nem futtatja</strong>, hanem korlátozott, biztonságos nyelvtani és matematikai ellenőrzéssel értékeli. Helyes teljes modell és optimum: 1 pont. Más: 0 pont vagy nem értékelhető. Nincs részpont.</p>
    {!embedded&&<Link className="text-sm underline" href={linkedChat?`/chat/${linkedChat}`:'/chat/new?mode=practice'}>Vissza a Practice beszélgetéshez</Link>}
   </header>
-  <section className="flex flex-wrap items-end gap-3 rounded-xl border p-4 xl:col-span-2">
+  <section data-testid="gusek-task-controls-r14z" data-rendered-kind={kind}
+   data-rendered-dialect={transportDialect}
+   className="flex flex-wrap items-end gap-3 rounded-xl border p-4 xl:col-span-2">
     <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
@@ -249,7 +252,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     :<p>Minimális vásárlási költség: {task.variableNames[0]} ({task.prices?.[0]} Ft, +{task.knowledge?.[0]} tudásegység), {task.variableNames[1]} ({task.prices?.[1]} Ft, +{task.knowledge?.[1]} tudásegység). Legalább {task.target} tudásegység szükséges; összesen legfeljebb {task.maxTablets} tabletta, és legalább annyi epres, mint spenótos. Folytonos változókat használj.</p>}
     <p className="text-xs text-neutral-500">Szükséges változónevek: {task.variableNames.join(', ')}. Az optimális megoldást nem fedjük fel.</p>
   </section>}
-  {task&&<section className="min-w-0 space-y-3 rounded-xl border p-4">
+  {task&&<section data-testid="gusek-exam-source-state-r14z" data-source-length={source.length}
+   className="min-w-0 space-y-3 rounded-xl border p-4">
     <label htmlFor="gusek-source" className="block font-semibold">GUSEK / MathProg modell (.mod)</label>
     <div className="flex flex-wrap gap-2">
      <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={()=>uploadModel.current?.click()}>.mod importálása</button>

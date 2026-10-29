@@ -59,6 +59,7 @@ try{
   assert.ok(await page.$('[data-testid="gusek-workbench-r14"]'));
  });
  await page.select('[data-testid="gusek-transport-dialect-r14"]','indexed');
+ await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-dialect')==='indexed');
  await page.evaluate(()=>{
   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
   if(!button)throw Error('task_button_missing');button.click();
@@ -81,6 +82,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-practice-draft-status-r14z"]')?.textContent?.includes('helyben mentve'),{timeout:12000});
   await page.reload({waitUntil:'networkidle2',timeout:30000});
   await page.select('[data-testid="gusek-transport-dialect-r14"]','indexed');
+  await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-dialect')==='indexed');
   await page.evaluate(()=>{
    const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
    if(!button)throw Error('task_button_missing_after_reload');button.click();
@@ -177,6 +179,7 @@ try{
   assert.equal(await page.$eval(modelInput,el=>el.hidden),false);
  });
  await page.select('select[aria-label="Feladattípus"]','froccs');
+ await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-kind')==='froccs');
  await page.evaluate(()=>{
   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
   if(!button)throw Error('new_froccs_task_missing');button.click();
@@ -192,6 +195,7 @@ try{
   assert.ok(!/^maximize\s/m.test(starter));
  });
  await page.select('select[aria-label="Feladattípus"]','tablet');
+ await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-kind')==='tablet');
  await page.evaluate(()=>{
   const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Új feladat');
   if(!button)throw Error('new_tablet_task_missing');button.click();

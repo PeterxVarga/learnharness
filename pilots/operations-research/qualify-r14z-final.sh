@@ -72,37 +72,6 @@ server.once('error',()=>{console.error('BLOCKED_PORT_ALREADY_IN_USE');process.ex
 server.listen({host:'127.0.0.1',port,exclusive:true},()=>server.close());
 JS
 echo "R14Z_FINAL_HEAD=$PIN"
-echo "=== exact source, dependencies and build ==="
-STEP="npm_ci"
-timeout --kill-after=15s 1200s npm ci --no-audit --no-fund >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
-STEP="offline"
-timeout --kill-after=15s 360s node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
-node --input-type=module - "$EVIDENCE/offline.json" <<'JS'
-import {readFileSync} from 'node:fs';
-import assert from 'node:assert/strict';
-const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
-assert.equal(receipt.status,'PASS');
-assert.equal(receipt.totalTests,469);
-assert.equal(receipt.suites.length,37);
-console.log('R14Z_OFFLINE=PASS_469_IN_37');
-JS
-STEP="npm_test"
-timeout --kill-after=15s 1200s npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
-node --input-type=module - "$EVIDENCE/npm-test.log" <<'JS'
-import {readFileSync} from 'node:fs';
-import assert from 'node:assert/strict';
-const log=readFileSync(process.argv[2],'utf8');
-const value=name=>[...log.matchAll(new RegExp('(?:^|\\n)# '+name+' (\\d+)','g'))].at(-1)?.[1];
-assert.equal(Number(value('tests')),2825,'Unexpected full npm test count');
-assert.equal(Number(value('pass')),2825,'A new test silently skipped or failed');
-assert.equal(Number(value('fail')),0,'Nonzero npm test failures');
-console.log('R14Z_FULL_NPM_TESTS=PASS_2825');
-JS
-STEP="typecheck"
-timeout --kill-after=15s 900s npm run typecheck >"$EVIDENCE/typecheck.log" 2>&1 || { tail -n 40 "$EVIDENCE/typecheck.log"; exit 1; }
-STEP="next_build"
-timeout --kill-after=15s 1200s npm run build >"$EVIDENCE/build.log" 2>&1 || { tail -n 40 "$EVIDENCE/build.log"; exit 1; }
-echo "R14Z_NPM_TYPESCRIPT_BUILD=PASS"
 echo "=== actual immutable rootless GNU GLPK ==="
 STEP="native_glpsol"
 export LH_GLPK_IMAGE_ID="$IMAGE"
@@ -182,6 +151,52 @@ console.log(JSON.stringify({
 }));
 JS
 echo "R14Z_REAL_GLPK=PASS"
+echo "=== exact source, dependencies and build ==="
+STEP="npm_ci"
+timeout --kill-after=15s 1200s npm ci --no-audit --no-fund >"$EVIDENCE/npm-ci.log" 2>&1 || { tail -n 30 "$EVIDENCE/npm-ci.log"; exit 1; }
+STEP="typecheck"
+timeout --kill-after=15s 900s npm run typecheck >"$EVIDENCE/typecheck.log" 2>&1 || { tail -n 40 "$EVIDENCE/typecheck.log"; exit 1; }
+STEP="next_build"
+timeout --kill-after=15s 1200s npm run build >"$EVIDENCE/build.log" 2>&1 || { tail -n 40 "$EVIDENCE/build.log"; exit 1; }
+echo "R14Z_NPM_TYPESCRIPT_BUILD=PASS"
+STEP="chromium_smoke"
+# Cheap launchability check before the expensive full test suites.
+timeout --kill-after=5s 45s node --input-type=module <<'JS' >"$EVIDENCE/browser-bootstrap.log" 2>&1
+import assert from 'node:assert/strict';
+import puppeteer from 'puppeteer-core';
+const path=process.env.LH_R14_CHROMIUM;
+assert.ok(path?.startsWith('/'),'absolute distro Chromium required');
+const browser=await puppeteer.launch({executablePath:path,headless:true,args:['--disable-dev-shm-usage']});
+try{
+ const page=await browser.newPage();
+ await page.goto('about:blank');
+ assert.equal(page.url(),'about:blank');
+ console.log('R14Z_CHROMIUM_BOOTSTRAP=PASS');
+}finally{await browser.close();}
+JS
+STEP="offline"
+timeout --kill-after=15s 360s node pilots/operations-research/verify-offline.mjs >"$EVIDENCE/offline.json"
+node --input-type=module - "$EVIDENCE/offline.json" <<'JS'
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const receipt=JSON.parse(readFileSync(process.argv[2],'utf8'));
+assert.equal(receipt.status,'PASS');
+assert.equal(receipt.totalTests,469);
+assert.equal(receipt.suites.length,37);
+console.log('R14Z_OFFLINE=PASS_469_IN_37');
+JS
+STEP="npm_test"
+timeout --kill-after=15s 1200s npm test >"$EVIDENCE/npm-test.log" 2>&1 || { tail -n 40 "$EVIDENCE/npm-test.log"; exit 1; }
+node --input-type=module - "$EVIDENCE/npm-test.log" <<'JS'
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const log=readFileSync(process.argv[2],'utf8');
+const value=name=>[...log.matchAll(new RegExp('(?:^|\\n)# '+name+' (\\d+)','g'))].at(-1)?.[1];
+assert.equal(Number(value('tests')),2825,'Unexpected full npm test count');
+assert.equal(Number(value('pass')),2825,'A new test silently skipped or failed');
+assert.equal(Number(value('fail')),0,'Nonzero npm test failures');
+console.log('R14Z_FULL_NPM_TESTS=PASS_2825');
+JS
 echo "=== Next.js + two final browser flows ==="
 STEP="server"
 TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"

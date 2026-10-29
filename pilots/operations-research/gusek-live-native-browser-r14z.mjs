@@ -100,6 +100,10 @@ try{
   const startNative=network.native,startGrade=network.grade;
   expectedCurrent={kind,model,variableNames:task.variableNames};
   await page.select('select[aria-label="Feladattípus"]',kind);
+  // React 19 can commit select state after Puppeteer has returned.
+  await page.waitForFunction(expected=>
+   document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-kind')===expected,
+   {timeout:12000},kind);
   await page.evaluate(()=>{
    const button=[...document.querySelectorAll('button')].find(
     b=>b.textContent?.trim()==='Új feladat');
@@ -115,7 +119,8 @@ try{
   await setText('[data-testid="gusek-exam-source-r14"]',model);
   await check(kind+'_EXACT_TRUSTED_SOURCE_ENTERED',async()=>{
    await page.waitForFunction(expected=>
-    document.querySelector('[data-testid="gusek-exam-source-r14"]')?.value===expected,
+    document.querySelector('[data-testid="gusek-exam-source-r14"]')?.value===expected &&
+    document.querySelector('[data-testid="gusek-exam-source-state-r14z"]')?.getAttribute('data-source-length')===String(expected.length),
     {timeout:12000},model);
    assert.equal(await page.$eval('[data-testid="gusek-exam-source-r14"]',
     el=>el.value),model);

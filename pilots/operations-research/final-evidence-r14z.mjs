@@ -9,10 +9,10 @@ import {basename,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const SHA=/^[a-f0-9]{40}$/;
 const STEPS=new Set(['preflight','npm_ci','offline','npm_test','typecheck','next_build',
- 'native_glpsol','server','browser_workbench','browser_practice','browser_live_native','final_git','final_receipt']);
+ 'native_glpsol','chromium_smoke','server','browser_workbench','browser_practice','browser_live_native','final_git','final_receipt']);
 const LOGS=Object.freeze([
  'npm-ci.log','offline.json','npm-test.log','typecheck.log','build.log',
- 'native-glpk.json','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
+ 'native-glpk.json','browser-bootstrap.log','next-server.log','browser-workbench.log','browser-practice.log','browser-live-native.log'
 ]);
 const EXPECTED={offline:469,suites:37,npm:2825};
 const LIVE_BROWSER_CHECKS=[
