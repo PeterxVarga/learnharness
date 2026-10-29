@@ -11,6 +11,12 @@ PIN="$(printf '%s' "$*")"
 [[ "$(git rev-parse HEAD)" == "$PIN" ]] || { echo "BLOCKED_WRONG_HEAD"; exit 2; }
 [[ "$(git branch --show-current)" == "pilot/operations-research-r14" ]] || { echo "BLOCKED_WRONG_BRANCH"; exit 2; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { echo "BLOCKED_DIRTY_SOURCE"; exit 2; }
+# Native Next.js typegen, dev and production build rewrite next-env.d.ts.
+# Keep the generated bridge ignored and untracked; never hide real source changes.
+[[ -z "$(git ls-files -- next-env.d.ts)" ]] &&
+ git check-ignore -q -- next-env.d.ts || {
+ echo "BLOCKED_NEXT_ENV_TRACKED_OR_NOT_IGNORED"; exit 2;
+}
 [[ "$(id -u)" != 0 ]] || { echo "BLOCKED_NO_ROOT"; exit 2; }
 IMAGE="$(printenv LH_GLPK_IMAGE_ID || true)"
 [[ "$IMAGE" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "BLOCKED_PINNED_IMAGE_REQUIRED"; exit 2; }

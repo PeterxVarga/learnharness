@@ -1389,3 +1389,26 @@ runtime scoring or full-suite count changed. This is source-only
 qualification work, not a claimed TypeScript PASS. Run only the
 cheap `npm run typecheck` first on the new exact commit; defer the
 full qualification until compiler and production build are green.
+
+## R14Z generated Next types source-fence fix — 2026-10-29
+
+On the actual Fedora worker, native rootless GLPK, the TypeScript compiler
+and a Next.js 16.3.2 production build all PASS on `60f19aa`. Immediately
+after that build, the exact Git-source gate blocked because the *only*
+tracked modification was `next-env.d.ts`: Next rewrote the two imports
+from `.next/dev/types/` to `.next/types/`. This is a generated-file
+tracking defect rather than a solver or compiler failure.
+
+Following Next.js's documented approach, this commit removes the generated
+`next-env.d.ts` from Git's tree, adds it to `.gitignore`, retains it in
+`tsconfig.json`'s includes, and makes the TypeScript script explicitly run
+`next typegen && tsc --noEmit` so clean clones also receive route types.
+Both the read-only preflight and the final release entrypoint guard against
+regressions that track or unignore the generated file.
+
+The owner must reconcile exactly one already-modified generated local file
+before fast-forwarding, without touching unrelated data. No test or full
+qualification has run on this new commit. Neither TypeScript strictness nor
+the final clean-Git evidence gate was weakened; real source edits still
+fail the release fence. This generated file remains on disk and is
+recreated/revised by Next commands, but will no longer be a Git change.

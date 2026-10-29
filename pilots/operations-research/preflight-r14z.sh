@@ -22,6 +22,14 @@ if command -v git >/dev/null 2>&1;then
  if [[ "$PIN" =~ ^[a-f0-9]{40}$ && "$HEAD" == "$PIN" ]];then pass EXACT_GIT_HEAD;else block WRONG_GIT_HEAD;fi
  if [[ "$BRANCH" == 'pilot/operations-research-r14' ]];then pass EXPECTED_BRANCH;else block WRONG_BRANCH;fi
  if [[ -z "$STATUS" ]];then pass CLEAN_WORKTREE;else block DIRTY_WORKTREE;fi
+ # Never track Next's machine-generated type bridge: dev and build rewrite
+ # its import paths differently and would dirty a pinned release source.
+ if [[ -z "$(git ls-files -- next-env.d.ts)" ]] &&
+    git check-ignore -q -- next-env.d.ts;then
+  pass NEXT_GENERATED_TYPES_IGNORED
+ else
+  block NEXT_GENERATED_TYPES_TRACKED_OR_NOT_IGNORED
+ fi
 fi
 if command -v node >/dev/null 2>&1;then
  if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>20||(a===20&&b>=9)?0:1)' >/dev/null 2>&1;
