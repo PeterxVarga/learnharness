@@ -205,8 +205,12 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    });const x=await r.json();if(!r.ok)throw Error(x.error??'Ellenőrzés sikertelen.');
    const out=(linkedChat?x.receipt:x) as Grade;
    if(out.taskId!==task.id||out.maxPoints!==1||![0,1,null].includes(out.points))throw Error('Érvénytelen értékelőválasz.');
-   if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
-   if(startedAt===formEpoch.current)setGrade(out);
+   if(startedAt===formEpoch.current){
+    // The server may have recorded a real old attempt, but that delayed
+    // response must not rewrite the new task's visible attempt history.
+    if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
+    setGrade(out);
+   }
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
   finally{
    if(gradeRequestEpoch.current===startedAt){
