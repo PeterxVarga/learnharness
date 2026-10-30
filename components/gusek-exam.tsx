@@ -375,7 +375,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
      {r15bBrief.steps.map((step,index)=><li key={index}>{step}</li>)}
     </ol>
     {r15bBrief.state==='repair'&&r15bBrief.repeatCount>=2&&
-     <p className="text-sm" data-testid="gusek-r15b-repeat">Ez a hibatípus {r15bBrief.repeatCount} korábbi hibás kísérletben is előfordult a rendelkezésre álló előzményekben.</p>}
+     <p className="text-sm" data-testid="gusek-r15b-repeat">Ez a hibatípus {r15bBrief.repeatCount} hibás kísérletben szerepel a rendelkezésre álló előzményekben, a jelenlegit is beleszámítva.</p>}
     <p className="text-xs text-neutral-500" data-testid="gusek-r15b-provenance">
      Ellenőrzött kísérletek: {r15bBrief.kindAttempts} · segítséghasználat: {r15bBrief.helpProvenance==='unknown'?'korábbi eredményből nem megállapítható':'önbevallás'}
     </p>
