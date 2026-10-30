@@ -80,6 +80,18 @@ try{
   assert.match(text,/43\. variáns/);
   assert.doesNotMatch(text,/optimális érték:|biztosan felkészült/);
  });
+ await check('R15B_GROUNDED_THREE_STEP_PLAN',async()=>{
+  const plan=await page.$('[data-testid="gusek-r15b-diagnostic"]');
+  assert.ok(plan,'repair guidance must appear only after real grade');
+  const state=await page.$eval('[data-testid="gusek-r15b-diagnostic"]',el=>el.getAttribute('data-repair-state'));
+  assert.equal(state,'repair');
+  const steps=await page.$eval('[data-testid="gusek-r15b-steps"] li',els=>els.map(el=>el.textContent?.trim()));
+  assert.equal(steps.length,3);
+  assert.ok(steps.every(t=>typeof t==='string'&&t.length>10));
+  const raw=await page.$eval('[data-testid="gusek-r15b-diagnostic"]',el=>el.textContent);
+  assert.doesNotMatch(raw,/answerSha256|secret_token|1\/1 – TELJESEN HELYES/);
+  assert.equal(counts.post,1);
+ });
  const before={...counts};
  await page.click('[data-testid="gusek-r15-choose"]');
  await check('R15_SELECTION_NEVER_AUTOSTARTS',async()=>{
@@ -92,6 +104,10 @@ try{
   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Új feladat');
   if(!b||b.disabled)throw Error('new_task_button_unavailable');b.click();
  });
+ await check('R15B_PLAN_CLEARS_ON_SELECTION',async()=>{
+  assert.equal(await page.$('[data-testid="gusek-r15b-diagnostic"]'),null);
+  assert.deepEqual(counts,before);
+ });
  await check('R15_EXPLICIT_NEXT_TASK',async()=>{
   await page.waitForFunction(()=>document.querySelector('[aria-label="Vizsgafeladat"]')?.textContent?.includes('gusek-transport-43'),
    {timeout:15000});
@@ -102,6 +118,7 @@ try{
   'R15_NO_SUGGESTION_BEFORE_GRADE','R15_REAL_TASK_LOADED',
   'R15_GRADE_IS_EXPLICIT','R15_REAL_BINARY_SERVER_GRADE',
   'R15_BOUNDED_REPAIR_SUGGESTION','R15_SELECTION_NEVER_AUTOSTARTS',
+  'R15B_GROUNDED_THREE_STEP_PLAN','R15B_PLAN_CLEARS_ON_SELECTION',
   'R15_EXPLICIT_NEXT_TASK']);
  process.stdout.write(JSON.stringify({
   schema:'learnharness.r15.browser.v1',status:'PASS',checks,

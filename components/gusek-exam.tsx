@@ -10,6 +10,7 @@ import {preparePracticeTransfer} from '../pilots/operations-research/gusek-pract
 import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
 import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
 import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-research/adaptive-practice-r15.mjs';
+import {r15bDiagnosticBrief} from '../pilots/operations-research/adaptive-diagnostics-r15b.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -76,6 +77,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
  const r15Suggestion=r15RecommendPractice({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)});
+ const r15bBrief=grade?r15bDiagnosticBrief({history,session:r15Outcomes}):null;
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -366,6 +368,18 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
      taskRequestEpoch.current++;invalidateForm();setBusy(false);
      setKind(r15Suggestion.kind as Kind);setSeed(String(r15Suggestion.seed));setTask(null);
     }}>Javasolt variáns kiválasztása (nem indítja el)</button>
+   </aside>}
+   {r15bBrief&&<aside data-testid="gusek-r15b-diagnostic" data-repair-state={r15bBrief.state} className="space-y-2 rounded-lg border p-3" aria-label="Hibajavítási ellenőrzőlista">
+    <p className="text-sm font-semibold">Háromlépéses ellenőrzés: {r15bBrief.topic}</p>
+    <ol className="list-decimal space-y-1 pl-5 text-sm" data-testid="gusek-r15b-steps">
+     {r15bBrief.steps.map((step,index)=><li key={index}>{step}</li>)}
+    </ol>
+    {r15bBrief.state==='repair'&&r15bBrief.repeatCount>=2&&
+     <p className="text-sm" data-testid="gusek-r15b-repeat">Ez a hibatípus {r15bBrief.repeatCount} korábbi hibás kísérletben is előfordult a rendelkezésre álló előzményekben.</p>}
+    <p className="text-xs text-neutral-500" data-testid="gusek-r15b-provenance">
+     Ellenőrzött kísérletek: {r15bBrief.kindAttempts} · segítséghasználat: {r15bBrief.helpProvenance==='unknown'?'korábbi eredményből nem megállapítható':'önbevallás'}
+    </p>
+    <p className="text-xs text-neutral-500">{r15bBrief.caveat}</p>
    </aside>}
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
