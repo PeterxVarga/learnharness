@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Targeted, exact-SHA R14Z browser replay; not a full release qualification.
-# Usage: bash pilots/operations-research/qualify-browser-r14z.sh SHA --build
-#        bash pilots/operations-research/qualify-browser-r14z.sh SHA --reuse
+# Usage: bash pilots/operations-research/qualify-browser-r14z.sh SHA --build [--live-only]
+#        bash pilots/operations-research/qualify-browser-r14z.sh SHA --reuse [--live-only]
 set -Eeuo pipefail
 umask 077
 ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd -P)"
@@ -15,8 +15,6 @@ SCOPE="${3:---all}"
  { echo "BLOCKED_BUILD_MODE"; exit 2; }
 [[ "$SCOPE" == "--all" || "$SCOPE" == "--live-only" ]] ||
  { echo "BLOCKED_BROWSER_SCOPE"; exit 2; }
-[[ "$SCOPE" != "--live-only" || "$MODE" == "--reuse" ]] ||
- { echo "BLOCKED_LIVE_ONLY_REQUIRES_REUSE"; exit 2; }
 [[ "$(id -u)" != 0 ]] || { echo "BLOCKED_ROOT"; exit 2; }
 [[ "$(git branch --show-current)" == "pilot/operations-research-r14" ]] ||
  { echo "BLOCKED_BRANCH"; exit 2; }
@@ -56,7 +54,7 @@ EVIDENCE="$(mktemp -d /tmp/learnharness-r14z-browser-XXXXXXXX)"
 chmod 700 "$EVIDENCE"
 echo "R14Z_BROWSER_EVIDENCE_DIR=$EVIDENCE"
 SERVER_PID=""
-STEP="build"
+STEP="preflight"
 cleanup(){
  local result=$?
  trap - EXIT
@@ -73,6 +71,23 @@ trap cleanup EXIT
 
 STAMP=".next/r14z-browser-build-head"
 if [[ "$MODE" == "--build" ]]; then
+ STEP="native_route_tests"
+ if ! timeout --kill-after=5s 90s node --experimental-strip-types --test \
+  pilots/operations-research/gusek-native-api-r14.test.mjs >"$EVIDENCE/native-route-tests.log" 2>&1; then
+  tail -n 45 "$EVIDENCE/native-route-tests.log" >&2
+  exit 1
+ fi
+ node --input-type=module - "$EVIDENCE/native-route-tests.log" <<'JS'
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const content=readFileSync(process.argv[2],'utf8');
+const value=name=>Number([...content.matchAll(new RegExp('(?:^|\\n)# '+name+' (\\d+)','g'))].at(-1)?.[1]);
+assert.equal(value('tests'),16,'native route test count');
+assert.equal(value('pass'),16,'native route pass count');
+assert.equal(value('fail'),0,'native route failures');
+console.log('R14Z_NATIVE_ROUTE=PASS_16');
+JS
+ STEP="build"
  # Never reuse a stamp after a failed subsequent build.
  rm -f -- "$STAMP"
  if ! NEXT_TELEMETRY_DISABLED=1 npm run build >"$EVIDENCE/build.log" 2>&1; then

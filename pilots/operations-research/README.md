@@ -1642,3 +1642,24 @@ build. Run cheap native route assertions and typecheck before the
 targeted native-browser gate; only then consider the full
 one-shot R14Z qualification. No runtime test PASS is claimed
 for this source yet.
+
+## R14Z cheap native route guard before a fresh live-only build — 2026-10-30
+
+The `d930af4` production native route change fixes a verified
+Next.js compatibility contradiction: Next's base-server populates
+`x-forwarded-host` with `Host` for direct requests, whereas our
+earlier native route rejected *all* `x-forwarded-host` values.
+Only equal local hosts are now accepted; mismatched host/Origin,
+invalid token, explicit `Forwarded` and hostile fetch metadata
+remain blocked and are covered within the same 16 route test cases.
+This is a runtime code change and requires a fresh production build.
+
+The targeted browser replay gate now allows `--build --live-only`.
+Before that build, it runs just the 16 native route unit/security
+tests (with an exact 16/16 receipt), failing early if the
+header-policy adjustment regresses anything. A successful new
+build then runs only 16 real-native Chromium checks; the earlier
+26 Workbench/Practice checks are not needlessly repeated. The
+build is stamped with the exact new HEAD for future test-only
+`--reuse` runs. Only the final one-shot qualification can
+issue the R14Z release PASS; this is a targeted diagnostic gate.
