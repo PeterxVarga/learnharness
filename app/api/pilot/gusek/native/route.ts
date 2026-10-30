@@ -20,11 +20,19 @@ function configured(){
    SHA.test(process.env.LH_GLPK_IMAGE_ID??"") &&
    TOKEN.test(process.env.LH_GLPK_RUN_TOKEN??"");
 }
-function sameOrigin(req:Request){
+function verifiedLocalHost(req:Request):string|null{
  const host=req.headers.get("host")??"";
+ // Next.js's own base-server synthesizes x-forwarded-host = Host for
+ // direct requests. Reject any differing/spoofed forwarding authority.
+ const forwarded=req.headers.get("x-forwarded-host");
+ if(!localHost.test(host)||req.headers.has("forwarded")||
+    (forwarded!==null&&forwarded!==host))return null;
+ return host;
+}
+function sameOrigin(req:Request){
+ const host=verifiedLocalHost(req);
  const origin=req.headers.get("origin")??"";
- if(!localHost.test(host) || origin!==`http://${host}`)return false;
- if(req.headers.has("x-forwarded-host")||req.headers.has("forwarded"))return false;
+ if(host===null||origin!==`http://${host}`)return false;
  const site=req.headers.get("sec-fetch-site");
  return !site||site==="same-origin";
 }
@@ -37,8 +45,7 @@ function authorized(req:Request){
 }
 export function GET(req:Request){
  // No solver secrets or image IDs are ever exposed.
- const host=req.headers.get("host")??"";
- if(!localHost.test(host)||req.headers.has("x-forwarded-host")||req.headers.has("forwarded"))
+ if(verifiedLocalHost(req)===null)
    return json({error:"local_only"},403);
  return json({schema:"learnharness.glpk-native-status.r14",available:configured(),scoreAuthority:false});
 }

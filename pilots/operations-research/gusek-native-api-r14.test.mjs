@@ -31,9 +31,22 @@ describe('R14 native GLPK diagnostic route -- opt-in, local auth, no score autho
   await Promise.resolve();
   assert.equal(process.env.LH_GLPK_RUN_TOKEN,TOKEN);
   const j=await get().json();assert.equal(j.available,true);assert.equal(j.scoreAuthority,false);
+  // Next.js base-server synthesizes a matching x-forwarded-host even
+  // for direct loopback requests; no secret must be emitted.
+  const response=get('localhost:3000',{'x-forwarded-host':'localhost:3000'});
+  assert.equal(response.status,200);
+  const withForwarded=await response.json();
+  assert.equal(withForwarded.available,true);
+  assert.equal(withForwarded.scoreAuthority,false);
+  assert.equal('token' in withForwarded,false);
+  assert.equal('imageId' in withForwarded,false);
  }));
  it('GET is blocked on a nonlocal host',async()=>env(ready,async()=>assert.equal(get('example.com').status,403)));
- it('GET refuses forwarded host metadata',async()=>env(ready,async()=>assert.equal(get('localhost:3000',{'x-forwarded-host':'evil.com'}).status,403)));
+ it('GET refuses forwarded host metadata',async()=>env(ready,async()=>{
+  assert.equal(get('localhost:3000',{'x-forwarded-host':'evil.com'}).status,403);
+  assert.equal(get('localhost:3000',{'x-forwarded-host':'127.0.0.1:3000'}).status,403);
+  assert.equal(get('localhost:3000',{'forwarded':'host=localhost:3000'}).status,403);
+ }));
  it('POST fails closed without explicit opt-in',async()=>env({},async()=>assert.equal((await POST(request())).status,503)));
  it('POST refuses absent or malformed token',async()=>env(ready,async()=>{
   for(const token of ['', 'short','nothex'.repeat(11)]){
@@ -44,12 +57,23 @@ describe('R14 native GLPK diagnostic route -- opt-in, local auth, no score autho
  it('POST refuses incorrect 64-byte token',async()=>env(ready,async()=>assert.equal((await POST(request({token:OTHER}))).status,403)));
  it('POST rejects cross-site Origin even with a valid token',async()=>env(ready,async()=>assert.equal((await POST(request({origin:'http://attacker.example'}))).status,403)));
  it('POST rejects forged Host despite otherwise valid Origin/token',async()=>env(ready,async()=>assert.equal((await POST(request({host:'app.example.org',origin:'http://app.example.org'}))).status,403)));
- it('POST rejects forwarded-host headers',async()=>env(ready,async()=>assert.equal((await POST(request({extra:{'x-forwarded-host':'attacker.example'}}))).status,403)));
+ it('POST rejects forwarded-host headers',async()=>env(ready,async()=>{
+  assert.equal((await POST(request({extra:{'x-forwarded-host':'attacker.example'}}))).status,403);
+  assert.equal((await POST(request({extra:{'x-forwarded-host':'127.0.0.1:3000'}}))).status,403);
+  assert.equal((await POST(request({extra:{forwarded:'host=localhost:3000'}}))).status,403);
+  assert.equal((await POST(request({origin:'http://attacker.example',extra:{'x-forwarded-host':'localhost:3000'}}))).status,403);
+  assert.equal((await POST(request({token:OTHER,extra:{'x-forwarded-host':'localhost:3000'}}))).status,403);
+ }));
  it('POST rejects cross-site fetch metadata',async()=>env(ready,async()=>assert.equal((await POST(request({extra:{'sec-fetch-site':'cross-site'}}))).status,403)));
  it('POST requires application/json',async()=>env(ready,async()=>assert.equal((await POST(request({type:'text/plain'}))).status,415)));
  it('POST enforces declared content length',async()=>env(ready,async()=>assert.equal((await POST(request({extra:{'content-length':'150000'}}))).status,413)));
  it('POST enforces actual byte length',async()=>env(ready,async()=>assert.equal((await POST(request({body:JSON.stringify({model:'x'.repeat(150000),mode:'check'})}))).status,413)));
- it('POST refuses malformed JSON without reaching Podman',async()=>env(ready,async()=>assert.equal((await POST(request({body:'{{'}))).status,400)));
+ it('POST refuses malformed JSON without reaching Podman',async()=>env(ready,async()=>{
+  assert.equal((await POST(request({body:'{{'}))).status,400);
+  // A matching synthesized forwarding header must make it through
+  // local Host+Origin+token auth, and still fail malformed JSON safely.
+  assert.equal((await POST(request({body:'{{',extra:{'x-forwarded-host':'localhost:3000'}}))).status,400);
+ }));
  it('POST refuses extra fields, wrong mode and nonstring data',async()=>env(ready,async()=>{
   for(const body of [
    {model:'var x;',mode:'check',path:'/etc/passwd'},

@@ -1610,3 +1610,35 @@ The existing two-argument all-three-journey invocation remains
 available. No build inputs changed, so the stamped `cb26a8f` build
 may be reused under the existing explicit diff allowlist.
 No tests were executed remotely or on Fedora for the new commit.
+
+## R14Z Next.js-generated forwarded-host false rejection — 2026-10-30
+
+A real Fedora live-native-only browser probe on `34c88dd`
+failed at the **unmocked GET status** with HTTP 403, before any
+real GLPK execution. The route's previous rule rejected any
+`x-forwarded-host` header, but Next.js's own Node base-server
+adds `x-forwarded-host` on requests when absent, defaulting to
+the incoming `Host`. The exact Fedora header equality has not
+yet been inspected, but the documented framework implementation
+and the 403 status strongly support this as the cause.
+
+The native route now shares `verifiedLocalHost()` between GET and
+POST: the actual Host must remain an approved loopback hostname,
+the standard `Forwarded` header is rejected, and `x-forwarded-host`
+is allowed **only when byte-identical to Host**. Different loopback
+hosts, attacker domains, comma-separated forwarded hosts and
+nonlocal authorities remain blocked. POST still requires exact
+`http://Host` Origin, same-origin fetch metadata when supplied,
+the 64-character valid token checked in constant time, bounded
+JSON and the rootless local image. No response exposes the token,
+image ID or score authority; GLPK never auto-grades.
+
+The existing native HTTP suite now exercises both the valid
+framework-synthesized header and multiple invalid forwarding
+variations, while preserving the original 16 native tests and
+469/2825 full-gate expected totals. This is an **application route
+change**, so unlike test-only changes it requires a fresh production
+build. Run cheap native route assertions and typecheck before the
+targeted native-browser gate; only then consider the full
+one-shot R14Z qualification. No runtime test PASS is claimed
+for this source yet.
