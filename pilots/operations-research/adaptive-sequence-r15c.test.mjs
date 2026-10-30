@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import {describe,it} from 'node:test';
+import {r15SessionOutcome} from './adaptive-practice-r15.mjs';
+import {r15cPracticeItinerary} from './adaptive-sequence-r15c.mjs';
+const good=(kind='transport',seed=42)=>({taskId:'gusek-'+kind+'-'+seed,points:1,correct:true,maxPoints:1,errors:[]});
+const bad=(kind='transport',seed=42,code='objective_mismatch')=>({...good(kind,seed),points:0,correct:false,errors:[code]});
+const unsupported=(kind='transport',seed=42)=>({...good(kind,seed),points:null,correct:null,errors:['source_unsupported_expression']});
+const outcome=(g,hintsUsed=false,at=1000)=>r15SessionOutcome(g,{kind:g.taskId.split('-')[1],seed:Number(g.taskId.split('-')[2]),hintsUsed,at});
+const plan=(session=[],kind='transport',seed=42,history=[])=>r15cPracticeItinerary({session,currentKind:kind,currentSeed:seed,history});
+const historical=(g,id='123e4567-e89b-42d3-a456-426614174000')=>({
+ ...g,id,seed:Number(g.taskId.split('-')[2]),submittedAt:'2026-10-30T09:00:00.000Z',
+ status:g.points===1?'FULL_CREDIT':g.points===0?'ZERO_CREDIT':'UNASSESSABLE'
+});
+describe('R15C bounded three-stop plan and evidence-only board',()=>{
+ it('zero observations have three kind summaries',()=>{const p=plan();assert.equal(p.summary.length,3);assert.equal(p.totals.observed,0);});
+ it('new learner receives exactly three advisory tasks',()=>assert.equal(plan().steps.length,3));
+ it('every stop requires manual start',()=>assert.ok(plan().steps.every(x=>x.requiresManualStart===true)));
+ it('first and third stop revisit the same kind after interleave',()=>{const p=plan();assert.equal(p.steps[0].kind,p.steps[2].kind);assert.notEqual(p.steps[1].kind,p.steps[0].kind);});
+ it('all task IDs are different even when kind repeats',()=>assert.equal(new Set(plan().steps.map(x=>x.taskId)).size,3));
+ it('new seeds do not reuse current seed',()=>assert.ok(plan().steps.every(x=>x.seed!==42)));
+ it('all seeds are uint32 integers',()=>assert.ok(plan().steps.every(x=>Number.isSafeInteger(x.seed)&&x.seed>=0&&x.seed<=4294967295)));
+ it('after failed transport focus remains transport',()=>assert.equal(plan([outcome(bad())]).steps[0].kind,'transport'));
+ it('after unsupported transport focus is transport',()=>{const p=plan([outcome(unsupported())]);assert.equal(p.steps[0].kind,'transport');assert.match(p.steps[0].reason,/nem bizonyít/);});
+ it('assisted success recommends independent same-kind retry',()=>{const p=plan([outcome(good(),true)]);assert.equal(p.steps[0].kind,'transport');assert.match(p.steps[0].reason,/nem bizonyított/);});
+ it('self-reported unaided success interleaves away from same kind',()=>assert.notEqual(plan([outcome(good())]).steps[0].kind,'transport'));
+ it('unknown older help cannot be treated as unaided success',()=>assert.equal(plan([], 'froccs',43,[historical(good())]).steps[0].kind,'transport'));
+ it('zero and unassessable are counted separately',()=>{const p=plan([outcome(bad('transport',41),false,100),outcome(unsupported('transport',42),false,200)]);assert.equal(p.totals.zero,1);assert.equal(p.totals.unassessable,1);});
+ it('an unassessable does not count as zero or full',()=>{const p=plan([outcome(unsupported())]);assert.equal(p.summary[0].zero,0);assert.equal(p.summary[0].full,0);});
+ it('full grade is counted as factual outcome, not mastery',()=>{const p=plan([outcome(good())]);assert.equal(p.totals.full,1);assert.equal('mastery' in p,false);});
+ it('unknown historical assistance is explicit',()=>{const p=plan([], 'transport',42,[historical(good())]);assert.equal(p.totals.unknownHelp,1);assert.equal(p.summary[0].selfReportedUnaidedFull,0);});
+ it('session self-reported no help is not proctored proof',()=>{const p=plan([outcome(good())]);assert.equal(p.summary[0].selfReportedUnaidedFull,1);assert.match(p.caveat,/nem bizonyít/);});
+ it('historical + session duplicate receipt is counted once',()=>{const h=historical(bad());const s={...outcome(bad(),false,Date.parse(h.submittedAt)),id:h.id};assert.equal(plan([s],'transport',42,[h]).totals.observed,1);});
+ it('known historical status is validated upstream',()=>assert.equal(plan([], 'transport',42,[{...historical(good()),status:'FAKE'}]).totals.observed,0));
+ it('invalid session grades are not evidence',()=>assert.equal(plan([{taskId:'gusek-transport-42',points:7,kind:'transport'}]).totals.observed,0));
+ it('all variants are distinct per kind, including multiple attempts on same seed',()=>{const p=plan([outcome(bad(),false,100),outcome(bad(),false,200)]);assert.equal(p.summary[0].attempts,2);assert.equal(p.summary[0].variants,1);});
+ it('recent seen seeds are skipped for same kind',()=>{const p=plan([outcome(bad('transport',43),false,100),outcome(bad('transport',44),false,200)]);assert.equal(p.steps[0].seed,45);assert.equal(p.steps[2].seed,46);});
+ it('independent kind seed can reuse another kind seed',()=>{const p=plan([outcome(bad('transport',43),false,100)]);assert.equal(p.steps[1].seed,43);});
+ it('uint32 wrap is safe for three-step sequence',()=>{const p=plan([], 'transport',4294967295);assert.deepEqual(p.steps.map(x=>x.seed),[0,0,1]);});
+ it('non-numeric seed is rejected without coercion',()=>assert.equal(r15cPracticeItinerary({currentSeed:'42'}),null));
+ it('fraction seed is rejected',()=>assert.equal(r15cPracticeItinerary({currentSeed:3.5}),null));
+ it('negative seed is rejected',()=>assert.equal(r15cPracticeItinerary({currentSeed:-1}),null));
+ it('unsafe seed above uint32 is rejected',()=>assert.equal(r15cPracticeItinerary({currentSeed:4294967296}),null));
+ it('unknown kind is rejected',()=>assert.equal(r15cPracticeItinerary({currentKind:'__proto__'}),null));
+ it('bounded history is at most 48',()=>{const many=Array.from({length:80},(_,i)=>outcome(bad('tablet',i),false,i*1000));assert.equal(plan(many,'tablet',80).totals.observed,48);});
+ it('counts sum to observed',()=>{const p=plan([outcome(bad('froccs',1),false,100),outcome(good('tablet',2),false,200)]);assert.equal(p.summary.reduce((n,r)=>n+r.attempts,0),p.totals.observed);});
+ it('foreign-kind errors are never exposed in plan',()=>{const x=plan([outcome(bad('tablet',42,'unexpected_weird_code'))]);assert.doesNotMatch(JSON.stringify(x),/unexpected_weird_code/);});
+ it('no grading, source or solver output in displayed plan',()=>{const x=JSON.stringify(plan([outcome(bad())]));for(const secret of ['answerSha256','model.mod','solutionListing','var x','secret_token'])assert.equal(x.includes(secret),false);});
+ it('all steps are uniquely numbered',()=>assert.deepEqual(plan().steps.map(x=>x.position),[1,2,3]));
+ it('output contract cannot add a score',()=>{const p=plan();assert.equal(p.scoreAuthority,false);assert.equal(p.autoStart,false);assert.equal('points' in p,false);});
+ it('all task IDs use strict validated task family',()=>assert.ok(plan().steps.every(x=>/^gusek-(transport|froccs|tablet)-\d+$/.test(x.taskId))));
+});
