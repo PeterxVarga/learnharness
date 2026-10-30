@@ -6,8 +6,8 @@ set -Eeuo pipefail
 umask 077
 ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd -P)"
 cd "$ROOT"
-PIN="\${1:-}"
-MODE="\${2:-}"
+PIN="${1:-}"
+MODE="${2:-}"
 [[ "$#" == 2 && "$PIN" =~ ^[a-f0-9]{40}$ ]] ||
  { echo "BLOCKED_EXACT_PIN_OR_ARGUMENTS"; exit 2; }
 [[ "$MODE" == "--build" || "$MODE" == "--reuse" ]] ||
@@ -25,18 +25,18 @@ for tool in node npm git podman timeout; do
 done
 [[ -f package-lock.json && -x node_modules/.bin/next ]] ||
  { echo "BLOCKED_DEPENDENCIES"; exit 2; }
-IMAGE="\${LH_GLPK_IMAGE_ID:-}"
+IMAGE="${LH_GLPK_IMAGE_ID:-}"
 [[ "$IMAGE" =~ ^sha256:[a-f0-9]{64}$ ]] ||
  { echo "BLOCKED_IMAGE_PIN"; exit 2; }
-RAW_IMAGE_ID="\${IMAGE#sha256:}"
+RAW_IMAGE_ID="${IMAGE#sha256:}"
 [[ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" == true ]] ||
  { echo "BLOCKED_ROOTLESS"; exit 2; }
 [[ "$(podman image inspect --format '{{.Id}}' "$RAW_IMAGE_ID" 2>/dev/null)" == "$RAW_IMAGE_ID" ]] ||
  { echo "BLOCKED_IMAGE_MISSING"; exit 2; }
-CHROME="\${LH_R14_CHROMIUM:-}"
+CHROME="${LH_R14_CHROMIUM:-}"
 [[ "$CHROME" == /* && -x "$CHROME" ]] ||
  { echo "BLOCKED_CHROMIUM"; exit 2; }
-PORT="\${LH_R14_FINAL_PORT:-33770}"
+PORT="${LH_R14_FINAL_PORT:-33770}"
 [[ "$PORT" =~ ^[0-9]{4,5}$ ]] &&
  ((10#$PORT>=1024 && 10#$PORT<=65535)) ||
  { echo "BLOCKED_PORT"; exit 2; }
@@ -119,15 +119,15 @@ done
 SCRIPTS=(gusek-workbench-browser-r14.mjs gusek-practice-browser-r14.mjs gusek-live-native-browser-r14z.mjs)
 LABELS=(workbench practice live-native)
 for i in 0 1 2; do
- STEP="browser_\${LABELS[$i]}"
- LOG="$EVIDENCE/\${LABELS[$i]}.log"
- echo "R14Z_BROWSER_RUNNING=\${LABELS[$i]}"
+ STEP="browser_${LABELS[$i]}"
+ LOG="$EVIDENCE/${LABELS[$i]}.log"
+ echo "R14Z_BROWSER_RUNNING=${LABELS[$i]}"
  if ! timeout --kill-after=15s 240s \
-  node "pilots/operations-research/\${SCRIPTS[$i]}" >"$LOG" 2>&1; then
+  node "pilots/operations-research/${SCRIPTS[$i]}" >"$LOG" 2>&1; then
   tail -n 55 "$LOG" >&2
   exit 1
  fi
- echo "R14Z_BROWSER_STAGE_\${LABELS[$i]}=PASS"
+ echo "R14Z_BROWSER_STAGE_${LABELS[$i]}=PASS"
 done
 STEP="receipts"
 node --input-type=module - "$EVIDENCE" <<'JS'
