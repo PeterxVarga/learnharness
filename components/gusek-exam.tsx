@@ -8,6 +8,7 @@ import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/wo
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
 import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
+import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-research/adaptive-practice-r15.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -46,6 +47,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [nativeSnapshot,setNativeSnapshot]=useState<{taskId:string;model:string;data:string}|null>(null);
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
+ const [r15Outcomes,setR15Outcomes]=useState<Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>>([]);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
@@ -72,6 +74,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
+ const r15Suggestion=r15RecommendPractice({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)});
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -213,6 +216,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     // The server may have recorded a real old attempt, but that delayed
     // response must not rewrite the new task's visible attempt history.
     if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
+    const evidence=r15SessionOutcome(out,{kind:task.kind,seed:Number(seed),hintsUsed:hints});
+    if(evidence)setR15Outcomes(old=>[...old,evidence].slice(-48));
     setGrade(out);
    }
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
@@ -350,6 +355,17 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   {grade&&<section role="status" data-testid="gusek-grade-r14z" data-task-id={grade.taskId} data-grade-points={grade.points===null?"unassessable":String(grade.points)} className="space-y-2 rounded-xl border p-4 xl:col-start-2"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
+   {r15Suggestion&&<aside data-testid="gusek-r15-recommendation" className="space-y-2 rounded-lg border p-3" aria-label="Következő gyakorlási javaslat">
+    <p className="text-sm font-semibold">Következő gyakorlási javaslat (R15)</p>
+    <p className="text-sm">{r15Suggestion.reason}</p>
+    {r15Suggestion.correction&&<p className="text-sm"><strong>{r15Suggestion.correction.topic}:</strong> {r15Suggestion.correction.step}</p>}
+    <p className="text-sm" data-testid="gusek-r15-next-task">{r15Suggestion.kind==='transport'?'Szállítás':r15Suggestion.kind==='froccs'?'Fröccs':'Tabletta'} · {r15Suggestion.seed}. variáns</p>
+    <p className="text-xs text-neutral-500">{r15Suggestion.caveat}</p>
+    <button type="button" data-testid="gusek-r15-choose" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+     taskRequestEpoch.current++;invalidateForm();setBusy(false);
+     setKind(r15Suggestion.kind as Kind);setSeed(String(r15Suggestion.seed));setTask(null);
+    }}>Javasolt variáns kiválasztása (nem indítja el)</button>
+   </aside>}
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
     <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
