@@ -12,6 +12,7 @@ import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gus
 import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-research/adaptive-practice-r15.mjs';
 import {r15bDiagnosticBrief} from '../pilots/operations-research/adaptive-diagnostics-r15b.mjs';
 import {r15cPracticeItinerary} from '../pilots/operations-research/adaptive-sequence-r15c.mjs';
+import {r15dCreateRun,r15dCanSelect,r15dSelectRunStep,r15dLoadedRunStep,r15dRecordRunGrade,r15dPauseRun,r15dRunSummary} from '../pilots/operations-research/adaptive-run-r15d.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -51,6 +52,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [r15Outcomes,setR15Outcomes]=useState<Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>>([]);
+ const [r15dRun,setR15dRun]=useState<ReturnType<typeof r15dCreateRun>>(null);
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
@@ -80,6 +82,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const r15Suggestion=r15RecommendPractice({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)});
  const r15bBrief=grade?r15bDiagnosticBrief({history,session:r15Outcomes}):null;
  const r15cPlan=grade?r15cPracticeItinerary({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)}):null;
+ const r15dProgress=r15dRun?r15dRunSummary(r15dRun):null;
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -143,6 +146,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    setObjective(restored?.objective??'');setHints(restored?.hintsUsed??false);
    setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
    setDraftState(storageFailed?'unavailable':restored?'restored':'idle');
+   setR15dRun(old=>r15dLoadedRunStep(old,t.id));
   }catch(e){if(epoch===taskRequestEpoch.current)setError(e instanceof Error?e.message:String(e));}
   finally{if(epoch===taskRequestEpoch.current)setBusy(false);}
  }
@@ -222,7 +226,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     // response must not rewrite the new task's visible attempt history.
     if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
     const evidence=r15SessionOutcome(out,{kind:task.kind,seed:Number(seed),hintsUsed:hints});
-    if(evidence)setR15Outcomes(old=>[...old,evidence].slice(-48));
+    if(evidence){
+     setR15Outcomes(old=>[...old,evidence].slice(-48));
+     setR15dRun(old=>r15dRecordRunGrade(old,evidence));
+    }
     setGrade(out);
    }
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
@@ -242,7 +249,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   <section data-testid="gusek-task-controls-r14z" data-rendered-kind={kind}
    data-rendered-dialect={transportDialect}
    className="flex flex-wrap items-end gap-3 rounded-xl border p-4 xl:col-span-2">
-    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setKind(e.target.value as Kind);setTask(null);}}>
+    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
     {kind==='transport'&&<label className="text-sm">MathProg felírás
@@ -253,7 +260,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
       <option value="indexed">Indexelt x[i,j] + .dat (R14)</option>
      </select>
     </label>}
-    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(e.target.value);setTask(null);}}/></label>
+    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setSeed(e.target.value);setTask(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
   {task&&<section aria-label="Vizsgafeladat" className="min-w-0 space-y-3 rounded-xl border p-4 xl:sticky xl:top-4 xl:self-start">
@@ -368,6 +375,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     <p className="text-xs text-neutral-500">{r15Suggestion.caveat}</p>
     <button type="button" data-testid="gusek-r15-choose" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
      taskRequestEpoch.current++;invalidateForm();setBusy(false);
+     setR15dRun(old=>r15dPauseRun(old));
      setKind(r15Suggestion.kind as Kind);setSeed(String(r15Suggestion.seed));setTask(null);
     }}>Javasolt variáns kiválasztása (nem indítja el)</button>
    </aside>}
@@ -394,6 +402,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
       </div>
       <button type="button" data-testid={'gusek-r15c-select-'+item.position} disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
        taskRequestEpoch.current++;invalidateForm();setBusy(false);
+       setR15dRun(old=>r15dPauseRun(old));
        setKind(item.kind as Kind);setSeed(String(item.seed));setTask(null);
       }}>Variáns kiválasztása</button>
      </li>)}
@@ -409,11 +418,35 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
      </tr>)}</tbody></table></div>
     <p className="text-xs text-neutral-500" data-testid="gusek-r15c-count">Eddig {r15cPlan.totals.observed} ellenőrzött kísérlet alapján.</p>
     <p className="text-xs text-neutral-500">{r15cPlan.caveat}</p>
+    <button type="button" data-testid="gusek-r15d-activate" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+     const candidate=r15dCreateRun(r15cPlan);
+     if(candidate)setR15dRun(candidate);
+    }}>{r15dRun?'Új gyakorlatsor indítása (az eddigi követés felülíródik)':'Gyakorlatsor követésének indítása'}</button>
    </section>}
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
-    <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
+    <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
    </div>
+  </section>}
+  {r15dRun&&r15dProgress&&<section className="space-y-3 rounded-xl border p-4 xl:col-span-2" data-testid="gusek-r15d-run" data-active={r15dRun.active??'none'} data-ready={String(r15dRun.ready)} aria-label="Aktív követett gyakorlatsor">
+   <h2 className="font-semibold">Aktív háromállomásos gyakorlatsor</h2>
+   <p className="text-sm" data-testid="gusek-r15d-progress">Beadással érintett állomások: {r15dProgress.attemptedStations}/3 · 1/1 eredményű állomások: {r15dProgress.fullCreditStations}/3 · ellenőrzött beadások: {r15dProgress.attempts}</p>
+   <ol className="space-y-2" data-testid="gusek-r15d-stations">
+    {r15dRun.steps.map(item=><li key={item.position} data-testid={'gusek-r15d-step-'+item.position} data-status={item.status} data-attempts={item.attempts} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
+     <div className="space-y-1">
+      <p className="text-sm font-semibold">{item.position}. {item.title} – {item.label} · {item.seed}. variáns</p>
+      <p className="text-xs text-neutral-500">Állapot: {item.status==='pending'?'még nem választottad ki':item.status==='selected'?'kiválasztva, nincs betöltve':item.status==='loaded'?'feladat betöltve':item.status==='zero'?'0/1, javítható':item.status==='unassessable'?'nem értékelhető':'1/1 ellenőrzött eredmény'} · beadások: {item.attempts}</p>
+     </div>
+     <button type="button" data-testid={'gusek-r15d-select-'+item.position} disabled={busy||!r15dCanSelect(r15dRun,item.position)} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>{
+      if(!r15dCanSelect(r15dRun,item.position))return;
+      taskRequestEpoch.current++;invalidateForm();setBusy(false);
+      setR15dRun(old=>r15dSelectRunStep(old,item.position));
+      setKind(item.kind as Kind);setSeed(String(item.seed));setTask(null);
+     }}>{item.attempts>0?'Állomás újrapróbálása':'Állomás kiválasztása'}</button>
+    </li>)}
+   </ol>
+   <p className="text-xs text-neutral-500">{r15dRun.caveat}</p>
+   <button type="button" data-testid="gusek-r15d-stop" className="rounded border px-3 py-2 text-sm" onClick={()=>setR15dRun(null)}>Követés lezárása (kézzel)</button>
   </section>}
   {linkedChat&&<section className="rounded-xl border p-4 xl:col-span-2"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
   {error&&<p role="alert" className="rounded border border-red-500 p-3 text-red-600">{error}</p>}
