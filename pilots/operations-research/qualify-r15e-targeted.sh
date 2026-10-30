@@ -24,7 +24,34 @@ done
 CHROME="${LH_R14_CHROMIUM:-}"
 [[ "$CHROME" == /* && -x "$CHROME" ]] ||
  { echo "BLOCKED_CHROMIUM";exit 2; }
-PORT=33770
+# Choose an unused loopback port rather than interrupting any other project.
+# Optional manual override remains restricted to 4/5-digit local ports.
+PORT="${LH_R15_QUALIFY_PORT:-}"
+if [[ -z "$PORT" ]];then
+ PORT="$(node --input-type=module <<'JS'
+import net from 'node:net';
+const server=net.createServer();
+server.once('error',e=>{
+ process.stderr.write('BLOCKED_PORT_DISCOVERY: '+e.message+'\n');
+ process.exitCode=2;
+});
+server.listen({host:'127.0.0.1',port:0,exclusive:true},()=>{
+ const address=server.address();
+ if(!address||typeof address==='string'){
+  process.stderr.write('BLOCKED_PORT_DISCOVERY_NO_ADDRESS\n');
+  process.exitCode=2;server.close();return;
+ }
+ process.stdout.write(String(address.port)+'\n');
+ server.close();
+});
+JS
+ )"
+fi
+[[ "$PORT" =~ ^[1-9][0-9]{3,4}$ ]] &&
+ (( 10#$PORT >= 1024 && 10#$PORT <= 65535 )) ||
+ { echo "BLOCKED_INVALID_LOOPBACK_PORT";exit 2; }
+echo "R15E_LOOPBACK_PORT=$PORT"
+# Re-check just before starting work; an extremely rare bind race fails closed.
 node --input-type=module - "$PORT" <<'JS'
 import net from 'node:net';
 const s=net.createServer();
