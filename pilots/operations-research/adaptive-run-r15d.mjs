@@ -4,6 +4,19 @@
  * Zero credit, unsupported and full credit are different states; none is mastery.
  * This module never loads a problem, persists data or awards points.
  */
+/**
+ * @typedef {{
+ *  position:number,kind:string,seed:number,taskId:string,
+ *  label:string,title:string,phase:string,status:string,
+ *  attempts:number,fullCount:number,zeroCount:number,
+ *  unassessableCount:number,assistance:string,lastReceiptKey:string|null
+ * }} R15DStep
+ * @typedef {{
+ *  schema:string,active:number|null,ready:boolean,
+ *  steps:ReadonlyArray<R15DStep>,scoreAuthority:boolean,
+ *  autoStart:boolean,caveat:string
+ * }} R15DRun
+ */
 import {r15ObservedOutcomes} from './adaptive-practice-r15.mjs';
 const KINDS=new Set(['transport','froccs','tablet']);
 const UINT32=4294967295;
@@ -16,7 +29,9 @@ const validItem=s=>s&&typeof s==='object'&&!Array.isArray(s)&&
  typeof s.title==='string'&&s.title.length>0&&s.title.length<=90 &&
  typeof s.label==='string'&&s.label.length>0&&s.label.length<=40 &&
  ['focus','interleave','return'].includes(s.phase)&&s.requiresManualStart===true;
-/** @param {ReturnType<import('./adaptive-sequence-r15c.mjs').r15cPracticeItinerary>} itinerary */
+/** @param {ReturnType<import('./adaptive-sequence-r15c.mjs').r15cPracticeItinerary>} itinerary
+ *  @returns {R15DRun|null}
+ */
 export function r15dCreateRun(itinerary){
  if(!itinerary||itinerary.schema!=='learnharness.r15c.practice-itinerary.v1'||
   !Array.isArray(itinerary.steps)||itinerary.steps.length!==3||
@@ -47,16 +62,23 @@ const validRun=run=>run&&run.schema===RUN_SCHEMA&&Array.isArray(run.steps)&&run.
  *  @param {number} position
  */
 export function r15dCanSelect(run,position){
- if(!validRun(run)||!Number.isInteger(position)||position<1||position>3)return false;
+ if(!run||!validRun(run)||!Number.isInteger(position)||position<1||position>3)return false;
  return position===1||run.steps[position-2].attempts>0;
 }
+/** @param {R15DRun} run
+ *  @param {number} position
+ *  @param {Partial<R15DStep>} update
+ *  @param {number|null} active
+ *  @param {boolean} ready
+ *  @returns {R15DRun}
+ */
 const transform=(run,position,update,active,ready)=>Object.freeze({
  ...run,active,ready,
  steps:Object.freeze(run.steps.map(s=>s.position===position?Object.freeze({...s,...update}):s))
 });
 /** @param {ReturnType<typeof r15dCreateRun>} run */
 export function r15dPauseRun(run){
- if(!validRun(run))return run;
+ if(!run||!validRun(run))return run;
  return Object.freeze({...run,active:null,ready:false});
 }
 /** @param {ReturnType<typeof r15dCreateRun>} run
@@ -71,7 +93,7 @@ export function r15dSelectRunStep(run,position){
  *  @param {string} taskId
  */
 export function r15dLoadedRunStep(run,taskId){
- if(!validRun(run)||run.active===null)return run;
+ if(!run||!validRun(run)||run.active===null)return run;
  const s=run.steps[run.active-1];
  if(s.taskId!==taskId)return r15dPauseRun(run);
  return transform(run,s.position,{status:s.attempts>0?s.status:'loaded'},s.position,true);
@@ -83,7 +105,7 @@ export function r15dLoadedRunStep(run,taskId){
  * @param {NonNullable<ReturnType<import('./adaptive-practice-r15.mjs').r15SessionOutcome>>|null} outcome
  */
 export function r15dRecordRunGrade(run,outcome){
- if(!validRun(run)||run.active===null||run.ready!==true||!outcome)return run;
+ if(!run||!validRun(run)||run.active===null||run.ready!==true||!outcome)return run;
  const evidence=r15ObservedOutcomes({session:[outcome]});
  if(evidence.length!==1)return run;
  const e=evidence[0],s=run.steps[run.active-1];
@@ -102,7 +124,7 @@ export function r15dRecordRunGrade(run,outcome){
 }
 /** @param {ReturnType<typeof r15dCreateRun>} run */
 export function r15dRunSummary(run){
- if(!validRun(run))return null;
+ if(!run||!validRun(run))return null;
  const attempted=run.steps.filter(s=>s.attempts>0).length;
  const gradedFull=run.steps.filter(s=>s.fullCount>0).length;
  return Object.freeze({
