@@ -28,7 +28,7 @@ describe('R15C bounded three-stop plan and evidence-only board',()=>{
  it('an unassessable does not count as zero or full',()=>{const p=plan([outcome(unsupported())]);assert.equal(p.summary[0].zero,0);assert.equal(p.summary[0].full,0);});
  it('full grade is counted as factual outcome, not mastery',()=>{const p=plan([outcome(good())]);assert.equal(p.totals.full,1);assert.equal('mastery' in p,false);});
  it('unknown historical assistance is explicit',()=>{const p=plan([], 'transport',42,[historical(good())]);assert.equal(p.totals.unknownHelp,1);assert.equal(p.summary[0].selfReportedUnaidedFull,0);});
- it('session self-reported no help is not proctored proof',()=>{const p=plan([outcome(good())]);assert.equal(p.summary[0].selfReportedUnaidedFull,1);assert.match(p.caveat,/nem bizonyít/);});
+ it('session self-reported no help is not proctored proof',()=>{const p=plan([outcome(good())]);assert.equal(p.summary[0].selfReportedUnaidedFull,1);assert.match(p.caveat,/nem bizonyít/i);});
  it('historical + session duplicate receipt is counted once',()=>{const h=historical(bad());const s={...outcome(bad(),false,Date.parse(h.submittedAt)),id:h.id};assert.equal(plan([s],'transport',42,[h]).totals.observed,1);});
  it('known historical status is validated upstream',()=>assert.equal(plan([], 'transport',42,[{...historical(good()),status:'FAKE'}]).totals.observed,0));
  it('invalid session grades are not evidence',()=>assert.equal(plan([{taskId:'gusek-transport-42',points:7,kind:'transport'}]).totals.observed,0));
