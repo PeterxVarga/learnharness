@@ -5,6 +5,7 @@
  */
 import {r15dCreateRun,r15dRunSummary} from './adaptive-run-r15d.mjs';
 const KINDS=new Set(['transport','froccs','tablet']);
+/** @type {Record<string,string>} */
 const LABEL=Object.freeze({transport:'Szállítás',froccs:'Fröccs',tablet:'Tabletta'});
 const PHASES=['focus','interleave','return'];
 const TITLES=['Újrapróba vagy új feladat','Feladattípus-váltás','Visszatérés'];
@@ -26,7 +27,7 @@ export function r15eCreateBookmark(run){
 /**
  * Deserializes a previously user-saved plan as an untrusted new run.
  * Always resets attempts, unlocks, active task and grade provenance.
- * @param {unknown} raw
+ * @param {any} raw - wholly untrusted browser JSON; every key is validated at runtime
  * @returns {ReturnType<import('./adaptive-run-r15d.mjs').r15dCreateRun>}
  */
 export function r15eRestoreBookmark(raw){
@@ -43,10 +44,13 @@ export function r15eRestoreBookmark(raw){
   requiresManualStart:true
  }));
  if(new Set(steps.map(s=>s.taskId)).size!==3)return null;
- return r15dCreateRun({
+ // Browser-derived advisory plan is not an evaluated itinerary; only the
+ // trusted R15D constructor can establish a fresh zero-evidence run.
+ const itinerary=/** @type {any} */ ({
   schema:'learnharness.r15c.practice-itinerary.v1',
   steps,autoStart:false,scoreAuthority:false
  });
+ return r15dCreateRun(itinerary);
 }
 /**
  * Existing server-verified 0 / null is a feedback event, not an auto retry.
