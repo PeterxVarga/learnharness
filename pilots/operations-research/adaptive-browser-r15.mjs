@@ -36,6 +36,9 @@ try{
  await check('R15_NO_SUGGESTION_BEFORE_GRADE',async()=>{
   assert.equal(await page.$('[data-testid="gusek-r15-recommendation"]'),null);
  });
+ await check('R15C_NO_ITINERARY_BEFORE_GRADE',async()=>{
+  assert.equal(await page.$('[data-testid="gusek-r15c-plan"]'),null);
+ });
  await page.evaluate(()=>{
   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Új feladat');
   if(!b)throw Error('missing_user_requested_task_button');b.click();
@@ -92,6 +95,26 @@ try{
   assert.doesNotMatch(raw,/answerSha256|secret_token|1\/1 – TELJESEN HELYES/);
   assert.equal(counts.post,1);
  });
+ await check('R15C_THREE_DISTINCT_MANUAL_STOPS',async()=>{
+  const section=await page.$('[data-testid="gusek-r15c-plan"]');
+  assert.ok(section,'a real server grade must produce the itinerary');
+  const tasks=await page.$$eval('[data-testid="gusek-r15c-steps"] li',els=>els.map(el=>el.textContent?.trim()));
+  assert.equal(tasks.length,3);
+  const buttons=await page.$$('[data-testid^="gusek-r15c-select-"]');
+  assert.equal(buttons.length,3);
+  const labels=await page.$$eval('[data-testid="gusek-r15c-steps"] li',els=>els.map(el=>el.textContent));
+  assert.match(labels[0],/43\. variáns/);
+  assert.match(labels[1],/Fröccs/);
+  assert.match(labels[2],/44\. variáns/);
+  assert.equal(counts.post,1);
+ });
+ await check('R15C_EVIDENCE_COUNTS_ONLY',async()=>{
+  const rows=await page.$$('[data-testid^="gusek-r15c-progress-"]');
+  assert.equal(rows.length,3);
+  const count=await page.$eval('[data-testid="gusek-r15c-count"]',el=>el.textContent);
+  assert.match(count,/1 ellenőrzött kísérlet/);
+  assert.equal(counts.post,1);
+ });
  const before={...counts};
  await page.click('[data-testid="gusek-r15-choose"]');
  await check('R15_SELECTION_NEVER_AUTOSTARTS',async()=>{
@@ -104,6 +127,10 @@ try{
   assert.equal(await page.$('[data-testid="gusek-r15b-diagnostic"]'),null);
   assert.deepEqual(counts,before,'selection alone must not trigger a request');
  });
+ await check('R15C_PLAN_CLEARS_ON_SELECTION',async()=>{
+  assert.equal(await page.$('[data-testid="gusek-r15c-plan"]'),null);
+  assert.deepEqual(counts,before);
+ });
  await page.evaluate(()=>{
   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Új feladat');
   if(!b||b.disabled)throw Error('new_task_button_unavailable');b.click();
@@ -114,12 +141,44 @@ try{
   assert.equal(counts.get,before.get+1);
   assert.equal(counts.post,before.post);
  });
+ await text('#gusek-objective','0');
+ await page.$eval('#gusek-objective',el=>el.blur());
+ await page.evaluate(()=>{
+  const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Teljes megoldás ellenőrzése');
+  if(!b||b.disabled)throw Error('second_grade_unavailable');b.click();
+ });
+ await check('R15C_SECOND_REAL_GRADE_FOR_ITINERARY',async()=>{
+  await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-grade-r14z"]')?.getAttribute('data-grade-points')==='0',
+   {timeout:20000});
+  await page.waitForSelector('[data-testid="gusek-r15c-plan"]',{timeout:10000});
+  assert.equal(counts.post,2);
+ });
+ const beforeSequence={...counts};
+ await page.click('[data-testid="gusek-r15c-select-2"]');
+ await check('R15C_INTERLEAVE_MANUAL_SELECTION_NO_REQUEST',async()=>{
+  await page.waitForFunction(()=>document.querySelector('select[aria-label="Feladattípus"]')?.value==='froccs'&&
+    document.querySelector('input[aria-label="Feladatvariáns"]')?.value==='44',{timeout:10000});
+  assert.equal(await page.$('[aria-label="Vizsgafeladat"]'),null);
+  assert.equal(await page.$('[data-testid="gusek-r15c-plan"]'),null);
+  assert.deepEqual(counts,beforeSequence);
+ });
+ await page.evaluate(()=>{
+  const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Új feladat');
+  if(!b||b.disabled)throw Error('third_task_button_unavailable');b.click();
+ });
+ await check('R15C_INTERLEAVE_REQUIRES_EXPLICIT_TASK',async()=>{
+  await page.waitForFunction(()=>document.querySelector('[aria-label="Vizsgafeladat"]')?.textContent?.includes('gusek-froccs-44'),{timeout:15000});
+  assert.equal(counts.get,beforeSequence.get+1);
+  assert.equal(counts.post,beforeSequence.post);
+ });
  assert.deepEqual(checks,[
-  'R15_NO_SUGGESTION_BEFORE_GRADE','R15_REAL_TASK_LOADED',
+  'R15_NO_SUGGESTION_BEFORE_GRADE','R15C_NO_ITINERARY_BEFORE_GRADE','R15_REAL_TASK_LOADED',
   'R15_GRADE_IS_EXPLICIT','R15_REAL_BINARY_SERVER_GRADE',
   'R15_BOUNDED_REPAIR_SUGGESTION','R15B_GROUNDED_THREE_STEP_PLAN',
-  'R15_SELECTION_NEVER_AUTOSTARTS','R15B_PLAN_CLEARS_ON_SELECTION',
-  'R15_EXPLICIT_NEXT_TASK']);
+  'R15C_THREE_DISTINCT_MANUAL_STOPS','R15C_EVIDENCE_COUNTS_ONLY',
+  'R15_SELECTION_NEVER_AUTOSTARTS','R15B_PLAN_CLEARS_ON_SELECTION','R15C_PLAN_CLEARS_ON_SELECTION',
+  'R15_EXPLICIT_NEXT_TASK','R15C_SECOND_REAL_GRADE_FOR_ITINERARY',
+  'R15C_INTERLEAVE_MANUAL_SELECTION_NO_REQUEST','R15C_INTERLEAVE_REQUIRES_EXPLICIT_TASK']);
  process.stdout.write(JSON.stringify({
   schema:'learnharness.r15.browser.v1',status:'PASS',checks,
   realServerGrade:true,nativeSolverUsed:false,automaticRequestOnRecommendation:false
