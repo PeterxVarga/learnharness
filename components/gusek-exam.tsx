@@ -13,6 +13,7 @@ import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-resea
 import {r15bDiagnosticBrief} from '../pilots/operations-research/adaptive-diagnostics-r15b.mjs';
 import {r15cPracticeItinerary} from '../pilots/operations-research/adaptive-sequence-r15c.mjs';
 import {r15dCreateRun,r15dCanSelect,r15dSelectRunStep,r15dLoadedRunStep,r15dRecordRunGrade,r15dPauseRun,r15dRunSummary} from '../pilots/operations-research/adaptive-run-r15d.mjs';
+import {R15E_BOOKMARK_KEY,r15eCreateBookmark,r15eRestoreBookmark,r15ePrepareCorrection} from '../pilots/operations-research/adaptive-checkpoint-r15e.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -53,6 +54,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
  const [r15Outcomes,setR15Outcomes]=useState<Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>>([]);
  const [r15dRun,setR15dRun]=useState<ReturnType<typeof r15dCreateRun>>(null);
+ const [r15eHasBookmark,setR15eHasBookmark]=useState(false);
+ const [r15eNotice,setR15eNotice]=useState('');
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
@@ -83,6 +86,35 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const r15bBrief=grade?r15bDiagnosticBrief({history,session:r15Outcomes}):null;
  const r15cPlan=grade?r15cPracticeItinerary({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)}):null;
  const r15dProgress=r15dRun?r15dRunSummary(r15dRun):null;
+ useEffect(()=>{
+  try{
+   const raw=window.sessionStorage.getItem(R15E_BOOKMARK_KEY);
+   if(!raw||raw.length>2048)return;
+   setR15eHasBookmark(r15eRestoreBookmark(JSON.parse(raw))!==null);
+  }catch{/* Client storage may be unavailable. */}
+ },[]);
+ function r15eSavePlan(){
+  const bookmark=r15eCreateBookmark(r15dRun);
+  if(!bookmark){setR15eNotice('Nincs menthető gyakorlatsor.');return;}
+  try{
+   window.sessionStorage.setItem(R15E_BOOKMARK_KEY,JSON.stringify(bookmark));
+   setR15eHasBookmark(true);
+   setR15eNotice('A terv elmentve ehhez a böngészőlaphoz, pontok és megoldások nélkül.');
+  }catch{setR15eNotice('A böngésző nem engedte a terv mentését.');}
+ }
+ function r15eLoadPlan(){
+  try{
+   const raw=window.sessionStorage.getItem(R15E_BOOKMARK_KEY);
+   const restored=raw&&raw.length<=2048?r15eRestoreBookmark(JSON.parse(raw)):null;
+   if(!restored)throw Error('invalid_bookmark');
+   taskRequestEpoch.current++;invalidateForm();setTask(null);
+   setR15dRun(restored);
+   setR15eNotice('Terv visszaállítva, ellenőrzött pontok nélkül. Válaszd ki az első állomást.');
+  }catch{
+   setR15eHasBookmark(false);
+   setR15eNotice('A mentett terv nem állítható vissza, vagy a böngészőtárhely nem elérhető.');
+  }
+ }
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -423,11 +455,20 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
      if(candidate)setR15dRun(candidate);
     }}>{r15dRun?'Új gyakorlatsor indítása (az eddigi követés felülíródik)':'Gyakorlatsor követésének indítása'}</button>
    </section>}
-   <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
+   <div className="flex flex-wrap gap-4"><button className="text-sm underline" data-testid="gusek-r15e-correct" onClick={()=>{
+     setR15dRun(old=>r15ePrepareCorrection(old,grade.taskId));
+     setGrade(null);
+    }}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
     <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
    </div>
   </section>}
+  <section className="space-y-2 rounded-xl border p-3 xl:col-span-2" data-testid="gusek-r15e-bookmark" aria-label="Gyakorlatsor mentése és visszaállítása">
+   <p className="text-sm font-semibold">Feladatterv könyvjelzője (R15E)</p>
+   <p className="text-xs text-neutral-500">Csak a három feladattípus és variáns kerül a böngészőlap ideiglenes tárhelyére. Beadások, pontok és megoldások nem. Visszaállítás után az előrehaladás nulláról indul.</p>
+   {r15eHasBookmark&&<button type="button" data-testid="gusek-r15e-restore" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={r15eLoadPlan}>Mentett terv visszaállítása (pontok nélkül)</button>}
+   {r15eNotice&&<p role="status" className="text-xs text-neutral-600" data-testid="gusek-r15e-notice">{r15eNotice}</p>}
+  </section>
   {r15dRun&&r15dProgress&&<section className="space-y-3 rounded-xl border p-4 xl:col-span-2" data-testid="gusek-r15d-run" data-active={r15dRun.active??'none'} data-ready={String(r15dRun.ready)} aria-label="Aktív követett gyakorlatsor">
    <h2 className="font-semibold">Aktív háromállomásos gyakorlatsor</h2>
    <p className="text-sm" data-testid="gusek-r15d-progress">Beadással érintett állomások: {r15dProgress.attemptedStations}/3 · 1/1 eredményű állomások: {r15dProgress.fullCreditStations}/3 · ellenőrzött beadások: {r15dProgress.attempts}</p>
@@ -446,6 +487,11 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     </li>)}
    </ol>
    <p className="text-xs text-neutral-500">{r15dRun.caveat}</p>
+   <p className="text-xs text-neutral-500" data-testid="gusek-r15e-paused">{r15dRun.active===null?'Szünetel: válassz egy feloldott állomást, majd külön indítsd a feladatot.':'Követés aktív, külön szüneteltethető.'}</p>
+   <div className="flex flex-wrap gap-2">
+    <button type="button" data-testid="gusek-r15e-save" className="rounded border px-3 py-2 text-sm" onClick={r15eSavePlan}>Terv mentése a böngészőlapra</button>
+    <button type="button" data-testid="gusek-r15e-pause" disabled={r15dRun.active===null} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>setR15dRun(old=>r15dPauseRun(old))}>Követés szüneteltetése</button>
+   </div>
    <button type="button" data-testid="gusek-r15d-stop" className="rounded border px-3 py-2 text-sm" onClick={()=>setR15dRun(null)}>Követés lezárása (kézzel)</button>
   </section>}
   {linkedChat&&<section className="rounded-xl border p-4 xl:col-span-2"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
