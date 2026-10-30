@@ -89,7 +89,10 @@ try{
  await check('SEEDED_PRACTICE_DRAFT_SURVIVES_RELOAD',async()=>{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-practice-draft-status-r14z"]')?.textContent?.includes('helyben mentve'),{timeout:12000});
   const reloadResponse=await page.reload({waitUntil:'domcontentloaded',timeout:30000});
-  assert.equal(reloadResponse?.status(),200,'gusek_reloaded_document_must_return_http_200');
+  // On browser reload an HTTP 304 reuses an existing cached document.
+  // Only accept it here; initial entry strictly requires 200.
+  // Hydration and draft restoration checks below remain mandatory.
+  assert.ok([200,304].includes(reloadResponse?.status()),'gusek_reloaded_document_must_return_http_200_or_304');
   await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
  await page.waitForFunction(
   ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',

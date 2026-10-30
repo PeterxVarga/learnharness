@@ -83,9 +83,35 @@ if [[ "$MODE" == "--build" ]]; then
 else
  [[ -f .next/BUILD_ID && -f "$STAMP" ]] ||
   { echo "BLOCKED_UNSTAMPED_BUILD"; exit 2; }
- [[ "$(cat "$STAMP")" == "$PIN" ]] ||
-  { echo "BLOCKED_BUILD_PIN_MISMATCH"; exit 2; }
- echo "R14Z_BROWSER_REUSING_PINNED_BUILD=YES"
+ BUILT_HEAD="$(cat "$STAMP")"
+ [[ "$BUILT_HEAD" =~ ^[a-f0-9]{40}$ ]] ||
+  { echo "BLOCKED_BUILD_STAMP_FORMAT"; exit 2; }
+ git cat-file -e "${BUILT_HEAD}^{commit}" 2>/dev/null ||
+  { echo "BLOCKED_BUILD_STAMP_NOT_A_COMMIT"; exit 2; }
+ if [[ "$BUILT_HEAD" != "$PIN" ]]; then
+  # Reuse is only safe when every intervening change is test-only or docs.
+  git merge-base --is-ancestor "$BUILT_HEAD" "$PIN" ||
+   { echo "BLOCKED_BUILD_HEAD_NOT_ANCESTOR"; exit 2; }
+  mapfile -d '' -t CHANGED_PATHS < <(
+   git diff --no-ext-diff --no-renames --name-only -z "$BUILT_HEAD" "$PIN" --
+  )
+  (("${#CHANGED_PATHS[@]}" > 0)) ||
+   { echo "BLOCKED_BUILD_PROVENANCE_EMPTY_DIFF"; exit 2; }
+  for changed in "${CHANGED_PATHS[@]}"; do
+   case "$changed" in
+    pilots/operations-research/gusek-workbench-browser-r14.mjs|\
+    pilots/operations-research/gusek-practice-browser-r14.mjs|\
+    pilots/operations-research/gusek-live-native-browser-r14z.mjs|\
+    pilots/operations-research/qualify-browser-r14z.sh|\
+    pilots/operations-research/README.md) ;;
+    *) echo "BLOCKED_BUILD_INPUT_CHANGED"; exit 2 ;;
+   esac
+  done
+  echo "R14Z_BROWSER_REUSED_BUILD_SOURCE=$BUILT_HEAD"
+  echo "R14Z_BROWSER_TEST_HEAD=$PIN"
+ else
+  echo "R14Z_BROWSER_REUSING_PINNED_BUILD=YES"
+ fi
 fi
 STEP="server"
 TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"

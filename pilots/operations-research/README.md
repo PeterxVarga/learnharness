@@ -1557,3 +1557,28 @@ strict structured receipts. `--reuse` is allowed only for this same
 SHA-stamped build (never across source changes). A browser-only PASS
 is not the authoritative final R14Z release receipt; the full
 `qualify-r14z-final.sh` remains the final release gate.
+
+## R14Z HTTP 304 browser reload and build provenance fix — 2026-10-30
+
+The first actual Fedora browser replay on `cb26a8f` compiled and
+reached the Workbench's sixth PASS: entry, tabs, exact rapid
+typing, highlighting, search and named snapshot restore.
+Then its reload assertion expected only HTTP 200 and rejected
+Chromium's **304 Not Modified**, despite a cached representation
+being a normal response for a conditional reload (RFC 9110 §15.4.5).
+
+The two relevant browser scripts now accept **only 200 or 304 for
+reload**. Fresh document entry still requires 200, and the tests
+must independently verify hydrated DOM and exact persisted drafts.
+Neither negative acceptance nor grading assertions were relaxed.
+
+The targeted browser runner can now reuse an existing build after
+a source HEAD change only if its earlier, validated build-stamp SHA
+is an ancestor and a rename-disabled complete Git diff contains
+exclusively the browser harness and R14 README paths. Every
+application component, package lock, Next.js config and other
+build input still fails closed. The original stamp is preserved
+to reflect the **actual** build source, not changed to the
+new browser-test HEAD. No second build is necessary to test this
+harness-only change. A formal release receipt still requires
+the original one-shot qualification on the final exact HEAD.
