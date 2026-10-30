@@ -93,6 +93,30 @@ function nextUnusedSeed(initial,seen){
  return n;
 }
 /**
+ * R15B: one authoritative normalization path for recommendations and explanations.
+ * Session values must be the validated result of r15SessionOutcome, not arbitrary
+ * browser storage or untrusted model output. Older chat receipts never assert help.
+ * @param {{
+ *  history?: import('../../src/core/contracts/chat.ts').TransportAttemptReceipt[],
+ *  session?: Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>
+ * }} [options]
+ */
+export function r15ObservedOutcomes({history=[],session=[]}={}){
+ const fromHistory=Array.isArray(history)?history.slice(-MAX_HISTORY).map(r15HistoryOutcome).filter(Boolean):[];
+ const fromSession=Array.isArray(session)?session.slice(-MAX_HISTORY).filter(x=>
+  x&&safeKind(x.kind)&&safeSeed(x.seed)&&['assisted','self_reported_no_help'].includes(x.assistance) &&
+  x.taskId==='gusek-'+x.kind+'-'+x.seed && validGrade({
+   points:x.points,maxPoints:1,correct:x.points===null?null:x.points===1,errors:x.errors
+  }) && Number.isSafeInteger(x.at)&&x.at>=0&&x.at<=8640000000000000):[];
+ // Prefer the immediate session copy if a chat receipt was also loaded.
+ const combined=new Map();
+ for(const r of fromHistory)combined.set(r.id??r.taskId+':'+r.at,r);
+ for(const r of fromSession)combined.set(r.id??r.taskId+':'+r.at,r);
+ const records=[...combined.values()].sort((a,b)=>a.at-b.at).slice(-MAX_HISTORY);
+ return records;
+}
+
+/**
  * No automatic new task, no partial credit, no mastery/retention claim.
  * Prioritize a weak task family after zero credit, rotate after success,
  * and require a fresh seed for every suggestion.
@@ -109,17 +133,7 @@ function nextUnusedSeed(initial,seen){
  */
 export function r15RecommendPractice({history=[],session=[],currentKind='transport',currentSeed=42}={}){
  if(!safeKind(currentKind)||!safeSeed(Number(currentSeed)))return null;
- const fromHistory=Array.isArray(history)?history.slice(-MAX_HISTORY).map(r15HistoryOutcome).filter(Boolean):[];
- const fromSession=Array.isArray(session)?session.slice(-MAX_HISTORY).filter(x=>
-  x&&safeKind(x.kind)&&safeSeed(x.seed)&&['assisted','self_reported_no_help'].includes(x.assistance) &&
-  x.taskId==='gusek-'+x.kind+'-'+x.seed && validGrade({
-   points:x.points,maxPoints:1,correct:x.points===null?null:x.points===1,errors:x.errors
-  }) && Number.isSafeInteger(x.at)&&x.at>=0&&x.at<=8640000000000000):[];
- // Prefer the immediate session copy if a chat receipt was also loaded.
- const combined=new Map();
- for(const r of fromHistory)combined.set(r.id??r.taskId+':'+r.at,r);
- for(const r of fromSession)combined.set(r.id??r.taskId+':'+r.at,r);
- const records=[...combined.values()].sort((a,b)=>a.at-b.at).slice(-MAX_HISTORY);
+ const records=r15ObservedOutcomes({history,session});
  const last=records.at(-1)??null;
  const evidence=Object.fromEntries(KINDS.map(k=>[k,{
   attempts:records.filter(r=>r.kind===k).length,
