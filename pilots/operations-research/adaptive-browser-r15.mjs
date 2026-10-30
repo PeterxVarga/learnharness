@@ -85,7 +85,7 @@ try{
   assert.ok(plan,'repair guidance must appear only after real grade');
   const state=await page.$eval('[data-testid="gusek-r15b-diagnostic"]',el=>el.getAttribute('data-repair-state'));
   assert.equal(state,'repair');
-  const steps=await page.$eval('[data-testid="gusek-r15b-steps"] li',els=>els.map(el=>el.textContent?.trim()));
+  const steps=await page.$$eval('[data-testid="gusek-r15b-steps"] li',els=>els.map(el=>el.textContent?.trim()));
   assert.equal(steps.length,3);
   assert.ok(steps.every(t=>typeof t==='string'&&t.length>10));
   const raw=await page.$eval('[data-testid="gusek-r15b-diagnostic"]',el=>el.textContent);
@@ -100,13 +100,13 @@ try{
   assert.equal(await page.$('[aria-label="Vizsgafeladat"]'),null);
   assert.deepEqual(counts,before,'no task GET or scoring POST on choosing recommendation');
  });
+ await check('R15B_PLAN_CLEARS_ON_SELECTION',async()=>{
+  assert.equal(await page.$('[data-testid="gusek-r15b-diagnostic"]'),null);
+  assert.deepEqual(counts,before,'selection alone must not trigger a request');
+ });
  await page.evaluate(()=>{
   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='Új feladat');
   if(!b||b.disabled)throw Error('new_task_button_unavailable');b.click();
- });
- await check('R15B_PLAN_CLEARS_ON_SELECTION',async()=>{
-  assert.equal(await page.$('[data-testid="gusek-r15b-diagnostic"]'),null);
-  assert.deepEqual(counts,before);
  });
  await check('R15_EXPLICIT_NEXT_TASK',async()=>{
   await page.waitForFunction(()=>document.querySelector('[aria-label="Vizsgafeladat"]')?.textContent?.includes('gusek-transport-43'),
