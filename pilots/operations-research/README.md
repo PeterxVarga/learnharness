@@ -1582,3 +1582,31 @@ to reflect the **actual** build source, not changed to the
 new browser-test HEAD. No second build is necessary to test this
 harness-only change. A formal release receipt still requires
 the original one-shot qualification on the final exact HEAD.
+
+## R14Z live browser task-before-panel correction — 2026-10-30
+
+The first real targeted browser reuse at `9b93130` successfully passed
+all **11 Workbench** and **15 Practice** checks, then timed out
+looking for `gusek-native-r14` before creating a task. Code review
+falsified the initial runtime-integration suspicion: in GusekExam,
+the native controls are nested inside `task && <section ...>`.
+Therefore this element cannot exist until a real task loads.
+The browser test is corrected, not the runtime or grading contract.
+
+`LIVE_NATIVE_UI_READY` now occurs after the first transport task
+request, keeping the existing exact 16 check names and order.
+It additionally verifies the unmocked native GET endpoint returns
+HTTP 200, the native status schema, `available:true`,
+`scoreAuthority:false`, and no exposed token/image ID. It waits
+for the real token input and rejects any disabled native state.
+All three native GLPK-to-explicit-transfer-to-independent-score flows
+remain mandatory, with zero automatic GLPK grading authority.
+
+The browser runner has a new optional `--live-only` scope accepted
+*only with* `--reuse`. This runs just the 16 live checks, validating
+their strict receipt and printing `R14Z_BROWSER_LIVE_ONLY_GATE=PASS`
+on success. It must not claim the full 42-check replay succeeded.
+The existing two-argument all-three-journey invocation remains
+available. No build inputs changed, so the stamped `cb26a8f` build
+may be reused under the existing explicit diff allowlist.
+No tests were executed remotely or on Fedora for the new commit.

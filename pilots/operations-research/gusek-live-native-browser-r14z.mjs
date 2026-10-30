@@ -89,11 +89,8 @@ try{
   ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',
   {timeout:15000}
  );
- await check('LIVE_NATIVE_UI_READY',async()=>{
-  assert.ok(await page.$('[data-testid="gusek-workbench-r14"]'));
-  await page.waitForSelector('[data-testid="gusek-native-r14"]',{timeout:15000});
-  assert.equal(await page.$('[data-testid="gusek-native-disabled-r14"]'),null);
- });
+ // Native controls are rendered only when a task exists.
+ // LIVE_NATIVE_UI_READY moves after the first real task request.
  const setText=async(selector,value)=>{
   await page.$eval(selector,(el,source)=>{
    const type=el.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
@@ -118,6 +115,24 @@ try{
    if(!button||button.disabled)throw Error('new_task_button_unavailable');
    button.click();
   });
+  if(kind==='transport'){
+   await check('LIVE_NATIVE_UI_READY',async()=>{
+    await page.waitForSelector('[data-testid="gusek-native-r14"]',{timeout:15000});
+    const status=await page.evaluate(async()=>{
+     const response=await fetch('/api/pilot/gusek/native',{cache:'no-store'});
+     if(!response.ok)return {http:response.status};
+     const body=await response.json();
+     return {http:response.status,schema:body.schema,available:body.available,
+      scoreAuthority:body.scoreAuthority,exposedSecrets:'token' in body||'imageId' in body};
+    });
+    assert.deepEqual(status,{
+     http:200,schema:'learnharness.glpk-native-status.r14',
+     available:true,scoreAuthority:false,exposedSecrets:false
+    },'actual native runner must be enabled, ungraded and secret-free');
+    await page.waitForSelector('#gusek-native-token',{timeout:15000});
+    assert.equal(await page.$('[data-testid="gusek-native-disabled-r14"]'),null);
+   });
+  }
   await check(kind+'_SEEDED_TASK_LOADED',async()=>{
    await page.waitForFunction(id=>
     document.querySelector('[aria-label="Vizsgafeladat"]')?.textContent?.includes(id),

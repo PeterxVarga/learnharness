@@ -8,10 +8,15 @@ ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd -P)"
 cd "$ROOT"
 PIN="${1:-}"
 MODE="${2:-}"
-[[ "$#" == 2 && "$PIN" =~ ^[a-f0-9]{40}$ ]] ||
+SCOPE="${3:---all}"
+(( $# == 2 || $# == 3 )) && [[ "$PIN" =~ ^[a-f0-9]{40}$ ]] ||
  { echo "BLOCKED_EXACT_PIN_OR_ARGUMENTS"; exit 2; }
 [[ "$MODE" == "--build" || "$MODE" == "--reuse" ]] ||
  { echo "BLOCKED_BUILD_MODE"; exit 2; }
+[[ "$SCOPE" == "--all" || "$SCOPE" == "--live-only" ]] ||
+ { echo "BLOCKED_BROWSER_SCOPE"; exit 2; }
+[[ "$SCOPE" != "--live-only" || "$MODE" == "--reuse" ]] ||
+ { echo "BLOCKED_LIVE_ONLY_REQUIRES_REUSE"; exit 2; }
 [[ "$(id -u)" != 0 ]] || { echo "BLOCKED_ROOT"; exit 2; }
 [[ "$(git branch --show-current)" == "pilot/operations-research-r14" ]] ||
  { echo "BLOCKED_BRANCH"; exit 2; }
@@ -145,6 +150,7 @@ done
 SCRIPTS=(gusek-workbench-browser-r14.mjs gusek-practice-browser-r14.mjs gusek-live-native-browser-r14z.mjs)
 LABELS=(workbench practice live-native)
 for i in 0 1 2; do
+ if [[ "$SCOPE" == "--live-only" && "$i" != 2 ]]; then continue; fi
  STEP="browser_${LABELS[$i]}"
  LOG="$EVIDENCE/${LABELS[$i]}.log"
  echo "R14Z_BROWSER_RUNNING=${LABELS[$i]}"
@@ -156,16 +162,17 @@ for i in 0 1 2; do
  echo "R14Z_BROWSER_STAGE_${LABELS[$i]}=PASS"
 done
 STEP="receipts"
-node --input-type=module - "$EVIDENCE" <<'JS'
+node --input-type=module - "$EVIDENCE" "$SCOPE" <<'JS'
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
-const dir=process.argv[2];
+const dir=process.argv[2],scope=process.argv[3];
+assert.ok(scope==='--all'||scope==='--live-only','invalid browser scope');
 const cases=[
  ['workbench',11,'learnharness.r14.workbench-browser.v1'],
  ['practice',15,'learnharness.r14z.practice-browser.v1'],
  ['live-native',16,'learnharness.r14z.live-browser.v1']
-];
+].filter(([name])=>scope==='--all'||name==='live-native');
 const expectedLive=['LIVE_NATIVE_UI_READY',...['transport','froccs','tablet'].flatMap(k=>[
  k+'_SEEDED_TASK_LOADED',k+'_EXACT_TRUSTED_SOURCE_ENTERED',
  k+'_REAL_GLPK_OPTIMAL_COLUMNS',k+'_EXPLICIT_TRANSFER_TO_NAMED_GRID',
@@ -196,13 +203,17 @@ for(const [name,count,schema] of cases){
  }
  console.log('R14Z_BROWSER_'+name.toUpperCase()+'='+count+'/'+count);
 }
-console.log('R14Z_BROWSER_REPLAY=PASS_42');
+console.log(scope==='--all'?'R14Z_BROWSER_REPLAY=PASS_42':'R14Z_BROWSER_LIVE_ONLY=PASS_16');
 JS
 STEP="final_git"
 [[ "$(git rev-parse HEAD)" == "$PIN" ]] ||
  { echo "BLOCKED_HEAD_CHANGED"; exit 2; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] ||
  { echo "BLOCKED_SOURCE_DIRTY"; exit 2; }
-echo "R14Z_BROWSER_REPLAY_GATE=PASS"
+if [[ "$SCOPE" == "--all" ]]; then
+ echo "R14Z_BROWSER_REPLAY_GATE=PASS"
+else
+ echo "R14Z_BROWSER_LIVE_ONLY_GATE=PASS"
+fi
 echo "PIN=$PIN"
 echo "EVIDENCE_DIR=$EVIDENCE"
