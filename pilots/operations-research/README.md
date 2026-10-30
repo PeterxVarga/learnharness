@@ -1493,3 +1493,36 @@ unchanged. GLPK, grading authority and source limits are untouched.
 Because this changes the application component, a fresh production
 build and browser-only probe are needed. A full R14Z PASS is not yet
 claimed.
+
+## R14Z hydration and browser-replay research/falsification — 2026-10-30
+
+After the first live browser navigation failure was resolved, actual Fedora
+Chromium reached the workspace and file tabs, then uncovered a **real**
+fast-typing caret race. The previous `5ee0176` commit removed delayed
+animation-frame selection updates and applies custom-editor caret changes
+at React's committed layout stage. This fix is still not browser-qualified.
+
+Source-only research showed a second independent risk: the browser scripts
+wait for an SSR-rendered `[data-testid="gusek-workbench-r14"]` element,
+but SSR markup alone does not certify that React event handlers have
+hydrated. This commit adds a non-sensitive `data-hydrated` signal which
+becomes `true` only from a mounted client effect; all three Chromium
+journeys now await this signal on entry, and the two reload journeys
+recheck it after navigation. No sleeps, arbitrary delays, relaxed
+assertions, modified score limits, GLPK policy, or false positive
+check counts were introduced. The 11+15+16 expected checks remain.
+
+The new `qualify-browser-r14z.sh` replay gate builds once for a
+specific clean source SHA (or reuses only an exactly SHA-stamped output),
+launches a strictly loopback-owned Next.js process, runs the three
+existing browser journeys sequentially, asserts their structured
+receipts, and retains private stage-specific logs. It is a **targeted
+engineering gate**, not a replacement for the authoritative
+`qualify-r14z-final.sh` and its complete evidence receipt.
+
+The open-source candidates CodeMirror 6 / MathProg-editor and glpk.js
+were rejected for this release: switching editor or solver here would
+increase regression surface, while the directly observed failure is
+already localized to React controlled-caret ordering and browser
+hydration readiness. Revisit only as an isolated R15 adapter if
+compatibility and value can be proven.

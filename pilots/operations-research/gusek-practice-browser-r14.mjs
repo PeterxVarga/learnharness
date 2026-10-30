@@ -59,6 +59,10 @@ try{
  const documentResponse=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
  assert.equal(documentResponse?.status(),200,'gusek_document_must_return_http_200');
  await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
+ await page.waitForFunction(
+  ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',
+  {timeout:15000}
+ );
  await check('NATIVE_ONLY_MOCK_ON',async()=>{
   assert.ok(await page.$('[data-testid="gusek-workbench-r14"]'));
  });
@@ -87,6 +91,10 @@ try{
   const reloadResponse=await page.reload({waitUntil:'domcontentloaded',timeout:30000});
   assert.equal(reloadResponse?.status(),200,'gusek_reloaded_document_must_return_http_200');
   await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
+ await page.waitForFunction(
+  ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',
+  {timeout:15000}
+ );
   await page.select('[data-testid="gusek-transport-dialect-r14"]','indexed');
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-task-controls-r14z"]')?.getAttribute('data-rendered-dialect')==='indexed');
   await page.evaluate(()=>{

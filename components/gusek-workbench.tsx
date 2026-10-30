@@ -351,14 +351,18 @@ export function GusekWorkbench({chatId,embedded=false,onRequestCoaching}:{
  chatId?:string;embedded?:boolean;onRequestCoaching?:()=>void;
 }){
  const [mode,setMode]=useState<'practice'|'workspace'>('practice');
+ const [hydrated,setHydrated]=useState(false);
  const [copied,setCopied]=useState<{model:string;data:string;revision:number}|null>(null);
+ // SSR markup can exist before event handlers hydrate. Browser acceptance
+ // must not mistake it for a ready interactive workbench.
+ useEffect(()=>{setHydrated(true);},[]);
  const copyCounter=useRef(0);
  function copyToFree(model:string,data:string){
   if(!validateWorkbenchFile('model.mod',model).ok||!validateWorkbenchFile('data.dat',data).ok)return;
   if(!window.confirm('A szabad munkaterület jelenlegi szerkesztését felülírjuk a vizsgafeladat másolatával. Folytatod?'))return;
   setCopied({model,data,revision:++copyCounter.current});setMode('workspace');
  }
- return <div data-testid="gusek-workbench-r14" className="w-full space-y-2">
+ return <div data-testid="gusek-workbench-r14" data-hydrated={hydrated?'true':'false'} className="w-full space-y-2">
   <nav aria-label="GUSEK munkaterület üzemmód" className="mx-auto flex max-w-[1500px] flex-wrap gap-2 px-5 pt-4">
    <button type="button" data-testid="gusek-mode-practice-r14" aria-pressed={mode==='practice'}
     className={'rounded-lg border px-4 py-2 text-sm '+(mode==='practice'?'bg-foreground text-background':'')}

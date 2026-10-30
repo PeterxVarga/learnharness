@@ -21,6 +21,10 @@ try{
  const documentResponse=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
  assert.equal(documentResponse?.status(),200,'gusek_document_must_return_http_200');
  await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
+ await page.waitForFunction(
+  ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',
+  {timeout:15000}
+ );
  await check('WORKBENCH_ENTRY',async()=>{
   await page.waitForSelector('[data-testid="gusek-workbench-r14"]');
   assert.equal(await page.$('[data-testid="gusek-mode-practice-r14"]')!==null,true);
@@ -76,6 +80,10 @@ try{
   const reloadResponse=await page.reload({waitUntil:'domcontentloaded',timeout:30000});
   assert.equal(reloadResponse?.status(),200,'gusek_reloaded_document_must_return_http_200');
   await page.waitForSelector('[data-testid="gusek-workbench-r14"]',{timeout:15000});
+ await page.waitForFunction(
+  ()=>document.querySelector('[data-testid="gusek-workbench-r14"]')?.getAttribute('data-hydrated')==='true',
+  {timeout:15000}
+ );
   await page.click('[data-testid="gusek-mode-free-r14"]');
   await page.waitForSelector(editor);
   assert.equal(await page.$eval(editor,e=>e.value),target);
