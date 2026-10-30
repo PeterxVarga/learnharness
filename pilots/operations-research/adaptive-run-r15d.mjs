@@ -55,15 +55,19 @@ export function r15dCreateRun(itinerary){
  });
 }
 const validRun=run=>run&&run.schema===RUN_SCHEMA&&Array.isArray(run.steps)&&run.steps.length===3&&
+ (run.active===null||(Number.isInteger(run.active)&&run.active>=1&&run.active<=3))&&
+ typeof run.ready==='boolean'&&
  run.steps.every((s,i)=>validItem({...s,requiresManualStart:true})&&s.position===i+1&&STATUSES.has(s.status)&&
- Number.isSafeInteger(s.attempts)&&s.attempts>=0&&Number.isSafeInteger(s.fullCount)&&
- Number.isSafeInteger(s.zeroCount)&&Number.isSafeInteger(s.unassessableCount));
+ Number.isSafeInteger(s.attempts)&&s.attempts>=0&&Number.isSafeInteger(s.fullCount)&&s.fullCount>=0&&
+ Number.isSafeInteger(s.zeroCount)&&s.zeroCount>=0&&
+ Number.isSafeInteger(s.unassessableCount)&&s.unassessableCount>=0&&
+ s.fullCount+s.zeroCount+s.unassessableCount===s.attempts);
 /** @param {ReturnType<typeof r15dCreateRun>} run
  *  @param {number} position
  */
 export function r15dCanSelect(run,position){
  if(!run||!validRun(run)||!Number.isInteger(position)||position<1||position>3)return false;
- return position===1||run.steps[position-2].attempts>0;
+ return position===1||(run.steps[position-2]?.attempts??0)>0;
 }
 /** @param {R15DRun} run
  *  @param {number} position
@@ -87,6 +91,7 @@ export function r15dPauseRun(run){
 export function r15dSelectRunStep(run,position){
  if(!r15dCanSelect(run,position))return run;
  const s=run.steps[position-1];
+ if(!s)return run;
  return transform(run,position,{status:s.attempts>0?s.status:'selected'},position,false);
 }
 /** @param {ReturnType<typeof r15dCreateRun>} run
@@ -95,7 +100,7 @@ export function r15dSelectRunStep(run,position){
 export function r15dLoadedRunStep(run,taskId){
  if(!run||!validRun(run)||run.active===null)return run;
  const s=run.steps[run.active-1];
- if(s.taskId!==taskId)return r15dPauseRun(run);
+ if(!s||s.taskId!==taskId)return r15dPauseRun(run);
  return transform(run,s.position,{status:s.attempts>0?s.status:'loaded'},s.position,true);
 }
 /**
@@ -109,6 +114,7 @@ export function r15dRecordRunGrade(run,outcome){
  const evidence=r15ObservedOutcomes({session:[outcome]});
  if(evidence.length!==1)return run;
  const e=evidence[0],s=run.steps[run.active-1];
+ if(!e||!s)return run;
  if(e.taskId!==s.taskId||e.kind!==s.kind||e.seed!==s.seed||
   !['assisted','self_reported_no_help'].includes(e.assistance))return run;
  const key=e.id??(e.taskId+':'+e.at);
