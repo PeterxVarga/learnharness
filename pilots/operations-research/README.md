@@ -1526,3 +1526,34 @@ increase regression surface, while the directly observed failure is
 already localized to React controlled-caret ordering and browser
 hydration readiness. Revisit only as an isolated R15 adapter if
 compatibility and value can be proven.
+
+## R14Z async draft readiness extension — 2026-10-30
+
+The native FreeWorkspace calls `readFreeWorkspaceDraft()` from a mounted
+effect and sets `ready=true` when that asynchronous load settles. Browser
+scripts previously began typing after the editor textarea appeared, which
+may race the initial draft load and overwrite user input later. This
+additive gate publishes a non-sensitive `data-draft-ready` attribute
+derived directly from the existing `ready` state, and the Workbench
+browser journey waits for it both before editing and after reloading.
+No storage contract, source model, editor behavior or scoring logic
+changed; the 11 browser receipt check count remains exact.
+
+### Targeted browser replay invocation
+
+After an exact fast-forward to the new source HEAD on a clean checkout,
+set `LH_GLPK_IMAGE_ID` to the immutable local sha256 image and
+`LH_R14_CHROMIUM` to an absolute Chromium executable; then run:
+
+```bash
+bash -n pilots/operations-research/qualify-browser-r14z.sh
+bash pilots/operations-research/qualify-browser-r14z.sh EXACT_HEAD_SHA --build
+```
+
+The script stores its private logs under
+`/tmp/learnharness-r14z-browser-XXXXXXXX`, stamps `.next/` with the
+exact successful build HEAD, and runs the three browser journeys with
+strict structured receipts. `--reuse` is allowed only for this same
+SHA-stamped build (never across source changes). A browser-only PASS
+is not the authoritative final R14Z release receipt; the full
+`qualify-r14z-final.sh` remains the final release gate.

@@ -32,6 +32,10 @@ try{
  await page.click('[data-testid="gusek-mode-free-r14"]');
  await check('FREE_FILE_TABS',async()=>{
   await page.waitForSelector('[data-testid="gusek-free-model-r14"]');
+  await page.waitForFunction(
+   ()=>document.querySelector('[data-testid="gusek-free-workspace-r14"]')?.getAttribute('data-draft-ready')==='true',
+   {timeout:15000}
+  );
   assert.equal(await page.$('[data-testid="gusek-file-data-dat-r14"]')!==null,true);
  });
  const target='var y >= 0;\nminimize obj: y;\ns.t. cap: y <= 7;\nsolve;\nend;';
@@ -86,6 +90,10 @@ try{
  );
   await page.click('[data-testid="gusek-mode-free-r14"]');
   await page.waitForSelector(editor);
+  await page.waitForFunction(
+   ()=>document.querySelector('[data-testid="gusek-free-workspace-r14"]')?.getAttribute('data-draft-ready')==='true',
+   {timeout:15000}
+  );
   assert.equal(await page.$eval(editor,e=>e.value),target);
  });
  await check('FREE_MODE_NO_GRADE_AUTHORITY',async()=>{

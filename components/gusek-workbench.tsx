@@ -236,7 +236,7 @@ function FreeWorkspace({incoming}:{incoming:{model:string;data:string;revision:n
    void runNative(e.shiftKey?'check':'solve');
   }
  }
- return <div data-testid="gusek-free-workspace-r14" className="mx-auto max-w-[1500px] space-y-3 px-3 py-4 sm:px-6">
+ return <div data-testid="gusek-free-workspace-r14" data-draft-ready={ready?'true':'false'} className="mx-auto max-w-[1500px] space-y-3 px-3 py-4 sm:px-6">
   <header className="flex flex-wrap items-center justify-between gap-3">
    <div><h2 className="text-xl font-semibold">Szabad MathProg-munkaterület</h2>
     <p className="text-sm text-neutral-500">Saját .mod és .dat fájlok · eredeti GNU GLPK · vizsgapontozás nélkül</p>
