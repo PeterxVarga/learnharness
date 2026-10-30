@@ -44,7 +44,7 @@ cleanup(){
   wait "$SERVER_PID" 2>/dev/null || true
  fi
  if ((status!=0));then
-  printf 'R15_FAIL_STEP=%s\nEVIDENCE_DIR=%s\n' "$STEP" "$EVIDENCE" >&2
+  printf 'R15C_FAIL_STEP=%s\nEVIDENCE_DIR=%s\n' "$STEP" "$EVIDENCE" >&2
  fi
  exit "$status"
 }
@@ -66,7 +66,7 @@ const count=key=>Number(new RegExp('(?:^|\\n)# '+key+' (\\d+)').exec(log)?.[1]);
 assert.equal(count('tests'),98);
 assert.equal(count('pass'),98);
 assert.equal(count('fail'),0);
-console.log('R15C_UNIT_TESTS=PASS_168');
+console.log('R15C_UNIT_TESTS=PASS_98');
 JS
 
 STEP="typecheck"

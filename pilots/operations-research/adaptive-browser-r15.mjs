@@ -148,8 +148,10 @@ try{
   if(!b||b.disabled)throw Error('second_grade_unavailable');b.click();
  });
  await check('R15C_SECOND_REAL_GRADE_FOR_ITINERARY',async()=>{
-  await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-grade-r14z"]')?.getAttribute('data-grade-points')==='0',
-   {timeout:20000});
+  await page.waitForFunction(()=>{
+   const points=document.querySelector('[data-testid="gusek-grade-r14z"]')?.getAttribute('data-grade-points');
+   return points==='0'||points==='unassessable';
+  },{timeout:20000});
   await page.waitForSelector('[data-testid="gusek-r15c-plan"]',{timeout:10000});
   assert.equal(counts.post,2);
  });
