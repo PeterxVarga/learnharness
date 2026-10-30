@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import Link from 'next/link';
+import type {TransportAttemptReceipt} from '../src/core/contracts/chat';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {GusekValuesGrid} from './gusek-values-grid';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
@@ -16,7 +17,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  labels?:string[];wine?:number[];soda?:number[];prices?:number[];availableWine?:number;availableSoda?:number;
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
-type Attempt=Grade&{id:string;submittedAt:string};
+type Attempt=TransportAttemptReceipt;
 type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;solverStatus?:string;objective?:number|null;statusCode?:string;mode?:'solve'|'check';columnStatus?:string;columns?:{name:string;value:number}[];error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={

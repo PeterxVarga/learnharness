@@ -97,6 +97,16 @@ function nextUnusedSeed(initial,seen){
  * Prioritize a weak task family after zero credit, rotate after success,
  * and require a fresh seed for every suggestion.
  */
+/**
+ * Type the JS/TS seam without coercions: these arrays must not infer as never[].
+ * `history` is server-persisted, `session` is an unpersisted formative view.
+ * @param {{
+ *  history?: import('../../src/core/contracts/chat.ts').TransportAttemptReceipt[],
+ *  session?: Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>,
+ *  currentKind?: string,
+ *  currentSeed?: number
+ * }} [options]
+ */
 export function r15RecommendPractice({history=[],session=[],currentKind='transport',currentSeed=42}={}){
  if(!safeKind(currentKind)||!safeSeed(Number(currentSeed)))return null;
  const fromHistory=Array.isArray(history)?history.slice(-MAX_HISTORY).map(r15HistoryOutcome).filter(Boolean):[];
