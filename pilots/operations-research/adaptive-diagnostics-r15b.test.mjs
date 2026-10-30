@@ -30,7 +30,7 @@ describe('R15B deterministic repeated-error diagnosis, without score or mastery 
  it('prior repeated error outranks later one-off error within last grade',()=>{
   const s=[item(0,'source_missing_supply_balance','transport',39,1000),
    item(0,'source_missing_supply_balance','transport',40,2000),
-   r15SessionOutcome({...valid(0,'objective_mismatch'),errors:['objective_mismatch','source_missing_supply_balance']},
+   r15SessionOutcome({...valid(0,'objective_mismatch','transport',41),errors:['objective_mismatch','source_missing_supply_balance']},
     {kind:'transport',seed:41,at:3000,hintsUsed:false})];
   const p=brief(s);assert.equal(p.topic,'Kínálati mérleg');assert.equal(p.repeatCount,3);
  });

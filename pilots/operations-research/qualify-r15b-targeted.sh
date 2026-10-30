@@ -118,7 +118,7 @@ const r=JSON.parse(lines.at(-1));
 assert.equal(r.schema,'learnharness.r15.browser.v1');
 assert.equal(r.status,'PASS');
 assert.equal(r.checks.length,9);
-assert.equal(new Set(r.checks).size,7);
+assert.equal(new Set(r.checks).size,9);
 assert.equal(r.realServerGrade,true);
 assert.equal(r.nativeSolverUsed,false);
 assert.equal(r.automaticRequestOnRecommendation,false);
