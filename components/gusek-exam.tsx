@@ -2,12 +2,18 @@
 import {useEffect,useRef,useState} from 'react';
 import type {ChangeEvent,KeyboardEvent} from 'react';
 import Link from 'next/link';
+import type {TransportAttemptReceipt} from '../src/core/contracts/chat';
 import {GmplEditor} from './gusek-gmpl-editor';
 import {GusekValuesGrid} from './gusek-values-grid';
 import {glpkDiagnosticLine,validateWorkbenchFile} from '../src/features/gusek/workspace-files.mjs';
 import {preparePracticeTransfer} from '../pilots/operations-research/gusek-practice-transfer-r14.mjs';
 import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-r14z.mjs';
 import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
+import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-research/adaptive-practice-r15.mjs';
+import {r15bDiagnosticBrief} from '../pilots/operations-research/adaptive-diagnostics-r15b.mjs';
+import {r15cPracticeItinerary} from '../pilots/operations-research/adaptive-sequence-r15c.mjs';
+import {r15dCreateRun,r15dCanSelect,r15dSelectRunStep,r15dLoadedRunStep,r15dRecordRunGrade,r15dPauseRun,r15dRunSummary} from '../pilots/operations-research/adaptive-run-r15d.mjs';
+import {R15E_BOOKMARK_KEY,r15eCreateBookmark,r15eRestoreBookmark,r15ePrepareCorrection} from '../pilots/operations-research/adaptive-checkpoint-r15e.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -15,7 +21,7 @@ type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveS
  labels?:string[];wine?:number[];soda?:number[];prices?:number[];availableWine?:number;availableSoda?:number;
  target?:number;maxTablets?:number;knowledge?:number[]};
 type Grade={id?:string;taskId:string;points:0|1|null;maxPoints:1;correct:boolean|null;errors:string[]};
-type Attempt=Grade&{id:string;submittedAt:string};
+type Attempt=TransportAttemptReceipt;
 type GlpkResult={status:string;code:string;graded:false;points:null;diagnostic?:string;solutionListing?:string|null;solverStatus?:string;objective?:number|null;statusCode?:string;mode?:'solve'|'check';columnStatus?:string;columns?:{name:string;value:number}[];error?:string};
 const starter=(names:string[])=>JSON.stringify(Object.fromEntries(names.map(x=>[x,0])),null,2);
 const errorsHu:Record<string,string>={
@@ -46,6 +52,10 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [nativeSnapshot,setNativeSnapshot]=useState<{taskId:string;model:string;data:string}|null>(null);
  const [grade,setGrade]=useState<Grade|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [linkedChat,setLinkedChat]=useState<string|null>(null),[history,setHistory]=useState<Attempt[]>([]);
+ const [r15Outcomes,setR15Outcomes]=useState<Array<NonNullable<ReturnType<typeof r15SessionOutcome>>>>([]);
+ const [r15dRun,setR15dRun]=useState<ReturnType<typeof r15dCreateRun>>(null);
+ const [r15eHasBookmark,setR15eHasBookmark]=useState(false);
+ const [r15eNotice,setR15eNotice]=useState('');
  const [binding,setBinding]=useState<'checking'|'ready'|'none'|'failed'>('checking');
  const pending=useRef<{fingerprint:string;id:string}|null>(null);
  const taskRequestEpoch=useRef(0),formEpoch=useRef(0);
@@ -72,6 +82,39 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const [nativeCancelling,setNativeCancelling]=useState(false);
  const nativeDiagnostic=glpkDiagnosticLine(nativeResult?.diagnostic??'');
  const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
+ const r15Suggestion=r15RecommendPractice({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)});
+ const r15bBrief=grade?r15bDiagnosticBrief({history,session:r15Outcomes}):null;
+ const r15cPlan=grade?r15cPracticeItinerary({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)}):null;
+ const r15dProgress=r15dRun?r15dRunSummary(r15dRun):null;
+ useEffect(()=>{
+  try{
+   const raw=window.sessionStorage.getItem(R15E_BOOKMARK_KEY);
+   if(!raw||raw.length>2048)return;
+   setR15eHasBookmark(r15eRestoreBookmark(JSON.parse(raw))!==null);
+  }catch{/* Client storage may be unavailable. */}
+ },[]);
+ function r15eSavePlan(){
+  const bookmark=r15eCreateBookmark(r15dRun);
+  if(!bookmark){setR15eNotice('Nincs menthető gyakorlatsor.');return;}
+  try{
+   window.sessionStorage.setItem(R15E_BOOKMARK_KEY,JSON.stringify(bookmark));
+   setR15eHasBookmark(true);
+   setR15eNotice('A terv elmentve ehhez a böngészőlaphoz, pontok és megoldások nélkül.');
+  }catch{setR15eNotice('A böngésző nem engedte a terv mentését.');}
+ }
+ function r15eLoadPlan(){
+  try{
+   const raw=window.sessionStorage.getItem(R15E_BOOKMARK_KEY);
+   const restored=raw&&raw.length<=2048?r15eRestoreBookmark(JSON.parse(raw)):null;
+   if(!restored)throw Error('invalid_bookmark');
+   taskRequestEpoch.current++;invalidateForm();setTask(null);
+   setR15dRun(restored);
+   setR15eNotice('Terv visszaállítva, ellenőrzött pontok nélkül. Válaszd ki az első állomást.');
+  }catch{
+   setR15eHasBookmark(false);
+   setR15eNotice('A mentett terv nem állítható vissza, vagy a böngészőtárhely nem elérhető.');
+  }
+ }
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -135,6 +178,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    setObjective(restored?.objective??'');setHints(restored?.hintsUsed??false);
    setDataFile(indexed?preset!.dataTemplate!:'');setNativeResult(null);setNativeSnapshot(null);setNativeError('');pending.current=null;
    setDraftState(storageFailed?'unavailable':restored?'restored':'idle');
+   setR15dRun(old=>r15dLoadedRunStep(old,t.id));
   }catch(e){if(epoch===taskRequestEpoch.current)setError(e instanceof Error?e.message:String(e));}
   finally{if(epoch===taskRequestEpoch.current)setBusy(false);}
  }
@@ -213,6 +257,11 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     // The server may have recorded a real old attempt, but that delayed
     // response must not rewrite the new task's visible attempt history.
     if(linkedChat)setHistory(old=>[...old.filter(a=>a.id!==out.id),out as Attempt]);
+    const evidence=r15SessionOutcome(out,{kind:task.kind,seed:Number(seed),hintsUsed:hints});
+    if(evidence){
+     setR15Outcomes(old=>[...old,evidence].slice(-48));
+     setR15dRun(old=>r15dRecordRunGrade(old,evidence));
+    }
     setGrade(out);
    }
   }catch(e){if(startedAt===formEpoch.current)setError(e instanceof Error?e.message:String(e));}
@@ -232,7 +281,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   <section data-testid="gusek-task-controls-r14z" data-rendered-kind={kind}
    data-rendered-dialect={transportDialect}
    className="flex flex-wrap items-end gap-3 rounded-xl border p-4 xl:col-span-2">
-    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setKind(e.target.value as Kind);setTask(null);}}>
+    <label className="text-sm">Feladattípus<select aria-label="Feladattípus" className="mt-1 block rounded border bg-background p-2" value={kind} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setKind(e.target.value as Kind);setTask(null);}}>
       <option value="transport">Szállítási minimum</option><option value="froccs">Fröccs – maximum (egész)</option><option value="tablet">Tabletták – minimum (folytonos)</option>
     </select></label>
     {kind==='transport'&&<label className="text-sm">MathProg felírás
@@ -243,7 +292,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
       <option value="indexed">Indexelt x[i,j] + .dat (R14)</option>
      </select>
     </label>}
-    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(e.target.value);setTask(null);}}/></label>
+    <label className="text-sm">Feladatvariáns<input aria-label="Feladatvariáns" className="mt-1 block w-36 rounded border bg-background p-2" value={seed} onChange={e=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setSeed(e.target.value);setTask(null);}}/></label>
     <button disabled={busy} onClick={()=>void newTask()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Új feladat</button>
   </section>
   {task&&<section aria-label="Vizsgafeladat" className="min-w-0 space-y-3 rounded-xl border p-4 xl:sticky xl:top-4 xl:self-start">
@@ -350,10 +399,100 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   {grade&&<section role="status" data-testid="gusek-grade-r14z" data-task-id={grade.taskId} data-grade-points={grade.points===null?"unassessable":String(grade.points)} className="space-y-2 rounded-xl border p-4 xl:col-start-2"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`} – {grade.points===1?'TELJESEN HELYES':grade.points===0?'HIBÁS VAGY HIÁNYOS':'NEM TÁMOGATOTT FORMA'}</h2>
    {grade.errors.map(x=><p key={x} className="text-sm">{errorsHu[x]??`Ellenőrzési kód: ${x}`}</p>)}
    <p className="text-xs text-neutral-500">A pontszám kizárólag a független szerveroldali vizsgapontozóból származik. A natív GLPK futtatás diagnosztikája nem módosítja.</p>
-   <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
+   {r15Suggestion&&<aside data-testid="gusek-r15-recommendation" className="space-y-2 rounded-lg border p-3" aria-label="Következő gyakorlási javaslat">
+    <p className="text-sm font-semibold">Következő gyakorlási javaslat (R15)</p>
+    <p className="text-sm">{r15Suggestion.reason}</p>
+    {r15Suggestion.correction&&<p className="text-sm"><strong>{r15Suggestion.correction.topic}:</strong> {r15Suggestion.correction.step}</p>}
+    <p className="text-sm" data-testid="gusek-r15-next-task">{r15Suggestion.kind==='transport'?'Szállítás':r15Suggestion.kind==='froccs'?'Fröccs':'Tabletta'} · {r15Suggestion.seed}. variáns</p>
+    <p className="text-xs text-neutral-500">{r15Suggestion.caveat}</p>
+    <button type="button" data-testid="gusek-r15-choose" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+     taskRequestEpoch.current++;invalidateForm();setBusy(false);
+     setR15dRun(old=>r15dPauseRun(old));
+     setKind(r15Suggestion.kind as Kind);setSeed(String(r15Suggestion.seed));setTask(null);
+    }}>Javasolt variáns kiválasztása (nem indítja el)</button>
+   </aside>}
+   {r15bBrief&&<aside data-testid="gusek-r15b-diagnostic" data-repair-state={r15bBrief.state} className="space-y-2 rounded-lg border p-3" aria-label="Hibajavítási ellenőrzőlista">
+    <p className="text-sm font-semibold">Háromlépéses ellenőrzés: {r15bBrief.topic}</p>
+    <ol className="list-decimal space-y-1 pl-5 text-sm" data-testid="gusek-r15b-steps">
+     {r15bBrief.steps.map((step,index)=><li key={index}>{step}</li>)}
+    </ol>
+    {r15bBrief.state==='repair'&&r15bBrief.repeatCount>=2&&
+     <p className="text-sm" data-testid="gusek-r15b-repeat">Ez a hibatípus {r15bBrief.repeatCount} hibás kísérletben szerepel a rendelkezésre álló előzményekben, a jelenlegit is beleszámítva.</p>}
+    <p className="text-xs text-neutral-500" data-testid="gusek-r15b-provenance">
+     Ellenőrzött kísérletek: {r15bBrief.kindAttempts} · segítséghasználat: {r15bBrief.helpProvenance==='unknown'?'korábbi eredményből nem megállapítható':'önbevallás'}
+    </p>
+    <p className="text-xs text-neutral-500">{r15bBrief.caveat}</p>
+   </aside>}
+   {r15cPlan&&<section data-testid="gusek-r15c-plan" className="space-y-3 rounded-lg border p-3" aria-label="Háromállomásos gyakorlási terv">
+    <h3 className="font-semibold">Következő három gyakorlási állomás</h3>
+    <p className="text-xs text-neutral-500">Az ajánlások nem automatikus feladatok, és nem jelentenek vizsgakészenlétet. A tervezett feladatokat csak külön kiválasztás és az Új feladat gomb indítja el.</p>
+    <ol className="space-y-2" data-testid="gusek-r15c-steps">
+     {r15cPlan.steps.map(item=><li key={item.position} data-testid={'gusek-r15c-step-'+item.position} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+      <div className="space-y-1">
+       <p className="text-sm font-semibold">{item.position}. {item.title}: {item.label} · {item.seed}. variáns</p>
+       <p className="text-xs text-neutral-500">{item.reason}</p>
+      </div>
+      <button type="button" data-testid={'gusek-r15c-select-'+item.position} disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+       taskRequestEpoch.current++;invalidateForm();setBusy(false);
+       setR15dRun(old=>r15dPauseRun(old));
+       setKind(item.kind as Kind);setSeed(String(item.seed));setTask(null);
+      }}>Variáns kiválasztása</button>
+     </li>)}
+    </ol>
+    <h4 className="text-sm font-semibold">Ellenőrzött gyakorlási előzmények – feladattípusonként</h4>
+    <div className="overflow-x-auto" data-testid="gusek-r15c-board"><table className="w-full text-xs">
+     <thead><tr><th className="p-2 text-left">Típus</th><th className="p-2">Kísérlet</th><th className="p-2">1/1</th><th className="p-2">0/1</th><th className="p-2">Nem értékelhető</th><th className="p-2">Ismeretlen segítség</th></tr></thead>
+     <tbody>{r15cPlan.summary.map(row=><tr key={row.kind} data-testid={'gusek-r15c-progress-'+row.kind} className="border-t">
+      <th scope="row" className="p-2 text-left">{row.label}</th>
+      <td className="p-2 text-center">{row.attempts}</td><td className="p-2 text-center">{row.full}</td>
+      <td className="p-2 text-center">{row.zero}</td><td className="p-2 text-center">{row.unassessable}</td>
+      <td className="p-2 text-center">{row.unknownHelp}</td>
+     </tr>)}</tbody></table></div>
+    <p className="text-xs text-neutral-500" data-testid="gusek-r15c-count">Eddig {r15cPlan.totals.observed} ellenőrzött kísérlet alapján.</p>
+    <p className="text-xs text-neutral-500">{r15cPlan.caveat}</p>
+    <button type="button" data-testid="gusek-r15d-activate" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+     const candidate=r15dCreateRun(r15cPlan);
+     if(candidate)setR15dRun(candidate);
+    }}>{r15dRun?'Új gyakorlatsor indítása (az eddigi követés felülíródik)':'Gyakorlatsor követésének indítása'}</button>
+   </section>}
+   <div className="flex flex-wrap gap-4"><button className="text-sm underline" data-testid="gusek-r15e-correct" onClick={()=>{
+     setR15dRun(old=>r15ePrepareCorrection(old,grade.taskId));
+     setGrade(null);
+    }}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
-    <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
+    <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setR15dRun(old=>r15dPauseRun(old));setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
    </div>
+  </section>}
+  <section className="space-y-2 rounded-xl border p-3 xl:col-span-2" data-testid="gusek-r15e-bookmark" aria-label="Gyakorlatsor mentése és visszaállítása">
+   <p className="text-sm font-semibold">Feladatterv könyvjelzője (R15E)</p>
+   <p className="text-xs text-neutral-500">Csak a három feladattípus és variáns kerül a böngészőlap ideiglenes tárhelyére. Beadások, pontok és megoldások nem. Visszaállítás után az előrehaladás nulláról indul. Már beadott eredmények mellett először kézzel zárd le a jelenlegi követést.</p>
+   {r15eHasBookmark&&<button type="button" data-testid="gusek-r15e-restore" disabled={busy||(r15dProgress?.attempts??0)>0} className="rounded border px-3 py-2 text-sm" onClick={r15eLoadPlan}>Mentett terv visszaállítása (pontok nélkül)</button>}
+   {r15eNotice&&<p role="status" className="text-xs text-neutral-600" data-testid="gusek-r15e-notice">{r15eNotice}</p>}
+  </section>
+  {r15dRun&&r15dProgress&&<section className="space-y-3 rounded-xl border p-4 xl:col-span-2" data-testid="gusek-r15d-run" data-active={r15dRun.active??'none'} data-ready={String(r15dRun.ready)} aria-label="Aktív követett gyakorlatsor">
+   <h2 className="font-semibold">Aktív háromállomásos gyakorlatsor</h2>
+   <p className="text-sm" data-testid="gusek-r15d-progress">Beadással érintett állomások: {r15dProgress.attemptedStations}/3 · 1/1 eredményű állomások: {r15dProgress.fullCreditStations}/3 · ellenőrzött beadások: {r15dProgress.attempts}</p>
+   <ol className="space-y-2" data-testid="gusek-r15d-stations">
+    {r15dRun.steps.map(item=><li key={item.position} data-testid={'gusek-r15d-step-'+item.position} data-status={item.status} data-attempts={item.attempts} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
+     <div className="space-y-1">
+      <p className="text-sm font-semibold">{item.position}. {item.title} – {item.label} · {item.seed}. variáns</p>
+      <p className="text-xs text-neutral-500">Állapot: {item.status==='pending'?'még nem választottad ki':item.status==='selected'?'kiválasztva, nincs betöltve':item.status==='loaded'?'feladat betöltve':item.status==='zero'?'0/1, javítható':item.status==='unassessable'?'nem értékelhető':'1/1 ellenőrzött eredmény'} · beadások: {item.attempts}</p>
+     </div>
+     <button type="button" data-testid={'gusek-r15d-select-'+item.position} disabled={busy||!r15dCanSelect(r15dRun,item.position)} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>{
+      if(!r15dCanSelect(r15dRun,item.position))return;
+      taskRequestEpoch.current++;invalidateForm();setBusy(false);
+      setR15dRun(old=>r15dSelectRunStep(old,item.position));
+      setKind(item.kind as Kind);setSeed(String(item.seed));setTask(null);
+     }}>{item.attempts>0?'Állomás újrapróbálása':'Állomás kiválasztása'}</button>
+    </li>)}
+   </ol>
+   <p className="text-xs text-neutral-500">{r15dRun.caveat}</p>
+   <p className="text-xs text-neutral-500" data-testid="gusek-r15e-paused">{r15dRun.active===null?'Szünetel: válassz egy feloldott állomást, majd külön indítsd a feladatot.':'Követés aktív, külön szüneteltethető.'}</p>
+   <div className="flex flex-wrap gap-2">
+    <button type="button" data-testid="gusek-r15e-save" className="rounded border px-3 py-2 text-sm" onClick={r15eSavePlan}>Terv mentése a böngészőlapra</button>
+    <button type="button" data-testid="gusek-r15e-pause" disabled={r15dRun.active===null} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setTask(null);setR15dRun(old=>r15dPauseRun(old));}}>Követés szüneteltetése</button>
+   </div>
+   <button type="button" data-testid="gusek-r15d-stop" className="rounded border px-3 py-2 text-sm" onClick={()=>setR15dRun(null)}>Követés lezárása (kézzel)</button>
   </section>}
   {linkedChat&&<section className="rounded-xl border p-4 xl:col-span-2"><h2 className="font-semibold">Korábbi ellenőrzött kísérletek ({history.length})</h2><ul className="mt-2 space-y-1 text-sm">{history.slice(-12).reverse().map(a=><li key={a.id}>{a.taskId}: {a.points===null?'nem értékelhető':`${a.points}/1`} · {new Date(a.submittedAt).toLocaleString('hu-HU')}</li>)}</ul></section>}
   {error&&<p role="alert" className="rounded border border-red-500 p-3 text-red-600">{error}</p>}
