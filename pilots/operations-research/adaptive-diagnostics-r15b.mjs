@@ -147,7 +147,7 @@ const safeTopic=(kind,code)=>{
 /**
  * @param {{
  *  history?: import('../../src/core/contracts/chat.ts').TransportAttemptReceipt[],
- *  session?: Array<NonNullable<ReturnType<import('./adaptive-practice-r15.mjs').r15SessionOutcome>>>
+ *  session?: Array<NonNullable<ReturnType<typeof import('./adaptive-practice-r15.mjs').r15SessionOutcome>>>
  * }} [input]
  */
 export function r15bDiagnosticBrief({history=[],session=[]}={}){
