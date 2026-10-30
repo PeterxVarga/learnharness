@@ -1,0 +1,12 @@
+# LearnHarness R14Z local-only rootless GLPK test image.
+# Runtime uses --pull=never, --network=none and the final immutable image SHA.
+# The Debian source tag is NOT a cryptographic base digest; the built image's
+# SHA is recorded and bound to this single qualification run.
+FROM docker.io/library/debian:13-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends glpk-utils; \
+    /usr/bin/glpsol --version; \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp

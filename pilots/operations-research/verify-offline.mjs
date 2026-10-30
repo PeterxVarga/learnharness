@@ -32,9 +32,27 @@ const suites = [
   { name: 'r12-native-practice', file: 'native-integration-r12.test.mjs', count: 12 },
   { name: 'r13-gusek-model', file: 'gusek-r13.test.mjs', count: 22 },
   { name: 'r13-gusek-http', file: 'gusek-http-r13.test.mjs', count: 6, flags: ['--experimental-strip-types'] },
+  { name: 'r14-scalar-equivalence', file: 'gusek-equivalence-r14.test.mjs', count: 16 },
+  { name: 'r14n-native-glpsol-sandbox', file: 'glpk-native-sandbox-r14.test.mjs', count: 20 },
+  { name: 'r14-glpk-machine-status', file: 'glpk-solution-status-r14.test.mjs', count: 12 },
+  { name: 'r14-native-http-security', file: 'gusek-native-api-r14.test.mjs', count: 16, flags: ['--experimental-strip-types'] },
+  { name: 'r14-indexed-transport', file: 'gusek-indexed-r14.test.mjs', count: 20 },
+  { name: 'r14-indexed-http', file: 'gusek-indexed-http-r14.test.mjs', count: 8, flags: ['--experimental-strip-types'] },
+  { name: 'r14-workbench-files', file: 'gusek-workspace-r14.test.mjs', count: 14 },
+  { name: 'r14-glpk-columns', file: 'glpk-columns-r14.test.mjs', count: 15 },
+  { name: 'r14-practice-transfer', file: 'gusek-practice-transfer-r14.test.mjs', count: 13 },
+  { name: 'r14-glpk-async-runtime', file: 'glpk-native-async-r14.test.mjs', count: 15 },
+  { name: 'r14-gmpl-editor', file: 'gmpl-editor-r14.test.mjs', count: 16 },
+  { name: 'r14z-practice-draft', file: 'gusek-practice-draft-r14z.test.mjs', count: 8 },
+  { name: 'r14z-local-projects', file: 'gusek-project-r14z.test.mjs', count: 8 },
+  { name: 'r14z-scalar-starters', file: 'gusek-starters-r14z.test.mjs', count: 8 },
+  { name: 'r14z-full-scalar-loop', file: 'gusek-full-loop-r14z.test.mjs', count: 7, flags: ['--experimental-strip-types'] },
+  { name: 'r14z-glpk-feedback', file: 'glpk-feedback-r14z.test.mjs', count: 15 },
+  { name: 'r14z-values-grid', file: 'gusek-values-grid-r14z.test.mjs', count: 15 },
+  { name: 'r14z-final-evidence', file: 'final-evidence-r14z.test.mjs', count: 15 },
 ];
-const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts','../../components/gusek-exam.tsx','../../app/pilot/gusek/page.tsx'];
-const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'native-integration-r12.test.mjs', 'gusek-model-r13.mjs','gusek-exam-r13.mjs','gusek-r13.test.mjs','gusek-http-r13.test.mjs', '../../app/api/pilot/gusek/route.ts', '../../src/agent/courses/operations-research-hu.test.ts', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
+const hashOnlyFiles = ['../../components/chat.tsx','../../components/transport-exam.tsx','../../app/pilot/transport/page.tsx','../../src/agent/teacher-agent.ts','../../components/gusek-exam.tsx','../../components/gusek-workbench.tsx','../../components/gusek-gmpl-editor.tsx','../../components/gusek-values-grid.tsx','qualify-r14z-final.sh','preflight-r14z.sh','Containerfile.glpk-r14z','../../app/pilot/gusek/page.tsx'];
+const allFiles = ['oracles.mjs', ...suites.map((s) => s.file), 'glpk-contract.mjs', 'exam-binary.mjs', 'transport-exam-r3.mjs', 'transport-cli-r3.mjs', 'transport-mathprog-r4.mjs', 'qualify-glpsol-r5.mjs', 'mathprog-expanded-r6.mjs', 'mathprog-indexed-r7.mjs', 'attempt-service-r9.mjs', 'feedback-r11.mjs', 'native-integration-r12.test.mjs', 'gusek-model-r13.mjs','gusek-exam-r13.mjs','gusek-equivalence-r14.mjs','gusek-indexed-r14.mjs','glpk-columns-r14.mjs','gusek-practice-transfer-r14.mjs','gusek-starters-r14z.mjs','glpk-feedback-r14z.mjs','gusek-values-grid-r14z.mjs','final-evidence-r14z.mjs','glpk-native-async-r14.mjs','diagnose-glpk-r14z.mjs','../../src/features/gusek/gmpl-editor-core.mjs','../../src/features/gusek/practice-draft-r14z.mjs','../../src/features/gusek/project-contract-r14z.mjs','gusek-workbench-browser-r14.mjs','gusek-practice-browser-r14.mjs','gusek-live-native-browser-r14z.mjs','../../src/features/gusek/workspace-files.mjs','../../src/features/gusek/browser-drafts.ts','glpk-solution-status-r14.mjs','glpk-native-sandbox-r14.mjs','run-glpk-r14.mjs','gusek-r13.test.mjs','gusek-http-r13.test.mjs', '../../app/api/pilot/gusek/route.ts', '../../app/api/pilot/gusek/native/route.ts', '../../src/agent/courses/operations-research-hu.test.ts', 'qualify-release-r10.mjs', 'qualify-release-r10.test.mjs', '../../app/api/pilot/transport/route.ts', '../../src/agent/subagents/pdf-evidence.ts', '../../src/agent/courses/operations-research-hu.ts', 'start-course.mjs', 'verify-offline.mjs'];
 
 function node(argumentsList) {
   const result = spawnSync(process.execPath, argumentsList, {

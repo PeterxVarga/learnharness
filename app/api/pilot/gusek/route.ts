@@ -1,5 +1,7 @@
 /** R13: source-only GUSEK/GMPL subset. Never invokes a solver on learner input. */
 import {makeGusekTask,gradeGusekExam} from '../../../../pilots/operations-research/gusek-exam-r13.mjs';
+import {indexedTransportStarter,indexedTransportData} from '../../../../pilots/operations-research/gusek-indexed-r14.mjs';
+import {makeGusekScalarStarter} from '../../../../pilots/operations-research/gusek-starters-r14z.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const json = (body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Cache-Control':'no-store, private','Content-Type':'application/json; charset=utf-8'}});
@@ -9,7 +11,9 @@ export function GET(req:Request){
  const url=new URL(req.url),kind=url.searchParams.get('kind'),seed=seedOf(url.searchParams.get('seed'));
  if([...url.searchParams.keys()].sort().join(',')!=='kind,seed'||url.searchParams.getAll('kind').length!==1||url.searchParams.getAll('seed').length!==1||(kind===null||!KINDS.has(kind))||seed===null)return json({error:'invalid_task'},400);
  const task=makeGusekTask(kind,seed);
- return json({schema:'learnharness.gusek-task.r13',task});
+ return json({schema:'learnharness.gusek-task.r13',task,
+  scalar:{starter:makeGusekScalarStarter(task)},
+  ...(kind==='transport'?{indexed:{starter:indexedTransportStarter(),dataTemplate:indexedTransportData(task)}}:{})});
 }
 export async function POST(req:Request){
  if(!/^application\/json(?:\s*;|\s*$)/i.test(req.headers.get('content-type')??''))return json({error:'content_type_must_be_json'},415);

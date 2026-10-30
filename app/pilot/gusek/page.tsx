@@ -1,2 +1,2 @@
-import {GusekExam} from '@/components/gusek-exam';
-export default function Page(){return <GusekExam/>;}
+import {GusekWorkbench} from '@/components/gusek-workbench';
+export default function Page(){return <GusekWorkbench/>;}
