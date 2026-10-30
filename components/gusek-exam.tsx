@@ -465,8 +465,8 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
   </section>}
   <section className="space-y-2 rounded-xl border p-3 xl:col-span-2" data-testid="gusek-r15e-bookmark" aria-label="Gyakorlatsor mentése és visszaállítása">
    <p className="text-sm font-semibold">Feladatterv könyvjelzője (R15E)</p>
-   <p className="text-xs text-neutral-500">Csak a három feladattípus és variáns kerül a böngészőlap ideiglenes tárhelyére. Beadások, pontok és megoldások nem. Visszaállítás után az előrehaladás nulláról indul.</p>
-   {r15eHasBookmark&&<button type="button" data-testid="gusek-r15e-restore" disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={r15eLoadPlan}>Mentett terv visszaállítása (pontok nélkül)</button>}
+   <p className="text-xs text-neutral-500">Csak a három feladattípus és variáns kerül a böngészőlap ideiglenes tárhelyére. Beadások, pontok és megoldások nem. Visszaállítás után az előrehaladás nulláról indul. Már beadott eredmények mellett először kézzel zárd le a jelenlegi követést.</p>
+   {r15eHasBookmark&&<button type="button" data-testid="gusek-r15e-restore" disabled={busy||(r15dProgress?.attempts??0)>0} className="rounded border px-3 py-2 text-sm" onClick={r15eLoadPlan}>Mentett terv visszaállítása (pontok nélkül)</button>}
    {r15eNotice&&<p role="status" className="text-xs text-neutral-600" data-testid="gusek-r15e-notice">{r15eNotice}</p>}
   </section>
   {r15dRun&&r15dProgress&&<section className="space-y-3 rounded-xl border p-4 xl:col-span-2" data-testid="gusek-r15d-run" data-active={r15dRun.active??'none'} data-ready={String(r15dRun.ready)} aria-label="Aktív követett gyakorlatsor">
@@ -490,7 +490,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
    <p className="text-xs text-neutral-500" data-testid="gusek-r15e-paused">{r15dRun.active===null?'Szünetel: válassz egy feloldott állomást, majd külön indítsd a feladatot.':'Követés aktív, külön szüneteltethető.'}</p>
    <div className="flex flex-wrap gap-2">
     <button type="button" data-testid="gusek-r15e-save" className="rounded border px-3 py-2 text-sm" onClick={r15eSavePlan}>Terv mentése a böngészőlapra</button>
-    <button type="button" data-testid="gusek-r15e-pause" disabled={r15dRun.active===null} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>setR15dRun(old=>r15dPauseRun(old))}>Követés szüneteltetése</button>
+    <button type="button" data-testid="gusek-r15e-pause" disabled={r15dRun.active===null} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setTask(null);setR15dRun(old=>r15dPauseRun(old));}}>Követés szüneteltetése</button>
    </div>
    <button type="button" data-testid="gusek-r15d-stop" className="rounded border px-3 py-2 text-sm" onClick={()=>setR15dRun(null)}>Követés lezárása (kézzel)</button>
   </section>}

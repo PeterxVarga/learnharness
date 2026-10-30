@@ -82,6 +82,7 @@ try{
  await check('R15E_PAUSE_RETURNS_TO_MANUAL_SELECTION',async()=>{
   await page.waitForFunction(()=>document.querySelector('[data-testid="gusek-r15d-run"]')?.getAttribute('data-active')==='none',{timeout:10000});
   assert.equal(await page.$eval('[data-testid="gusek-r15d-step-1"]',el=>el.getAttribute('data-attempts')),'2');
+  assert.equal(await page.$('[aria-label="Vizsgafeladat"]'),null);
   assert.deepEqual(counts,beforePause);
  });
  await page.click('[data-testid="gusek-r15e-save"]');
