@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # R15B fail-fast gate: 62 pure tests, typecheck, build, 9 browser checks.
 # Never claims or rewrites the Fedora-qualified R14Z release receipt.
-# Usage: bash pilots/operations-research/qualify-r15b-targeted.sh EXACT_SHA
+# Usage: bash pilots/operations-research/qualify-r15b-targeted.sh EXACT_SHA [--reuse-browser]
+# --reuse-browser uses only the previously PASSed build at cd16631, and only
+# when Git proves all differences are this runner and the browser test.
 set -Eeuo pipefail
 umask 077
 cd "$(dirname "$0")/../.."
 PIN="${1:-}"
-[[ "$#" == 1 && "$PIN" =~ ^[a-f0-9]{40}$ ]] ||
+MODE="${2:---full}"
+[[ "$PIN" =~ ^[a-f0-9]{40}$ ]] &&
+ { [[ "$#" == 1 && "$MODE" == "--full" ]] ||
+   [[ "$#" == 2 && "$MODE" == "--reuse-browser" ]]; } ||
  { echo "BLOCKED_PIN"; exit 2; }
 [[ "$(git branch --show-current)" == "pilot/operations-research-r15" ]] ||
  { echo "BLOCKED_R15_BRANCH";exit 2; }
@@ -48,7 +53,8 @@ cleanup(){
 }
 trap cleanup EXIT
 
-if ! timeout --kill-after=5s 90s \
+if [[ "$MODE" == "--full" ]];then
+ if ! timeout --kill-after=5s 90s \
  node --test \
   pilots/operations-research/adaptive-practice-r15.test.mjs \
   pilots/operations-research/adaptive-diagnostics-r15b.test.mjs \
@@ -78,6 +84,35 @@ if ! NEXT_TELEMETRY_DISABLED=1 timeout --kill-after=10s 1200s npm run build >"$E
 fi
 [[ -f .next/BUILD_ID ]] || { echo "BLOCKED_BUILD_ID";exit 2; }
 echo "R15B_NEXT_BUILD=PASS"
+else
+ STEP="reuse_source"
+ BUILT_PIN="cd16631ee14d266655967af4da95b0a1d5f4c0b7"
+ PRIOR="/tmp/learnharness-r15b-targeted-DtMN5T5e"
+ [[ -s .next/BUILD_ID && ! -L .next/BUILD_ID ]] ||
+  { echo "BLOCKED_MISSING_REUSABLE_BUILD";exit 2; }
+ git cat-file -e "$BUILT_PIN^{commit}"
+ git merge-base --is-ancestor "$BUILT_PIN" "$PIN" ||
+  { echo "BLOCKED_REUSE_BASE_NOT_ANCESTOR";exit 2; }
+ EXPECTED_DIFF=$'pilots/operations-research/adaptive-browser-r15.mjs\npilots/operations-research/qualify-r15b-targeted.sh'
+ [[ "$(git diff --name-only "$BUILT_PIN" "$PIN")" == "$EXPECTED_DIFF" ]] ||
+  { echo "BLOCKED_NON_TEST_SOURCE_CHANGE";git diff --name-only "$BUILT_PIN" "$PIN";exit 2; }
+ git diff --check "$BUILT_PIN" "$PIN"
+ [[ -d "$PRIOR" && ! -L "$PRIOR" && -f "$PRIOR/unit.log" &&
+  -f "$PRIOR/typecheck.log" && -f "$PRIOR/build.log" &&
+  -f "$PRIOR/browser.log" ]] ||
+  { echo "BLOCKED_PRIOR_EVIDENCE";exit 2; }
+ node --input-type=module - "$PRIOR/unit.log" <<'JS'
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const log=readFileSync(process.argv[2],'utf8');
+const metric=k=>Number([...log.matchAll(new RegExp('(?:^|\\n)# '+k+' (\\d+)','g'))].at(-1)?.[1]);
+assert.equal(metric('tests'),62);
+assert.equal(metric('pass'),62);
+assert.equal(metric('fail'),0);
+JS
+ echo "R15B_REUSED_BUILD_SOURCE=$BUILT_PIN"
+ echo "R15B_PREVIOUS_UNIT_TYPESCRIPT_BUILD=PASS_EVIDENCED"
+fi
 
 STEP="server"
 export LH_R15_BROWSER_URL="http://127.0.0.1:$PORT/pilot/gusek"
@@ -129,6 +164,10 @@ STEP="source"
  { echo "BLOCKED_SHA_MOVED";exit 2; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] ||
  { echo "BLOCKED_SOURCE_DIRTY";exit 2; }
-echo "R15B_TARGETED_GATE=PASS"
+if [[ "$MODE" == "--full" ]];then
+ echo "R15B_TARGETED_GATE=PASS"
+else
+ echo "R15B_BROWSER_REPLAY_GATE=PASS"
+fi
 echo "PIN=$PIN"
 echo "EVIDENCE_DIR=$EVIDENCE"
