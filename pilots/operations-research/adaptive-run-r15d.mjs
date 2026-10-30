@@ -9,7 +9,8 @@
  *  position:number,kind:string,seed:number,taskId:string,
  *  label:string,title:string,phase:string,status:string,
  *  attempts:number,fullCount:number,zeroCount:number,
- *  unassessableCount:number,assistance:string,lastReceiptKey:string|null
+ *  unassessableCount:number,assistance:string,lastReceiptKey:string|null,
+ *  receiptKeys:ReadonlyArray<string>
  * }} R15DStep
  * @typedef {{
  *  schema:string,active:number|null,ready:boolean,
@@ -22,6 +23,8 @@ const KINDS=new Set(['transport','froccs','tablet']);
 const UINT32=4294967295;
 const STATUSES=new Set(['pending','selected','loaded','zero','unassessable','full']);
 const RUN_SCHEMA='learnharness.r15d.practice-run.v1';
+// Hard stop rather than silently forgetting an old receipt and double counting it.
+const MAX_RECEIPTS_PER_STEP=128;
 const validItem=s=>s&&typeof s==='object'&&!Array.isArray(s)&&
  Number.isInteger(s.position)&&s.position>=1&&s.position<=3&&
  KINDS.has(s.kind)&&Number.isSafeInteger(s.seed)&&s.seed>=0&&s.seed<=UINT32&&
@@ -48,7 +51,8 @@ export function r15dCreateRun(itinerary){
    position:s.position,kind:s.kind,seed:s.seed,taskId:s.taskId,
    label:s.label,title:s.title,phase:s.phase,
    status:'pending',attempts:0,fullCount:0,zeroCount:0,
-   unassessableCount:0,assistance:'unknown',lastReceiptKey:null
+   unassessableCount:0,assistance:'unknown',lastReceiptKey:null,
+   receiptKeys:Object.freeze([])
   }))),
   scoreAuthority:false,autoStart:false,
   caveat:'Csak az aktuális oldal memóriájában követett formatív gyakorlás. Az 1/1 ellenőrzött beadás, nem bizonyított vizsgakészenlét. Az oldal újratöltése lezárja a követést.'
@@ -61,7 +65,12 @@ const validRun=run=>run&&run.schema===RUN_SCHEMA&&Array.isArray(run.steps)&&run.
  Number.isSafeInteger(s.attempts)&&s.attempts>=0&&Number.isSafeInteger(s.fullCount)&&s.fullCount>=0&&
  Number.isSafeInteger(s.zeroCount)&&s.zeroCount>=0&&
  Number.isSafeInteger(s.unassessableCount)&&s.unassessableCount>=0&&
- s.fullCount+s.zeroCount+s.unassessableCount===s.attempts);
+ s.fullCount+s.zeroCount+s.unassessableCount===s.attempts&&
+ s.attempts<=MAX_RECEIPTS_PER_STEP&&Array.isArray(s.receiptKeys)&&
+ s.receiptKeys.length===s.attempts&&
+ s.receiptKeys.every(k=>typeof k==='string'&&k.length>0&&k.length<=80)&&
+ new Set(s.receiptKeys).size===s.receiptKeys.length&&
+ s.lastReceiptKey===(s.receiptKeys.at(-1)??null));
 /** @param {ReturnType<typeof r15dCreateRun>} run
  *  @param {number} position
  */
@@ -118,14 +127,17 @@ export function r15dRecordRunGrade(run,outcome){
  if(e.taskId!==s.taskId||e.kind!==s.kind||e.seed!==s.seed||
   !['assisted','self_reported_no_help'].includes(e.assistance))return run;
  const key=e.id??(e.taskId+':'+e.at);
- if(s.lastReceiptKey===key)return run;
+ if(typeof key!=='string'||key.length>80||key.length===0||
+  (e.id!==null&&!/^[0-9a-f-]{36}$/i.test(e.id))||
+  s.receiptKeys.includes(key)||s.attempts>=MAX_RECEIPTS_PER_STEP)return run;
  const status=e.points===1?'full':e.points===0?'zero':'unassessable';
  return transform(run,s.position,{
   status,attempts:s.attempts+1,
   fullCount:s.fullCount+(e.points===1?1:0),
   zeroCount:s.zeroCount+(e.points===0?1:0),
   unassessableCount:s.unassessableCount+(e.points===null?1:0),
-  assistance:e.assistance,lastReceiptKey:key
+  assistance:e.assistance,lastReceiptKey:key,
+  receiptKeys:Object.freeze([...s.receiptKeys,key])
  },s.position,true);
 }
 /** @param {ReturnType<typeof r15dCreateRun>} run */
