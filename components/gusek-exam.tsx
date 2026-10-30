@@ -11,6 +11,7 @@ import {classifyGlpkFeedback} from '../pilots/operations-research/glpk-feedback-
 import {readGusekPracticeDraft,saveGusekPracticeDraft} from '../src/features/gusek/browser-drafts';
 import {r15SessionOutcome,r15RecommendPractice} from '../pilots/operations-research/adaptive-practice-r15.mjs';
 import {r15bDiagnosticBrief} from '../pilots/operations-research/adaptive-diagnostics-r15b.mjs';
+import {r15cPracticeItinerary} from '../pilots/operations-research/adaptive-sequence-r15c.mjs';
 
 type Kind='transport'|'froccs'|'tablet';
 type Task={id:string;kind:Kind;taskType:string;variableNames:string[];objectiveSense:'min'|'max';
@@ -78,6 +79,7 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
  const nativeFeedback=nativeResult?classifyGlpkFeedback(nativeResult):null;
  const r15Suggestion=r15RecommendPractice({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)});
  const r15bBrief=grade?r15bDiagnosticBrief({history,session:r15Outcomes}):null;
+ const r15cPlan=grade?r15cPracticeItinerary({history,session:r15Outcomes,currentKind:kind,currentSeed:Number(seed)}):null;
  useEffect(()=>{
   const file=nativeDiagnostic?.file;
   if(file==='model.mod'||file==='data.dat')setFileTab(file);
@@ -381,6 +383,33 @@ export function GusekExam({chatId,embedded=false,onRequestCoaching,onCopyToWorks
     </p>
     <p className="text-xs text-neutral-500">{r15bBrief.caveat}</p>
    </aside>}
+   {r15cPlan&&<section data-testid="gusek-r15c-plan" className="space-y-3 rounded-lg border p-3" aria-label="Háromállomásos gyakorlási terv">
+    <h3 className="font-semibold">Következő három gyakorlási állomás</h3>
+    <p className="text-xs text-neutral-500">Az ajánlások nem automatikus feladatok, és nem jelentenek vizsgakészenlétet. A tervezett feladatokat csak külön kiválasztás és az Új feladat gomb indítja el.</p>
+    <ol className="space-y-2" data-testid="gusek-r15c-steps">
+     {r15cPlan.steps.map(item=><li key={item.position} data-testid={'gusek-r15c-step-'+item.position} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+      <div className="space-y-1">
+       <p className="text-sm font-semibold">{item.position}. {item.title}: {item.label} · {item.seed}. variáns</p>
+       <p className="text-xs text-neutral-500">{item.reason}</p>
+      </div>
+      <button type="button" data-testid={'gusek-r15c-select-'+item.position} disabled={busy} className="rounded border px-3 py-2 text-sm" onClick={()=>{
+       taskRequestEpoch.current++;invalidateForm();setBusy(false);
+       setKind(item.kind as Kind);setSeed(String(item.seed));setTask(null);
+      }}>Variáns kiválasztása</button>
+     </li>)}
+    </ol>
+    <h4 className="text-sm font-semibold">Ellenőrzött gyakorlási előzmények – feladattípusonként</h4>
+    <div className="overflow-x-auto" data-testid="gusek-r15c-board"><table className="w-full text-xs">
+     <thead><tr><th className="p-2 text-left">Típus</th><th className="p-2">Kísérlet</th><th className="p-2">1/1</th><th className="p-2">0/1</th><th className="p-2">Nem értékelhető</th><th className="p-2">Ismeretlen segítség</th></tr></thead>
+     <tbody>{r15cPlan.summary.map(row=><tr key={row.kind} data-testid={'gusek-r15c-progress-'+row.kind} className="border-t">
+      <th scope="row" className="p-2 text-left">{row.label}</th>
+      <td className="p-2 text-center">{row.attempts}</td><td className="p-2 text-center">{row.full}</td>
+      <td className="p-2 text-center">{row.zero}</td><td className="p-2 text-center">{row.unassessable}</td>
+      <td className="p-2 text-center">{row.unknownHelp}</td>
+     </tr>)}</tbody></table></div>
+    <p className="text-xs text-neutral-500" data-testid="gusek-r15c-count">Eddig {r15cPlan.totals.observed} ellenőrzött kísérlet alapján.</p>
+    <p className="text-xs text-neutral-500">{r15cPlan.caveat}</p>
+   </section>}
    <div className="flex flex-wrap gap-4"><button className="text-sm underline" onClick={()=>setGrade(null)}>Javítom és újra beadom</button>
     {linkedChat&&embedded&&onRequestCoaching&&<button className="text-sm underline" onClick={onRequestCoaching}>Hibajavítás a tanítóval</button>}
     <button className="text-sm underline" onClick={()=>{taskRequestEpoch.current++;invalidateForm();setBusy(false);setSeed(String((Number(seed)+1)>>>0));setTask(null);}}>Új variáns kiválasztása</button>
