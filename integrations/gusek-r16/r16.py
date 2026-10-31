@@ -665,6 +665,29 @@ def verify_namespace_contract(path: Path, evidence: dict, actual_addons: dict[st
         if sha256(expected_data)!=actual_addons[new]:
             raise Blocked('NAMESPACE_OVERLAY_DRIFT: '+old)
 
+# Next 16.4.3 (upstream 0.4.1) changes this GENERATED declaration during
+# dev/typecheck -> production build. This is the sole acceptable tracked-file
+# post-build rewrite. The source digest must prove the EXACT pinned upstream
+# preimage, and the post-build bytes must equal the EXACT production form.
+# Never ignore the file, trust arbitrary imports, or accept added code.
+PINNED_NEXT_ENV_DEV = (
+    b'/// <reference types="next" />\n'
+    b'/// <reference types="next/image-types/global" />\n'
+    b'import "./.next/dev/types/routes.d.ts";\n'
+    b'import "./.next/dev/types/root-params.d.ts";\n'
+    b'\n'
+    b'// NOTE: This file should not be edited\n'
+    b'// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.\n'
+)
+PINNED_NEXT_ENV_BUILD = PINNED_NEXT_ENV_DEV.replace(
+    b'"./.next/dev/types/', b'"./.next/types/'
+)
+
+def approved_next_env_postbuild(original_sha256: str, actual: bytes) -> bool:
+    return (original_sha256 == sha256(PINNED_NEXT_ENV_DEV)
+            and actual == PINNED_NEXT_ENV_BUILD)
+
+
 def verify_assembly(path: Path, allow_build_artifacts: bool = False):
     evidence = json.loads((path / 'evidence/assembly.json').read_text())
     inventory_bytes = (path / 'evidence/upstream-files.json').read_bytes()
@@ -708,8 +731,15 @@ def verify_assembly(path: Path, allow_build_artifacts: bool = False):
         raise Blocked(f'ASSEMBLED_PATH_SET_MISMATCH: extra={len(actual-set(expected))},missing={len(set(expected)-actual)}')
     for rel, digest in expected.items():
         posix_path(rel)
-        if not re.fullmatch(r'[a-f0-9]{64}', digest) or sha256((assembled / rel).read_bytes()) != digest:
+        if not re.fullmatch(r'[a-f0-9]{64}', digest):
             raise Blocked(f'ASSEMBLED_FILE_TAMPER: {rel}')
+        content = (assembled / rel).read_bytes()
+        if sha256(content) != digest:
+            # Only one exact upstream-pinned Next-generated import-path rewrite.
+            # No broad ignore or source bypass, even for post-build assets.
+            if not (allow_build_artifacts and rel == 'next-env.d.ts'
+                    and approved_next_env_postbuild(digest, content)):
+                raise Blocked(f'ASSEMBLED_FILE_TAMPER: {rel}')
     if 'addon_pack_lock_sha256' in evidence:
         pack_path=path/'addons-source'
         if sha256((pack_path/'pack-lock.json').read_bytes()) != evidence['addon_pack_lock_sha256']:
