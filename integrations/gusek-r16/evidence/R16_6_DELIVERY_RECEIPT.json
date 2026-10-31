@@ -1,0 +1,26 @@
+{
+  "mergeApproved": false,
+  "note": "Confirmed upstream ESLint import-law source violation repaired by top-level namespace. Real 0.4.1 application build still not run. Not release approval.",
+  "releaseApproved": false,
+  "repair": "R16.6 top-level tredven/addons and generated app import-law gate",
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "signedAttestation": false,
+  "source_pins": {
+    "r15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "upstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+  },
+  "upstream_eslint_source": "https://github.com/amosblomqvist/learnharness/blob/e69e85269c064c6c9c49a8b06ae78c06e79c4a63/eslint.config.mjs",
+  "verification": {
+    "bash_syntax": true,
+    "node_syntax": true,
+    "passed": 62,
+    "python_syntax": true,
+    "real_chromium": false,
+    "real_glpk": false,
+    "real_runtime_http": false,
+    "real_upstream_build": false,
+    "synthetic_and_targeted_unit_tests": 62,
+    "tsx_ts_parse_overlay_files": 5
+  },
+  "version": "r16.6"
+}

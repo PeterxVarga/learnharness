@@ -1,0 +1,25 @@
+R16.11 — Reproducible domain qualification evidence (2026-10-31)
+
+Offline local container, exact R16.11 artifacts:
+- python3 -m unittest discover -s tests -q: 97/97 PASS, synthetic git/pack/integrity/negative tests.
+- node --test overlay-workbench/learning/{teaching-handoff-r168,public-task-context-r169}.test.mjs
+  overlay-workbench/domain/{or-domain-r1610,or-assignment-equivalence-r1611}.test.mjs:
+  47 PASS / 0 FAIL / 2 SKIP. The two skipped tests require full pinned R15 source checkout.
+- python3 -m py_compile r16.py: PASS
+- bash -n qualify-r16.sh: PASS
+- node --check r16-http-smoke.mjs and every overlay .mjs: PASS
+- typescript createSourceFile parse of 9 TS/TSX overlays: PASS (syntax only, not TypeScript project typecheck)
+
+Separate GitHub connector V8 preflight (not container-integrated):
+- Fetched pinned R15 gUSEK parser and equivalence proof modules from exact SHA
+  9b7f374f4003276e67a96feb070124c244447aec.
+- Exercised exact R16.10 assignment and production task-source generation for 256 seeds each:
+  512/512 parser and canonical model self-equivalence checks PASS.
+- Reproduced 256/256 false-negative cases where one redundant assignment equation
+  removed causes the old general proof to return UNASSESSABLE and the strict
+  verifier to return ZERO_CREDIT/wrong_constraint_count.
+- This preflight does NOT run the R16.11 entire gradeOrTask with real R15 modules
+  or the bundled Next.js runtime. It is a separately executed source-level check.
+
+NOT RUN: actual R15+upstream 0.4.1 npm ci/typecheck/Next build/Chromium/GLPK.
+NO_SEND, NO GitHub writes; RELEASE_APPROVED=false; MERGE_APPROVED=false.

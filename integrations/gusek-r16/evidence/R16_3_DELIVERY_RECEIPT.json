@@ -1,0 +1,23 @@
+{
+  "actual_tests": {
+    "failed": 0,
+    "passed": 33,
+    "unittest_synthetic_git": 33
+  },
+  "github_write": false,
+  "host_runner_executed": false,
+  "previous_r15_pin": "9b7f374f4003276e67a96feb070124c244447aec",
+  "production_deployed": false,
+  "recorded_utc": "2026-10-31T16:13:14.519541+00:00",
+  "release": "R16.3",
+  "release_authority": "NO_GO",
+  "runtime_gate": "NOT_RUN_REAL_NEXT_FEDORA_OR_GLPK",
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "scope": "Portable add-on freeze, repeatable upstream candidate assembly, upstream inventory compare, post-build integrity proof",
+  "static_checks": [
+    "python3 -m py_compile r16.py",
+    "bash -n qualify-r16.sh",
+    "node --check r16-http-smoke.mjs"
+  ],
+  "upstream_target": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+}
