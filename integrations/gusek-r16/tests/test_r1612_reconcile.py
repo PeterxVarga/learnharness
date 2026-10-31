@@ -54,6 +54,52 @@ class ReconciliationLogChecks(unittest.TestCase):
         self.assertEqual(report['npmFailed'],0)
         self.assertEqual(report['originalExitCode'],3)
 
+    def test_node26_pretty_reporter_is_accepted(self):
+        data,w=synthetic_log()
+        for field in ('tests','pass','fail'):
+            data=data.replace(('# '+field+' ').encode(), ('ℹ '+field+' ').encode())
+        data=data.replace('ℹ tests 3187'.encode(),
+                          'ℹ tests 3187\nℹ suites 529'.encode())
+        result=mod.checked_log(data,w)
+        self.assertEqual((result['npmTests'],result['npmPassed'],result['npmFailed']),
+                         (3187,3187,0))
+
+    def test_pretty_reporter_with_ansi_codes(self):
+        data,w=synthetic_log()
+        for field in ('tests','pass','fail'):
+            data=data.replace(('# '+field+' ').encode(),
+                ('\x1b[32mℹ '+field+' ').encode())
+        data=data.replace(b'3187\n',b'3187\x1b[0m\n')
+        data=data.replace(b'# fail 0', '\x1b[32mℹ fail 0\x1b[0m'.encode())
+        self.assertEqual(mod.checked_log(data,w)['npmPassed'],3187)
+
+    def test_duplicate_reporter_summary_blocks(self):
+        data,w=synthetic_log()
+        data=data.replace(b'# tests 3187', '# tests 3187\nℹ tests 3187'.encode())
+        with self.assertRaisesRegex(mod.Blocked,'NPM_TEST_SUMMARY_MISSING_OR_AMBIGUOUS'):
+            mod.checked_log(data,w)
+
+    def test_mixed_reporter_fields_block(self):
+        data,w=synthetic_log()
+        data=data.replace(b'# pass 3187','ℹ pass 3187'.encode())
+        with self.assertRaisesRegex(mod.Blocked,'NPM_TEST_REPORTER_OR_ORDER_DRIFT'):
+            mod.checked_log(data,w)
+
+    def test_pretty_reporter_failure_blocks(self):
+        data,w=synthetic_log(npm_pass=3186,npm_fail=1)
+        for field in ('tests','pass','fail'):
+            data=data.replace(('# '+field+' ').encode(), ('ℹ '+field+' ').encode())
+        with self.assertRaisesRegex(mod.Blocked,'NPM_TEST_NOT_ALL_PASS'):
+            mod.checked_log(data,w)
+
+    def test_pretty_failure_marker_blocks_even_with_forged_success_summary(self):
+        data,w=synthetic_log()
+        data=data.replace(b'# tests 3187', '✖ failed subtest\nℹ tests 3187'.encode())
+        data=data.replace(b'# pass 3187','ℹ pass 3187'.encode())
+        data=data.replace(b'# fail 0','ℹ fail 0'.encode())
+        with self.assertRaisesRegex(mod.Blocked,'NPM_TEST_HAS_NOT_OK'):
+            mod.checked_log(data,w)
+
     def test_missing_actual_http_result_blocks(self):
         b,w=synthetic_log()
         with self.assertRaisesRegex(mod.Blocked,'LOG_MARKER_NOT_UNIQUE'):

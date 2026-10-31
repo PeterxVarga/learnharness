@@ -83,18 +83,33 @@ def checked_log(log: bytes, workspace: Path) -> dict:
     ):
         before = exact_line(lines, expected, before) + 1
     npm_start = before - 1
-    # A complete successful node:test TAP summary is required before build.
+    # Node's runner chooses TAP on non-TTY and Unicode spec reporter on
+    # interactive terminals. Both are genuine node:test final summaries:
+    #   # tests 3187 / # pass 3187 / # fail 0
+    #   ℹ tests 3187 / ℹ pass 3187 / ℹ fail 0
+    # Accept either ONE complete, consistently formatted terminal summary,
+    # never a duplicate/mixed/partial one or a failure hidden in test output.
     build_at = unique_line(lines, '> learnharness@0.4.1 build', npm_start)
     segment = lines[npm_start:build_at]
-    def one_summary(field: str) -> int:
-        values = [int(m.group(1)) for line in segment if (m := re.fullmatch(r'# '+field+r'\s+(\d+)\s*', line.strip()))]
-        if len(values) != 1:
+    ansi = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+    cleaned = [ansi.sub('', line).strip() for line in segment]
+    def one_summary(field: str) -> tuple[int, int, str]:
+        rows = []
+        for idx, line in enumerate(cleaned):
+            m = re.fullmatch(r'(?P<reporter>#|ℹ)\s+' + re.escape(field) + r'\s+(?P<count>\d+)', line)
+            if m:
+                rows.append((idx, int(m['count']), m['reporter']))
+        if len(rows) != 1:
             raise Blocked('NPM_TEST_SUMMARY_MISSING_OR_AMBIGUOUS: ' + field)
-        return values[0]
-    total, passed, failed = (one_summary(field) for field in ('tests', 'pass', 'fail'))
+        return rows[0]
+    t, p, f = (one_summary(field) for field in ('tests', 'pass', 'fail'))
+    if not (t[0] < p[0] < f[0] and f[0] - t[0] <= 20 and t[2] == p[2] == f[2]):
+        raise Blocked('NPM_TEST_REPORTER_OR_ORDER_DRIFT')
+    total, passed, failed = t[1], p[1], f[1]
     if not (total >= 3000 and passed == total and failed == 0):
         raise Blocked(f'NPM_TEST_NOT_ALL_PASS: tests={total} pass={passed} fail={failed}')
-    if any(re.match(r'^not ok\s+\d+\b', line.strip()) for line in segment):
+    if any(re.match(r'^not ok\s+\d+\b', line) or re.match(r'^[✖✘]\s', line)
+           for line in cleaned):
         raise Blocked('NPM_TEST_HAS_NOT_OK')
     after_build = exact_line(lines, '> next build', build_at + 1)
     http_at = unique_line(lines, HTTP, after_build)
