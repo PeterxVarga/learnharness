@@ -191,6 +191,7 @@ def export_addons(fork: Path, dest: Path) -> dict:
     # Pinned R15 guarantee: the only known type-only leaks get an exact
     # and intentionally narrow compatibility adapter.
     verify_pinned_type_contract(dest/'source', {'r15': R15})
+    verify_pinned_lint_contract(dest/'source', {'r15': R15})
     manifest = {
         'schema': 'tredven.learnharness.r16.export.v1', 'version': R16_VERSION,
         'base': BASE, 'r15': R15, 'added': added,
@@ -344,6 +345,25 @@ JSDOC_COMPAT_COUNTS = {
     'pilots/operations-research/adaptive-sequence-r15c.mjs': 1,
 }
 
+# The pinned R15 UI suppresses a react-hooks lint rule, but upstream 0.4.1
+# does not register that ESLint plugin. Keep frozen R15 sources immutable;
+# strip ONLY the two known directives in the private namespaced copies.
+R15_UNREGISTERED_ESLINT_DIRECTIVE = '// eslint-disable-next-line react-hooks/exhaustive-deps'
+R15_UNREGISTERED_ESLINT_FILES = frozenset({
+    'components/gusek-gmpl-editor.tsx',
+    'components/gusek-workbench.tsx',
+})
+R16_LINT_COMPAT_NOTE = '// R16.12.1: original R15 effect dependencies retained (upstream ESLint has no react-hooks rule)'
+
+def verify_pinned_lint_contract(source: Path, manifest: dict) -> None:
+    if manifest.get('r15') != PINNED_R15:
+        return
+    for path in sorted(R15_UNREGISTERED_ESLINT_FILES):
+        content=(source/path).read_text(encoding='utf-8')
+        n=content.count(R15_UNREGISTERED_ESLINT_DIRECTIVE)
+        if n!=1:
+            raise Blocked(f'R15_LINT_DIRECTIVE_SEAM_DRIFT: {path} count={n}')
+
 def verify_pinned_type_contract(source: Path, manifest: dict) -> None:
     """Verify the exact, connector-observed R15 type-only dependency surface.
 
@@ -375,6 +395,10 @@ def rewrite_namespaced_source(relative: str, data: bytes, addon_names: set[str])
         raise Blocked(f'UNEXPECTED_FORK_CORE_JSDOC_REFERENCE: {relative}')
     if relative in JSDOC_COMPAT_COUNTS:
         source=source.replace(LEGACY_JSDOC_TYPE,PRIVATE_JSDOC_TYPE)
+    if relative in R15_UNREGISTERED_ESLINT_FILES:
+        if source.count(R15_UNREGISTERED_ESLINT_DIRECTIVE)>1:
+            raise Blocked(f'R15_LINT_DIRECTIVE_SEAM_DRIFT: {relative}')
+        source=source.replace(R15_UNREGISTERED_ESLINT_DIRECTIVE,R16_LINT_COMPAT_NOTE)
     # Refuse additional links to the old core contract, including altered
     # extensions/quoting. Do not invent another shim for unknown upstream APIs.
     if re.search(r"import\s*\(\s*['\"](?:\.\./)+src/core/contracts/chat(?:\.ts)?['\"]\s*\)",source):
@@ -813,6 +837,7 @@ def verify_pack(path: Path) -> dict:
     if actual['quarantine/upstream-modifications.patch']['sha256'] != manifest['quarantine_patch_sha256']:
         raise Blocked('PACK_QUARANTINE_MISMATCH')
     verify_pinned_type_contract(path/'source',manifest)
+    verify_pinned_lint_contract(path/'source',manifest)
     for profile, required in (('core',ALLOWED_OVERLAY),('workbench',WORKBENCH_OVERLAY_PATHS)):
         names={p.removeprefix('overlays/'+profile+'/') for p in actual if p.startswith('overlays/'+profile+'/')}
         if names!=required:
