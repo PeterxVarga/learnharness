@@ -3,8 +3,8 @@ import {makeOrTask,orStarter,gradeOrTask,OR_KINDS} from '@/tredven/addons/domain
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'}});
-const seed=x=>typeof x==='string'&&/^(0|[1-9][0-9]{0,9})$/.test(x)&&Number(x)<=4294967295?Number(x):null;
-const supported=x=>typeof x==='string'&&OR_KINDS.includes(x);
+const seed=(x:unknown):number|null=>typeof x==='string'&&/^(0|[1-9][0-9]{0,9})$/.test(x)&&Number(x)<=4294967295?Number(x):null;
+const supported=(x:unknown):x is string=>typeof x==='string'&&OR_KINDS.includes(x);
 export function GET(req:Request){
  const u=new URL(req.url),params=[...u.searchParams.keys()].sort();
  const kind=u.searchParams.get('kind'),s=seed(u.searchParams.get('seed'));
