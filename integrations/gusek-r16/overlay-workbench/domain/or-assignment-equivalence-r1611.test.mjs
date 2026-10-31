@@ -48,6 +48,14 @@ test('nonbinary or missing domains cannot be claimed equivalent',()=>{
  const {parsed,expected}=fixture();parsed.vars.get('a11').upper=Infinity;
  assert.equal(proveAssignmentByEnumeration(parsed,expected).status,'UNASSESSABLE');
 });
+test('fractionally perturbed assignment equality cannot earn MATCH',()=>{
+ const {parsed,expected}=fixture();
+ parsed.constraints[0].bound=1.000000005;
+ assert.equal(proveAssignmentByEnumeration(parsed,expected).status,'UNASSESSABLE');
+ parsed.constraints[0].bound=1;
+ parsed.constraints[0].coeff.set('a11',1.000000005);
+ assert.equal(proveAssignmentByEnumeration(parsed,expected).status,'UNASSESSABLE');
+});
 test('non-integer objective coefficient and constraints remain bounded',()=>{
  const {parsed,expected}=fixture();parsed.objective.coeff.set('a11',1e9);
  assert.equal(proveAssignmentByEnumeration(parsed,expected).status,'UNASSESSABLE');

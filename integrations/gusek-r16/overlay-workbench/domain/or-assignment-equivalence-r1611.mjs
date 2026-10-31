@@ -7,9 +7,9 @@
 const UNASSESSABLE = code => ({status:'UNASSESSABLE',code,verifiedBy:'r1611_finite_binary_exhaustion'});
 const WRONG = code => ({status:'ZERO_CREDIT',code,verifiedBy:'r1611_finite_binary_exhaustion'});
 const MATCH = Object.freeze({status:'MATCH',code:null,verifiedBy:'r1611_finite_binary_exhaustion'});
-const delta = 1e-8;
+const delta = 0; // Only integer arithmetic is provable here; epsilon could accept an impossible equality.
 const names = Array.from({length:9},(_,i)=>`a${Math.floor(i/3)+1}${i%3+1}`);
-const finite = n => typeof n==='number' && Number.isFinite(n) && Math.abs(n)<=1e7;
+const finite = n => Number.isSafeInteger(n) && Math.abs(n)<=1e7;
 
 function hasBinaryDomains(vars){
   return names.every(n=>{

@@ -53,7 +53,7 @@ class OperationsResearchDomain(unittest.TestCase):
         self.assertNotIn('glpsol',route)
         source=(ROOT/'overlay-workbench/domain/or-domain-r1610.mjs').read_text()
         self.assertIn('gusek-model-r13.mjs',source)
-        self.assertIn('gusek-equivalence-r14.mjs',source)
+        self.assertNotIn('gusek-equivalence-r14.mjs',source)
 
     def test_r169_frozen_pack_restores_r1610_overlay(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -4,7 +4,6 @@
  * No LLM, network, filesystem, glpsol, global scores or storage.
  */
 import {parseGusekModel} from '../pilots/operations-research/gusek-model-r13.mjs';
-import {proveEquivalentScalarModel} from '../pilots/operations-research/gusek-equivalence-r14.mjs';
 
 const UINT32=4294967295;
 const int=(n,a=0,b=UINT32)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
@@ -150,16 +149,13 @@ export function gradeOrTask(kind,seed,answer){
  const finiteProof=task.kind==='assignment'
   ?proveAssignmentByEnumeration(model,expected)
   :proveProductionByEnumeration(model,expected);
- const proof=finiteProof?.status==='MATCH'||finiteProof?.status==='ZERO_CREDIT'
-  ?finiteProof:proveEquivalentScalarModel(model,expected);
- // The old strict row-count fallback is not a proof of a different integer
- // feasible set. For unknown equivalence, fail safely as UNASSESSABLE.
- const verified=finiteProof?.status==='MATCH'||finiteProof?.status==='ZERO_CREDIT'
-  ?finiteProof:proof.status==='MATCH'?proof:{status:'UNASSESSABLE',code:finiteProof?.code??'equivalence_not_proven'};
+ // R14's approximate halfspace normal form cannot certify integer-boundary
+ // equivalence; never upgrade an inconclusive exact proof to FULL_CREDIT.
+ const verified=finiteProof;
  if(verified.status!=='MATCH'){
   // Fail-safe distinction: unknown equivalence is not a proof of error.
   // Only a proven semantic mismatch can yield ZERO_CREDIT.
-  const code=verified.code??proof.code??'unsupported_source';
+  const code=verified.code??'unsupported_source';
   if(verified.status==='UNASSESSABLE')return err(null,
    task.kind==='assignment'?'assignment_binary_proof_not_available':
    knownOrError(verified.code)?verified.code:'unsupported_source','model');

@@ -19,8 +19,8 @@ class AssignmentProofIntegration(unittest.TestCase):
         self.assertIn('proveAssignmentByEnumeration(model,expected)',src)
         self.assertIn("task.kind==='assignment'",src)
         self.assertIn('parseGusekModel(answer.mathprog)',src)
-        self.assertIn('proveEquivalentScalarModel(model,expected)',src)
-        self.assertIn("'UNASSESSABLE',code:finiteProof?.code??'equivalence_not_proven'",src)
+        self.assertNotIn('proveEquivalentScalarModel(model,expected)',src)
+        self.assertIn('const verified=finiteProof;',src)
     def test_exact_gate_runs_in_one_final_qualification(self):
         src=(ROOT/'qualify-r16.sh').read_text()
         self.assertIn('domain/or-assignment-equivalence-r1611.test.mjs',src)

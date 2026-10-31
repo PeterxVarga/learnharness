@@ -6,7 +6,7 @@ import {readFileSync,existsSync} from 'node:fs';
 const url=new URL('./or-domain-r1610.mjs',import.meta.url);
 const source=readFileSync(url,'utf8');
 assert.match(source,/from '\.\.\/pilots\/operations-research\/gusek-model-r13\.mjs'/);
-assert.match(source,/from '\.\.\/pilots\/operations-research\/gusek-equivalence-r14\.mjs'/);
+assert.doesNotMatch(source,/from '\.\.\/pilots\/operations-research\/gusek-equivalence-r14\.mjs'/);
 const stripped=source.replace(/^import \{.*\} from '(?:\.\.\/pilots\/operations-research|\.\/or-diagnostics-r1610|\.\/or-assignment-equivalence-r1611|\.\/or-production-equivalence-r1612)[^'\n]*';\n/gm,'');
 // These mocks isolate mathematics and validation. They do NOT establish that
 // R15's real parser accepts the submitted MathProg source (separate E2E gate).
@@ -14,9 +14,9 @@ const doubles=`const knownOrError=(code)=>['wrong_objective','wrong_constraint',
 const explainOrError=(code)=>code==='assignment_requires_binary'?'Egy munkatárs és egy munka párosítása csak 0 vagy 1 lehet.':'A korlát hibás.';
 const parseGusekModel=(source)=>source==='INVALID' ? {ok:false,code:'unsupported_statement'}:
   ({ok:true,vars:new Map(),constraints:[],objective:{sense:'min',constant:0,coeff:new Map()},__source:source});
-const proveEquivalentScalarModel=()=>({status:'UNASSESSABLE',code:'equivalence_not_proven'});
-const proveAssignmentByEnumeration=model=>model.__source==='WRONG'?{status:'UNASSESSABLE',code:'equivalence_not_proven'}:{status:'MATCH',code:null};
-const proveProductionByEnumeration=model=>model.__source==='WRONG'?{status:'ZERO_CREDIT',code:'production_model_profit'}:{status:'MATCH',code:null};
+const proveEquivalentScalarModel=()=>({status:'MATCH',code:null}); // Deliberately unsafe fallback mock must never grant points.
+const proveAssignmentByEnumeration=model=>['WRONG','UNCERTAIN'].includes(model.__source)?{status:'UNASSESSABLE',code:'unsupported_numeric_form'}:{status:'MATCH',code:null};
+const proveProductionByEnumeration=model=>model.__source==='WRONG'?{status:'ZERO_CREDIT',code:'production_model_profit'}:model.__source==='UNCERTAIN'?{status:'UNASSESSABLE',code:'production_lattice_proof_not_available'}:{status:'MATCH',code:null};
 const verifyGusekModel=(model,expected)=>model.__source==='WRONG' ?
   ({status:'ZERO_CREDIT',code:'wrong_objective'}):({status:'MATCH',code:null});\n`;
 const mod=await import('data:text/javascript;base64,'+Buffer.from(doubles+stripped).toString('base64'));
@@ -68,6 +68,13 @@ test('correct trusted witness scores 1/1 under source-matching mock only',()=>{
  for(const k of ['assignment','production']){
   const t=makeOrTask(k,42);
   assert.deepEqual(gradeOrTask(k,42,answerFor(t)).points,1);
+ }
+});
+test('legacy approximate MATCH never upgrades an uncertain finite proof',()=>{
+ for(const kind of ['assignment','production']){
+  const task=makeOrTask(kind,42),answer=answerFor(task);
+  answer.mathprog='UNCERTAIN';
+  assert.equal(gradeOrTask(kind,42,answer).points,null,kind);
  }
 });
 test('unassessable grammar is not an automatic incorrect model',()=>{
