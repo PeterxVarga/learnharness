@@ -22,7 +22,10 @@ import importPlugin from "eslint-plugin-import";
 export default defineConfig([
 	// electron/** — the desktop shell: plain Node, no framework, outside the
 // import law (same rationale as scripts/).
-	globalIgnores([".next/**", "node_modules/**", "data/**", "next-env.d.ts", "scripts/**", "electron/**", "dist/**"]),
+	// GUSEK overlay files are staged source, not standalone app modules;
+	// the separately assembled candidate must still be linted and typechecked.
+	globalIgnores([".next/**", "node_modules/**", "data/**", "next-env.d.ts", "scripts/**", "electron/**", "dist/**",
+		"integrations/gusek-r16/overlay/**", "integrations/gusek-r16/overlay-workbench/**"]),
 	{
 		files: ["**/*.{js,mjs,ts,tsx}"],
 		languageOptions: {
