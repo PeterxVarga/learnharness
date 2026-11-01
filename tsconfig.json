@@ -44,6 +44,8 @@
   "exclude": [
     "node_modules",
     "dist",
-    ".next"
+    ".next",
+    "integrations/gusek-r16/overlay/**",
+    "integrations/gusek-r16/overlay-workbench/**"
   ]
 }
