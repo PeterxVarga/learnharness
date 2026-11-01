@@ -1,0 +1,95 @@
+{
+  "buildGates": {
+    "browserDelayedPostRace": "PASS",
+    "browserStudentJourney": "PASS",
+    "gusekHTTP": "PASS",
+    "nextProductionBuild": "PASS",
+    "postBuildSourceIntegrity": "PASS",
+    "provenance": "OWNER_FEDORA_LOCAL_NOT_SIGNED",
+    "sourceInventory": {
+      "addons": 55,
+      "result": "PASS",
+      "total": 767,
+      "upstream": 712
+    },
+    "targetedPythonTests": {
+      "fail": 0,
+      "pass": 5
+    },
+    "typescript": "PASS"
+  },
+  "candidate": {
+    "codeReviewGitCommit": "ff6e56295a1c19698a7d1d6addf02ceb5ef60396",
+    "forkMain": "3dc88472eea41eed0d5e5f29c2f16f8d063c415b",
+    "gusekR15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "mode": "workbench-only/source-overlay",
+    "nativeGlpkEnabled": false,
+    "officialUpstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63",
+    "securityManifest": "80f225d1fe16483b8e018b51dbfef4465262156e"
+  },
+  "decision": {
+    "boundedLocalPilotCandidate": true,
+    "deploymentApproved": false,
+    "localPilotOwnerApproved": false,
+    "mergeApproved": false,
+    "releaseApproved": false,
+    "sourceTechnicallyQualified": true,
+    "status": "NO_GO_RELEASE_PENDING_EXPLICIT_OWNER_REVIEW"
+  },
+  "dependencyAudit": {
+    "full": {
+      "affectedMinimatchDevOnly": true,
+      "critical": 0,
+      "fixVersion": "minimatch@11.0.1",
+      "high": 0,
+      "moderate": 23,
+      "result": "RESIDUAL_RISK_OWNER_DECISION_REQUIRED",
+      "rootAdvisory": "GHSA-g3hv-75wg-m249",
+      "rootAdvisoryCount": 1,
+      "total": 23
+    },
+    "productionOnly": {
+      "findings": 0,
+      "result": "PASS"
+    }
+  },
+  "notes": [
+    "Local file hashes are inventory evidence, not signed provenance.",
+    "Full dev audit is non-zero.",
+    "PR #4 source-only merge cannot deploy GUSEK Workbench."
+  ],
+  "ownerFedoraEvidence": {
+    "browserTestScriptSHA256": "158c2773585463f78d5963bbbbe501e2ada74c27ffc7f567fc7d0e5a217adab4",
+    "r1614FullAuditJson": {
+      "availableInPublicRepo": false,
+      "sha256": "2f60d78d8a7ece7c58d361eb764c579fce57ff76bc440e646d0a90f41ec3de5c"
+    },
+    "r1614UIFixedLog": {
+      "availableInPublicRepo": false,
+      "sha256": "5eddea63fe976a4edf8d4f7f5f67032102c1fa8f930ca89061c413349f43ade1"
+    },
+    "r1615BrowserRaceLog": {
+      "availableInPublicRepo": false,
+      "sha256": "ca62eeb68f4ddd3777dcb2d1a5f54b7c364f945f93ce29c5ef6fb52a41db5a83"
+    }
+  },
+  "pullRequest": {
+    "changesToForkMainAreSourceBundleOnly": true,
+    "commitStatusCount": 0,
+    "draft": true,
+    "merged": false,
+    "number": 4,
+    "reviewCount": 0,
+    "reviewersApproved": false
+  },
+  "schema": "tredven.learnharness.r16.release-decision-evidence.v1",
+  "snapshotDate": "2026-11-01",
+  "unresolvedGates": [
+    "HUMAN_INDEPENDENT_REVIEW",
+    "OWNER_RESIDUAL_DEV_SECURITY_RISK_DECISION",
+    "OWNER_RELEASE_SCOPE_APPROVAL",
+    "DEPLOYMENT_ARTIFACT_TRACE_REVIEW",
+    "ELECTRON_OR_NATIVE_GLPK_IF_REQUESTED",
+    "RECORD_REAL_CI_EQUIVALENT_APPROVAL"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "actualGLPK": "UNQUALIFIED_NOT_RUN",
+  "actualUpstreamBuild": "UNQUALIFIED_NOT_RUN",
+  "bashSyntax": "PASS",
+  "confidenceCaveat": "Hash checks are unsigned; synthetic tests do not prove runtime compatibility",
+  "createdUtc": "2026-10-31T16:05:18.946307+00:00",
+  "delivery": "source-only migration tooling and overlays; not a preassembled upstream repository",
+  "githubWrites": false,
+  "localOfflineUnitTests": {
+    "failed": 0,
+    "passed": 19,
+    "scope": "synthetic local Git and source-inventory negative tests"
+  },
+  "nodeSyntax": "PASS",
+  "pythonCompile": "PASS",
+  "releaseApproved": false,
+  "sampleUpstreamPin": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63",
+  "schema": "tredven.learnharness.r16-2.delivery.v1",
+  "sourcePinR15": "9b7f374f4003276e67a96feb070124c244447aec",
+  "typescriptOverlayParse": "PASS_4_NO_PROJECT_TYPECHECK"
+}

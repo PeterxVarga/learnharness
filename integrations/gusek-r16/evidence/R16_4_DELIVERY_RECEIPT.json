@@ -1,0 +1,26 @@
+{
+  "github_write": false,
+  "host_runner_executed": false,
+  "independent_human_review": false,
+  "previous_r15_pin": "9b7f374f4003276e67a96feb070124c244447aec",
+  "production_deployed": false,
+  "real_fedora_glpk_browser": "NOT_RUN",
+  "real_upstream_build": "NOT_RUN_NO_FULL_CHECKOUT_NETWORK_DNS_BLOCKED",
+  "recorded_utc": "2026-10-31T16:20:56.170374+00:00",
+  "release": "R16.4",
+  "release_authority": "NO_GO",
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "scope": "Portable R15 add-on full source namespace relocation, Next routing bridges, frozen-source re-projection integrity and pinned one-shot qualification",
+  "static_checks": [
+    "python3 -m py_compile r16.py",
+    "bash -n qualify-r16.sh",
+    "node --check r16-http-smoke.mjs",
+    "TypeScript parser: 4 bundled overlays"
+  ],
+  "test_result": {
+    "failed": 0,
+    "passed": 42,
+    "unittest_synthetic_git": 42
+  },
+  "upstream_target": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+}

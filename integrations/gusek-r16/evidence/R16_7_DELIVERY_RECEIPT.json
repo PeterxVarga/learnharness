@@ -1,0 +1,25 @@
+{
+  "mergeApproved": false,
+  "note": "Offline source-only compatibility improvement. Real full 0.4.1 + R15 integration not run. No remote writes.",
+  "releaseApproved": false,
+  "repair": "No alias imports from portable add-ons into upstream core/server/components; rejection at freeze and assembly",
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "signedAttestation": false,
+  "source_pins": {
+    "r15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "upstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+  },
+  "verification": {
+    "bash_syntax": true,
+    "node_syntax": true,
+    "passed": 70,
+    "python_syntax": true,
+    "real_chromium": false,
+    "real_glpk": false,
+    "real_runtime_http": false,
+    "real_upstream_build": false,
+    "synthetic_and_targeted_unit_tests": 70,
+    "tsx_ts_parse_overlay_files": 5
+  },
+  "version": "r16.7"
+}

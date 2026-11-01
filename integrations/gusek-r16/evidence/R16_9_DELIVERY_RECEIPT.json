@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-31",
+  "mergeApproved": false,
+  "releaseApproved": false,
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "signedAttestation": false,
+  "sources": {
+    "r15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "upstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+  },
+  "summary": "Task-scoped public exercise facts for explicit teacher handoff, coach link and existing regrade workflow",
+  "verification": {
+    "bash_syntax": true,
+    "native_glpk": false,
+    "node_pure_learning_tests": 22,
+    "node_syntax": true,
+    "passed": 106,
+    "python_syntax": true,
+    "real_fedora_e2e": false,
+    "real_provider_teaching": false,
+    "real_upstream_build": false,
+    "synthetic_git_python_tests": 84,
+    "total_checked": 106,
+    "tsx_syntax": true
+  },
+  "version": "r16.9"
+}

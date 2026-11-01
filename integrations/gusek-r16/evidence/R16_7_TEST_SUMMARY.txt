@@ -1,0 +1,10 @@
+R16.7 source fence test run — 2026-10-31
+Command: python3 -m unittest discover -s tests -q
+Result: Ran 70 tests in 10.168s — OK
+Python compile: PASS
+Bash syntax: PASS
+Node syntax: PASS
+TypeScript parser: 5 overlay TS/TSX source files, 0 syntax diagnostics
+Real upstream 0.4.1 application build: NOT RUN
+Real GLPK/Chromium/Next HTTP runtime: NOT RUN
+Release/Merge: NO_GO

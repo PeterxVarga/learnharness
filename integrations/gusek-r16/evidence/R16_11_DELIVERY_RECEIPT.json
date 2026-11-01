@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-31",
+  "mergeApproved": false,
+  "releaseApproved": false,
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "signedAttestation": false,
+  "sources": {
+    "r15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "upstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+  },
+  "summary": "Exact 512-state proof for 3x3 binary assignment equivalence; safe support for redundant constraints; production unchanged",
+  "verification": {
+    "github_sourced_r15_old_false_negatives_reproduced": 256,
+    "github_sourced_r15_parser_self_equivalence_checks": 512,
+    "node_pure_fail": 0,
+    "node_pure_pass": 47,
+    "node_real_parser_skipped": 2,
+    "real_browser": false,
+    "real_next_build": false,
+    "real_r15_with_r1611_grade_qualified": false,
+    "synthetic_git_python_pass": 97,
+    "ts_syntax_only_overlays": 9
+  },
+  "version": "r16.11"
+}

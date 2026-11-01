@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-31",
+  "mergeApproved": false,
+  "releaseApproved": false,
+  "schema": "tredven.learnharness.r16.delivery.v1",
+  "signedAttestation": false,
+  "sources": {
+    "r15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "upstream": "e69e85269c064c6c9c49a8b06ae78c06e79c4a63"
+  },
+  "summary": "Optional GUSEK grade to LearnHarness teacher copy-only handoff; no upstream-core mutation or new assessment",
+  "verification": {
+    "bash_syntax": true,
+    "chat_teaching_end_to_end": false,
+    "native_glpk": false,
+    "node_pure_logic_tests": 10,
+    "node_syntax": true,
+    "passed": 88,
+    "python_syntax": true,
+    "real_application_build": false,
+    "real_fedora_e2e": false,
+    "synthetic_git_python_tests": 78,
+    "total_checked": 88,
+    "tsx_syntax": true
+  },
+  "version": "r16.8"
+}
