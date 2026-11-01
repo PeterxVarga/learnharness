@@ -16,11 +16,11 @@ export function TredvenOrDomain(){
  const [values,setValues]=useState('');const [objective,setObjective]=useState('');
  const [hints,setHints]=useState(false);const [grade,setGrade]=useState<Grade|null>(null);
  const [busy,setBusy]=useState(false);const [error,setError]=useState('');
- const epoch=useRef(0);const active=useRef(false);
- const invalidate=()=>{epoch.current++;setGrade(null);setBusy(false);};
+ const epoch=useRef(0);const active=useRef<AbortController|null>(null);
+ const invalidate=()=>{epoch.current++;active.current?.abort();active.current=null;setGrade(null);setBusy(false);};
  const reset=()=>{invalidate();setTask(null);setModel('');setValues('');setObjective('');setError('');};
  async function load(){
-  const ticket=++epoch.current;setBusy(true);setTask(null);setGrade(null);setError('');
+  invalidate();const ticket=epoch.current;setBusy(true);setTask(null);setGrade(null);setError('');
   try{
    if(!/^(0|[1-9][0-9]{0,9})$/.test(seed)||Number(seed)>4294967295)throw Error('A variáns 0 és 4294967295 között lehet.');
    const r=await fetch(`${endpoint}?kind=${kind}&seed=${seed}`,{cache:'no-store'});
@@ -35,17 +35,17 @@ export function TredvenOrDomain(){
  }
  async function check(){
   if(!task||active.current)return;
-  const ticket=epoch.current;active.current=true;setBusy(true);setError('');setGrade(null);
+  const ticket=epoch.current;const request=new AbortController();active.current=request;setBusy(true);setError('');setGrade(null);
   try{
    if(objective.trim()===''||!Number.isFinite(Number(objective)))throw Error('Adj meg véges célfüggvényértéket.');
    const body={kind:task.kind,seed:String(task.seed),answer:{mathprog:model,values:JSON.parse(values),
     reportedObjective:Number(objective),hintsUsed:hints}};
-   const r=await fetch(endpoint,{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+   const r=await fetch(endpoint,{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:request.signal});
    const data=await r.json();if(!r.ok)throw Error(data.error??'Sikertelen ellenőrzés.');
    if(data.taskId!==task.id||data.maxPoints!==1||![0,1,null].includes(data.points))throw Error('Érvénytelen szerverértékelés.');
    if(ticket===epoch.current)setGrade(data);
   }catch(e){if(ticket===epoch.current)setError(e instanceof Error?e.message:String(e));}
-  finally{active.current=false;if(ticket===epoch.current)setBusy(false);}
+  finally{if(active.current===request)active.current=null;if(ticket===epoch.current)setBusy(false);}
  }
  return <main className="mx-auto max-w-5xl space-y-5 p-5">
   <Link className="text-sm underline" href="/pilot/gusek">← Vissza a GUSEK Workbenchhez</Link>
