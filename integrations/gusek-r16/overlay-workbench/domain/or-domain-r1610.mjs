@@ -3,12 +3,14 @@
  * checker authoritative for source models. Never execute learner source.
  * No LLM, network, filesystem, glpsol, global scores or storage.
  */
-import {parseGusekModel} from '../pilots/operations-research/gusek-model-r13.mjs';
+import {parseGusekModel,verifyGusekModel} from '../pilots/operations-research/gusek-model-r13.mjs';
+import {indexedTransportStarter,verifyIndexedTransport} from './or-indexed-transport-r1627.mjs';
+import {manualTask,manualStarter,manualReference,gradeManual} from './or-manual-lp-r1628.mjs';
 
 const UINT32=4294967295;
 const int=(n,a=0,b=UINT32)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
-const KINDS=Object.freeze(['assignment','production']);
-const NAMES=Object.freeze({assignment:'Munkatárs–feladat hozzárendelés',production:'Egészértékű termeléstervezés'});
+const KINDS=Object.freeze(['assignment','production','transport','transport_indexed','simplex','graphical']);
+const NAMES=Object.freeze({assignment:'Munkatárs–feladat hozzárendelés',production:'Egészértékű termeléstervezés',transport:'Szállítási modell (3×3)',transport_indexed:'Általános szállítási modell (set/param/sum)'});
 const err=(points,code,scope='domain')=>({points,maxPoints:1,correct:points===null?null:points===1,
  status:points===null?'UNASSESSABLE':points===1?'FULL_CREDIT':'ZERO_CREDIT',errors:points===1?[]:[code],
  verifiedBy:'r1610_static_model_and_exact_enumeration',diagnosticScope:scope});
@@ -33,11 +35,36 @@ function makeProduction(seed){
  material,hours,profit,materialLimit,hoursLimit,
  statement:'Egy műhely két terméket gyárt. A darabszámok nemnegatív egészek. Az alapanyag- és munkaidőkorlát egyidejű betartása mellett maximalizáld az összes nyereséget.'};
 }
+// Bounded synthetic transport data; no private exam values or answer key.
+function makeTransport(seed){
+ const rand=xorshift(seed),supply=[4,5,6],demand=[5,4,6],routeLimit=2;
+ const costs=Array.from({length:3},()=>Array.from({length:3},()=>3+Math.floor(rand()*15)));
+ return {schema:'tredven.or.transport.v1',id:'or-transport-'+seed,kind:'transport',seed,
+  title:NAMES.transport,objectiveSense:'min',
+  variableNames:Array.from({length:9},(_,i)=>'x'+(Math.floor(i/3)+1)+(i%3+1)),
+  supply,demand,routeLimit,costs,
+  labels:{rows:['A telephely','B telephely','C telephely'],columns:['1. bolt','2. bolt','3. bolt']},
+  statement:'Három telephely minden készletét három bolt pontos igényére szállítjuk. Az 1. telephely és 2. bolt útvonalon külön mennyiségi felső korlát van. A darabszámok nemnegatív egészek. Minimalizáld a teljes szállítási költséget. Ez generált gyakorló, nem az eredeti mintavizsga.'};
+}
 export function makeOrTask(kind,seed){
  if(!KINDS.includes(kind)||!int(seed))throw Error('invalid_or_task');
- return kind==='assignment'?makeAssignment(seed):makeProduction(seed);
+ if(kind==='simplex'||kind==='graphical')return manualTask(kind,seed);
+ if(kind==='transport_indexed'){
+  const base=makeTransport(seed);
+  return {...base,schema:'tredven.or.transport-indexed.v1',kind:'transport_indexed',
+   id:'or-transport_indexed-'+seed,title:NAMES.transport_indexed};
+ }
+ return kind==='assignment'?makeAssignment(seed):kind==='transport'?makeTransport(seed):makeProduction(seed);
 }
 function trustedSource(task){
+ if(task.kind==='transport'){
+  const n=(i,j)=>'x'+(i+1)+(j+1);
+  const row=[0,1,2].map(i=>'s.t. keszlet_'+(i+1)+': '+[0,1,2].map(j=>n(i,j)).join(' + ')+' = '+task.supply[i]+';');
+  const col=[0,1,2].map(j=>'s.t. igeny_'+(j+1)+': '+[0,1,2].map(i=>n(i,j)).join(' + ')+' = '+task.demand[j]+';');
+  return [...task.variableNames.map(name=>'var '+name+' >= 0, integer;'),
+   ...row,...col,'s.t. utvonal: x12 <= '+task.routeLimit+';',
+   'minimize szallitasi_koltseg: '+task.variableNames.map((name,i)=>task.costs[Math.floor(i/3)][i%3]+'*'+name).join(' + ')+';'].join('\n');
+ }
  if(task.kind==='assignment'){
   const x=(i,j)=>`a${i+1}${j+1}`;
   const declarations=task.variableNames.map(name=>`var ${name} binary;`);
@@ -65,12 +92,23 @@ function expectedModel(task){
 /** Public starter does not expose constraints, objective coefficients, or optimum. */
 export function orStarter(task){
  const kind=task?.kind;
+ if(kind==='simplex'||kind==='graphical')return manualStarter(task);
+ if(kind==='transport_indexed')return indexedTransportStarter(task);
  if(kind==='assignment')return [
   '# GUSEK / MathProg: hozzárendelés (bináris 3x3 modell)',
   ...task.variableNames.map(n=>`var ${n} binary;`),
   '# TODO: minden munkatars pontosan egy feladatot kapjon',
   '# TODO: minden feladat pontosan egy munkatarshoz keruljon',
   '# TODO: a teljes munkara forditott ido minimalizalasa',
+  'solve;','end;'
+ ].join('\n');
+ if(kind==='transport')return [
+  '# Generalt 3x3 szallitasi modell (nem az eredeti vizsga)',
+  ...task.variableNames.map(n=>'var '+n+' >= 0, integer;'),
+  '# TODO: 3 telephely pontos teljes keszlete (egyenletek)',
+  '# TODO: 3 bolt pontos igenye (egyenletek)',
+  '# TODO: x12 kulon utvonalkorlata',
+  '# TODO: a fuvaronkenti koltsegek minimalizalasa',
   'solve;','end;'
  ].join('\n');
  if(kind==='production')return [
@@ -102,10 +140,62 @@ function productionOracle(task){
  }
  return {objective:optimum,exemplar,checked};
 }
+// Exact finite 3x3 transportation oracle, server/test only; no user source execution.
+function transportOracle(task){
+ let optimum=Infinity,exemplar=null,checked=0;
+ const [a,b,c]=task.supply,[d0,d1,d2]=task.demand;
+ for(let x11=0;x11<=Math.min(a,d0);x11++)
+  for(let x12=0;x12<=Math.min(a-x11,d1,task.routeLimit);x12++){
+   const x13=a-x11-x12;
+   if(x13<0||x13>d2)continue;
+   for(let x21=0;x21<=Math.min(b,d0-x11);x21++)
+    for(let x22=0;x22<=Math.min(b-x21,d1-x12);x22++){
+     const x23=b-x21-x22,x31=d0-x11-x21,x32=d1-x12-x22,x33=d2-x13-x23;
+     if([x23,x31,x32,x33].some(v=>v<0)||x31+x32+x33!==c)continue;
+     checked++;
+     const vals=[x11,x12,x13,x21,x22,x23,x31,x32,x33];
+     const obj=vals.reduce((sum,x,i)=>sum+x*task.costs[Math.floor(i/3)][i%3],0);
+     if(obj<optimum){optimum=obj;exemplar=vals;}
+    }
+  }
+ if(!exemplar)throw Error('trusted_transport_not_feasible');
+ return {objective:optimum,exemplar,checked};
+}
+function gradeTransport(task,answer){
+ if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
+ if(typeof answer.mathprog!=='string')return err(null,'unsupported_source','grammar');
+ const model=parseGusekModel(answer.mathprog);
+ if(!model.ok)return err(null,'unsupported_source','grammar');
+ // The structural verifier proves the canonical form only.
+ // A different mathematically equivalent formulation is NOT called wrong.
+ const proof=verifyGusekModel(model,expectedModel(task));
+ if(proof.status!=='MATCH')return proof.code==='wrong_objective'
+  ?err(0,'transport_model_cost','model'):
+  err(null,'transport_canonical_proof_not_available','model');
+ const values=answer.values;
+ if(!values||typeof values!=='object'||Array.isArray(values)||
+    Object.keys(values).length!==9||
+    task.variableNames.some(n=>!Object.hasOwn(values,n)||!int(values[n],0,1000)))
+  return err(0,'solution_requires_nonnegative_integers','solution');
+ const xs=task.variableNames.map(n=>values[n]);
+ for(let i=0;i<3;i++)if(xs.slice(i*3,i*3+3).reduce((a,b)=>a+b,0)!==task.supply[i])
+  return err(0,'transport_supply_not_exact','solution');
+ for(let j=0;j<3;j++)if(xs[j]+xs[j+3]+xs[j+6]!==task.demand[j])
+  return err(0,'transport_demand_not_exact','solution');
+ if(xs[1]>task.routeLimit)return err(0,'transport_route_limit','solution');
+ const cost=xs.reduce((sum,x,i)=>sum+x*task.costs[Math.floor(i/3)][i%3],0);
+ if(typeof answer.reportedObjective!=='number'||!eq(answer.reportedObjective,cost))
+  return err(0,'objective_mismatch','solution');
+ if(!eq(cost,transportOracle(task).objective))return err(0,'not_optimal','solution');
+ if(answer.hintsUsed!==false)return err(0,'independence_not_demonstrated','evidence');
+ return err(1,null,'exam');
+}
 export function orReference(task){
  // Intentionally not exported by the HTTP route; only local test/server side.
  if(task?.kind==='assignment')return assignmentOracle(task);
  if(task?.kind==='production')return productionOracle(task);
+ if(task?.kind==='simplex'||task?.kind==='graphical')return manualReference(task);
+ if(task?.kind==='transport')return transportOracle(task);
  throw Error('invalid_task');
 }
 const eq=(a,b)=>Math.abs(a-b)<=1e-7*Math.max(1,Math.abs(a),Math.abs(b));
@@ -138,6 +228,19 @@ import {proveProductionByEnumeration} from './or-production-equivalence-r1612.mj
  */
 export function gradeOrTask(kind,seed,answer){
  const task=makeOrTask(kind,seed);
+ if(kind==='simplex'||kind==='graphical')return gradeManual(task,answer);
+ if(kind==='transport')return gradeTransport(task,answer);
+ if(kind==='transport_indexed'){
+  if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
+  const verify=verifyIndexedTransport(task,answer.mathprog);
+  if(verify.status==='UNASSESSABLE')return err(null,verify.code,'model');
+  if(verify.status==='MISMATCH')return err(0,verify.code,'model');
+  // Equivalence of this strict canonical indexed model + task-matching data
+  // to the scalar model is guaranteed by the verified expansion. Reuse the
+  // proven server-only solution/optimum checker; never execute source.
+  const scalar={...task,kind:'transport'};
+  return gradeTransport(scalar,{...answer,mathprog:trustedSource(scalar)});
+ }
  if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
  if(typeof answer.mathprog!=='string')return err(null,'unsupported_source','grammar');
  const model=parseGusekModel(answer.mathprog);

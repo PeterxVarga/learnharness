@@ -3,15 +3,49 @@ import {useRef,useState} from 'react';
 import Link from 'next/link';
 import {explainOrError} from '../domain/or-diagnostics-r1610.mjs';
 
-type Kind='assignment'|'production';
+type Kind='assignment'|'production'|'transport'|'transport_indexed'|'simplex'|'graphical';
 type Task={id:string;kind:Kind;seed:number;title:string;statement:string;variableNames:string[];
  objectiveSense:'min'|'max';costs?:number[][];labels?:{rows:string[];columns:string[]};
- material?:number[];hours?:number[];profit?:number[];materialLimit?:number;hoursLimit?:number};
+ material?:number[];hours?:number[];profit?:number[];materialLimit?:number;hoursLimit?:number;
+ supply?:number[];demand?:number[];routeLimit?:number;coefficients?:number[][];rhs?:number[];initialTableau?:number[][]};
 type Grade={taskId:string;points:0|1|null;errors:string[];status:string};
 const endpoint='/api/pilot/gusek/szakmai';
 // R16.20: bounded, offline study primers sourced from the checked-in R16.10
 // Hungarian learning cards. These are NOT the student's earlier uploaded PDFs.
 const lessons={
+ transport:{
+  title:'Kötelező szállítási modell – pontos készlet és kereslet',
+  objective:'Miért kell hat egyenlőség és külön útvonalkorlát egy 3×3 szállítási feladathoz?',
+  steps:[
+   'Kilenc döntési változó: x11, x12, ..., x33. Mindegyik adott telephelyből adott boltba szállított mennyiség.',
+   'Minden telephely teljes készletét el kell szállítani: a sorösszeg = készlet.',
+   'Minden bolt pontos igényét ki kell elégíteni: az oszlopösszeg = kereslet.',
+   'Az x12 útvonal legfeljebb az adott maximumig használható, ettől nem változik a többi egyenlet.',
+   'A cél a kilenc egységköltség és szállított mennyiség szorzatának minimalizálása.'
+  ],
+  syntax:'var x11 >= 0, integer;\nvar x12 >= 0, integer;\n# EGYENLET: x11+x12+x13 = elso telephely keszlete',
+  question:'Egy bolt pontosan 4 darabot igényel. Milyen a három beérkező szállítás összege?',
+  choices:['Legfeljebb 4.','Pontosan 4.','Mindegyik telephelynek külön 4.'],
+  correct:1,
+  why:'A pontos igény egyenlőség, nem felső korlát. Ellenőrizd a sorok és oszlopok összegét külön is.'
+ },
+ transport_indexed:{
+  title:'Általános GMPL – set, param, sum és külön adatok',
+  objective:'Hogyan alakítod át az első, kilencváltozós szállítási feladatot általános modellé úgy, hogy csak az adatokat kelljen módosítani?',
+  steps:[
+   'set I az indulási, set J az érkezési helyek halmaza. A data szakaszban 1, 2 és 3 az index.',
+   'param supply{I}, demand{J}, cost{I,J} és routeLimit hordozza a konkrét feladatadatokat.',
+   'var x{i in I,j in J} >= 0, integer; így egyetlen deklaráció írja le a kilenc fuvar döntési változóját.',
+   's.t. keszlet{i in I}: sum{j in J} x[i,j] = supply[i]; minden forrásnak egy saját egyenletet generál.',
+   's.t. igeny{j in J}: sum{i in I} x[i,j] = demand[j]; minden boltnak egy saját egyenletet generál.',
+   'Az x[1,2] <= routeLimit külön útvonal-feltétel. A költségminimalizálás kettős sum összegzés.'
+  ],
+  syntax:'set I; set J;\nparam supply{I}; param demand{J};\nvar x{i in I,j in J} >= 0, integer;\n# sum{j in J} x[i,j] = supply[i];',
+  question:'Miért nem kell kilenc külön var-deklaráció a 3×3-as szállításnál?',
+  choices:['Mert az adatfájl kijavítja a hibás változókat.','A var x{i in I,j in J} minden indexpárra változót generál.','Mert az útvonalkorlát eltűnik.'],
+  correct:1,
+  why:'A változódeklarációt a set I és set J mérete határozza meg; a modellképletek változatlanok.'
+ },
  assignment:{
   title:'Hozzárendelés – a modell felépítése',
   objective:'Mikor használunk bináris változót, és hogyan lesz minden párosítás pontosan egyszeri?',
@@ -41,8 +75,228 @@ const lessons={
   choices:['Tetszőleges valós szám.','Csak 0 vagy 1.','Nemnegatív egész szám.'],
   correct:2,
   why:'A darabszám 0, 1, 2… lehet; sem törtdarabot, sem negatív mennyiséget nem gyárthatunk.'
+ },
+ simplex:{
+  title:'Kézi szimplex – két pivot, számolás',
+  objective:'A standard alak, báziscsere, hányadosteszt és sorátalakítás önálló gyakorlása.',
+  steps:['A két ≤ korláthoz vezesd be az s1,s2 nemnegatív hiányváltozókat.',
+   'A célfüggvénysorban a legnegatívabb együtthatójú változó lép be.',
+   'A kilépő sort csak pozitív pivot-oszlopelemnél képezhető legkisebb RHS/hányados alapján válaszd.',
+   'Pivotálj Gauss–Jordan módon minden soron, majd ismételd az optimális tábláig.'],
+  syntax:'max 3x+2y;\nx+y <= b1; 2x+y <= b2;\n# tableau: x,y,s1,s2,RHS',
+  question:'Mit jelent a legkisebb pozitív hányados?',
+  choices:['Az új bázismegoldás megengedett marad.','A modell egészértékű lesz.','A költségminimum ismert.'],
+  correct:0,why:'A hányadosteszt megőrzi a megengedettséget a pivot után.'
+ },
+ graphical:{
+  title:'Grafikus LP – csúcspontok és optimum',
+  objective:'A félsíkok közös metszetének csúcspontjait és a maximumát kell meghatározni.',
+  steps:['Rajzold be az x+y ≤ b1 és 2x+y ≤ b2 határegyeneseket.',
+   'A megengedett régióban x,y ≥ 0 is kötelező.',
+   'Határozd meg a tengelymetszetekből és az egyenesek metszéspontjából a négy csúcsot.',
+   'Számold ki minden csúcsra a 3x+2y célfüggvényt.'],
+  syntax:'max 3x+2y;\nx+y <= b1;\n2x+y <= b2;\nx,y >= 0;',
+  question:'Hol érdemes először maximumot keresni egy korlátos, nem üres LP-sokszögben?',
+  choices:['A csúcspontokban.','Kizárólag az origóban.','A teljes síkon.'],
+  correct:0,why:'Lineáris célfüggvény optimális értéke csúcspontban is felvehető.'
+ },
+} as const;
+// R16.21 – original micro-lessons, never raw or full course materials.
+const examLessons={
+ transport:{
+  title:'Szállítási modell (1. feladattípus)',
+  theory:['A döntési változó x[i,j] egy adott forrásból adott célhoz szállított mennyiség.',
+   'A költségminimalizálás a költség és a szállított mennyiség szorzatösszege.',
+   'A pontos kereslet és kötelező szállítás egyenlőség, az útvonal limitje felső korlát.'],
+  question:'Egy bolt pontosan 70 egységet vár. Melyik helyes?',
+  options:['A beérkező mennyiségek összege = 70.','A beérkező mennyiségek összege <= 70.','Minden forrásból külön 70.'],
+  correct:0,
+  remedy:'A pontosan előírt igény egyenlőség. A legfeljebb feltétel engedné a hiányt.',
+  transfer:'Új helyzet: egyetlen útvonalon legfeljebb 9 egység vihető. Melyik korlát helyes?',
+  transferOptions:['Az érintett x[i,j] = 9.','Az érintett x[i,j] <= 9.','Minden bolt teljes igénye <= 9.'],
+  transferCorrect:1,
+  why:'Az útvonalkorlát csak egy forrás–cél pár mennyiségének felső korlátja.',
+  next:'Gyakorolj eltérő adatokkal egy 3×3 szállítási feladatot a GUSEK Workbenchben.',
+  href:'/pilot/gusek'
+ },
+ indexed:{
+  title:'Általános GMPL-modell (2. feladattípus)',
+  theory:['A set halmazok az indexeket, a param paraméterek a konkrét értékeket adják.',
+   'A var x{i in I,j in J} minden forrás–cél párhoz döntési változót rendel.',
+   'A sum{j in J} x[i,j] rögzített i esetén az összes célhoz menő mennyiséget adja.'],
+  question:'Mit számol a sum{j in J} x[i,j] rögzített i mellett?',
+  options:['Minden forrás összes mennyiségét.','Az i forrásból minden célhoz küldött mennyiséget.','Csak az első cél mennyiségét.'],
+  correct:1,
+  remedy:'Az i rögzített, a j végigfut az összes célon; ezért keletkezik egy forrásonkénti összeg.',
+  transfer:'Ha új bolt nyílik, mit változtatsz elsődlegesen az általános modellben?',
+  transferOptions:['A halmazt és a hozzá tartozó adatokat.','Minden képletet kézzel megduplázol.','Minden változót binárissá teszel.'],
+  transferCorrect:0,
+  why:'A halmazos modell méretfüggetlen; a városok számának változása az adatokat érinti.',
+  next:'Készíts külön modell- és adatrészt egy 2×3 szállítási példához. A kötött szerkezetű indexelt GMPL-gyakorló szerveresen ellenőrizhető.',
+  href:'/pilot/gusek'
+ },
+ simplex:{
+  title:'Kézi szimplex (3. feladattípus)',
+  theory:['A <= típusú lineáris korláthoz nemnegatív hiányváltozót adunk.',
+   'A pivot egy változót bevisz a bázisba és egy másikat kivesz.',
+   'A kilépő sor kiválasztása pozitív pivot-oszlopelemek mellett a legkisebb megengedett hányadost használja.'],
+  question:'Miért kell elvégezni a hányadostesztet?',
+  options:['A megengedettség megőrzéséhez.','Az egészértékűség bizonyításához.','A célfüggvény elhagyásához.'],
+  correct:0,
+  remedy:'A sorválasztás nem önkényes: az új bázismegoldásnak is teljesítenie kell a korlátokat.',
+  transfer:'Két pozitív pivotelem 2 és 5, a jobb oldalak 12 és 20. Melyik sor lép ki?',
+  transferOptions:['Az első, mert 12/2 = 6.','A második, mert 20/5 = 4.','Egyik sem.'],
+  transferCorrect:1,
+  why:'A két hányados 6 és 4. A kisebb, 4-es hányados jelöli a kilépő sort.',
+  next:'Oldj meg kézzel egy szimplextáblát. A kötött kétpivot-lépés ellenőrizhető, GLPK nélkül.',
+  href:'/chat/new?mode=teach'
+ },
+ graphical:{
+  title:'Grafikus LP (4. feladattípus)',
+  theory:['Minden kétváltozós lineáris egyenlőtlenség egy félsíkot jelöl.',
+   'A megengedett tartomány a félsíkok közös metszete, ami lehet üres.',
+   'Ha van nem üres korlátos sokszög, egy lineáris célfüggvény szélsőértéke csúcspontban is felvehető.'],
+  question:'Ha x+y <= 2 és x+y >= 3, mi igaz?',
+  options:['Az origó az optimális.','Nincs megengedett megoldás.','A maximum biztosan korlátlan.'],
+  correct:1,
+  remedy:'E két félsíknak nincs közös pontja. A megengedettséget mindig az optimum keresése előtt ellenőrizd.',
+  transfer:'Új feltételek: 3x+3y <= 15 és x+y >= 6. Mi igaz?',
+  transferOptions:['Egyetlen megoldás van.','A tartomány biztosan nem üres.','A korlátok ellentmondásosak.'],
+  transferCorrect:2,
+  why:'Az első feltétel x+y <= 5, a második x+y >= 6, tehát nincs közös pont.',
+  next:'Rajzold meg papíron a két félsíkot. A JSON-csúcspontok ellenőrizhetők, a kézi rajz nem.',
+  href:'/chat/new?mode=teach'
  }
 } as const;
+// R16.25: verified *references*, not copied university lecture/source content.
+// Local 19-source corpus stays private; this is a human-readable reading route.
+// Physical PDF pages are backed by the original 2026-11-02 source manifest.
+const examReadingRoute={
+ transport:{
+  priority:'Elsődleges: a mintavizsga szerint a többi feladat értékelésének feltétele az első feladat helyes megoldása.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 1. fizikai oldal: kötelező szállítási feladat',
+   'Ferenczi_Zoltan_Operaciokutatas.pdf – 92–96. fizikai oldal: szállítási modellek'
+  ],
+  focus:'Először döntsd el, mi a változó, mely feltételek egyenlőségek, és mely útvonalakra vonatkozik külön felső korlát.',
+  deliverable:'Saját MathProg .mod modell; a beépített Workbench csak külön generált gyakorlófeladatot pontoz.'
+ },
+ indexed:{
+  priority:'Ráépül az első feladatra: ugyanazt a modellt halmazokkal, paraméterekkel és indexelt összegekkel kell általánosítani.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 2. fizikai oldal: modell- és adatfájl',
+   'Froccsok_halmazok.mod és Autokereskedes_halmazokkal.mod – eredeti, ellenőrizendő GMPL-minták'
+  ],
+  focus:'Tudd megkülönböztetni a forrás- és célhalmazt, az egyes párok költségadatait, illetve a forrásonkénti és célonkénti összegzést.',
+  deliverable:'Általános modell és külön adatok (vagy egy együtt beadott fájl); nincs igazolt teljes automatikus értékelés.'
+ },
+ simplex:{
+  priority:'A mintavizsgán külön, kézzel megoldandó pluszfeladat: GLPK nem használható.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 3. fizikai oldal: szimplexfeladat',
+   'LPfeladatok.pdf – 1–10. fizikai oldal: standard alak, pivot, kétfázisú példák',
+   'Komaromi_Eva_Linearis_programozas.pdf – 31–36. fizikai oldal: szimplex és kiinduló bázis'
+  ],
+  focus:'Előbb alakítsd át a feltételeket és jelöld a bázist, utána indokold a belépő oszlopot és a pozitív hányadosok közül a kilépő sort.',
+  deliverable:'Kézi szimplextáblák és levezetés; a tanító chat csak külön modellkonfigurációval használható.'
+ },
+ graphical:{
+  priority:'A mintavizsgán papíron beadandó pluszfeladat; az optimális pont keresése előtt a megengedett tartományt vizsgáld.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 4. fizikai oldal: grafikus LP-feladat',
+   'Ferenczi_Zoltan_Operaciokutatas.pdf – 12–16. fizikai oldal: grafikus modellek'
+  ],
+  focus:'Rajzold fel a feltételekhez tartozó félsíkokat, keresd a közös metszetet; ha üres, nincs optimum, amit számolni lehetne.',
+  deliverable:'Papírra rajzolt félsíkok és szöveges következtetés; a JSON-csúcspontok ellenőrizhetők, de a rajz nem.'
+ }
+} as const;
+
+type ExamKind=keyof typeof examLessons;
+type ExamOutcome='retry'|'supported_transfer'|'independent_transfer';
+const examOrder:ExamKind[]=['transport','indexed','simplex','graphical'];
+function ExamStudy({onTransportPractice,onIndexedPractice,onSimplexPractice,onGraphicalPractice}:{onTransportPractice:()=>void;onIndexedPractice:()=>void;onSimplexPractice:()=>void;onGraphicalPractice:()=>void}){
+ const [topic,setTopic]=useState<ExamKind>('transport');
+ const [first,setFirst]=useState<number|null>(null);
+ const [transfer,setTransfer]=useState<number|null>(null);
+ const [results,setResults]=useState<Partial<Record<ExamKind,ExamOutcome>>>({});
+ const item=examLessons[topic];
+ const reading=examReadingRoute[topic];
+ const select=(kind:ExamKind)=>{setTopic(kind);setFirst(null);setTransfer(null);};
+ // A changed concept answer or explicit retry invalidates the last completed
+ // transfer observation. Never recommend from an abandoned attempt.
+ const restartAttempt=(answer:number|null)=>{
+  setFirst(answer);setTransfer(null);
+  setResults(previous=>{
+   if(!(topic in previous))return previous;
+   const next={...previous};delete next[topic];return next;
+  });
+ };
+ const answerTransfer=(i:number)=>{
+  setTransfer(i);
+  setResults(prev=>({...prev,[topic]:i!==item.transferCorrect?'retry':
+   first===item.correct?'independent_transfer':'supported_transfer'}));
+ };
+ const allFormativeChecksPassed=examOrder.every(k=>results[k]==='independent_transfer');
+ const recommended=examOrder.find(k=>results[k]==='retry')??
+  examOrder.find(k=>results[k]===undefined)??
+  examOrder.find(k=>results[k]==='supported_transfer')??'transport';
+ return <section className="space-y-4 rounded border p-4" data-testid="or-exam-study">
+  <h2 className="text-xl font-semibold">Mintavizsgára felkészítő: előbb elmélet, utána alkalmazás</h2>
+  <p className="text-xs text-neutral-500">A négy témához írt saját magyarázatok, nem az eredeti egyetemi PDF-ek és .mod fájlok másolatai. A kérdések nem vizsgapontok. Nincs tartósan mért tudásszint.</p>
+  <label className="block font-semibold">Vizsgatéma:
+   <select aria-label="Mintavizsga témája" data-testid="or-exam-topic" className="ml-2 rounded border bg-background p-2" value={topic} onChange={e=>select(e.target.value as ExamKind)}>
+    {examOrder.map(k=><option value={k} key={k}>{examLessons[k].title}</option>)}
+   </select>
+  </label>
+  <section className="space-y-2 rounded border p-3 text-sm" data-testid="or-exam-source-guide">
+   <h3 className="font-semibold">Eredeti források szerinti tanulási útvonal</h3>
+   <p className="font-medium">{reading.priority}</p>
+   <p className="text-xs text-neutral-500">A források a saját Fedora gépen, privát könyvtárban vannak előkészítve. Ez a felület még nem olvassa automatikusan a PDF-eket, és nem használ belőlük AI-alapú kivonatolást.</p>
+   <ul className="list-disc space-y-1 pl-5">{reading.sources.map(s=><li key={s}>{s}</li>)}</ul>
+   <p><strong>Mit érts meg?</strong> {reading.focus}</p>
+   <p><strong>Mit gyakorolj / adj be?</strong> {reading.deliverable}</p>
+  </section>
+  <ol className="list-decimal space-y-2 pl-5 text-sm">{item.theory.map(s=><li key={s}>{s}</li>)}</ol>
+  <fieldset className="space-y-2 rounded border p-3" data-testid="or-exam-diagnostic">
+   <legend className="font-semibold">1. Fogalmi ellenőrzés</legend><p>{item.question}</p>
+   {item.options.map((answer,i)=><label className="flex items-start gap-2" key={answer}>
+    <input type="radio" name="or-exam-first" checked={first===i} onChange={()=>restartAttempt(i)}/><span>{answer}</span>
+   </label>)}
+  </fieldset>
+  {first!==null&&<section className="space-y-3 rounded border p-3" data-testid="or-exam-branch">
+   <p role="status">{first===item.correct?'Helyes. Próbáld átvinni egy új helyzetre.':'Célzott újramagyarázás: '+item.remedy}</p>
+   <fieldset className="space-y-2" data-testid="or-exam-transfer">
+    <legend className="font-semibold">2. Új helyzet (átvitel)</legend><p>{item.transfer}</p>
+    {item.transferOptions.map((answer,i)=><label className="flex items-start gap-2" key={answer}>
+     <input type="radio" name="or-exam-transfer-answer" checked={transfer===i} onChange={()=>answerTransfer(i)}/><span>{answer}</span>
+    </label>)}
+   </fieldset>
+   {transfer!==null&&<div role="status" className="space-y-2" data-testid="or-exam-feedback">
+    <p>{transfer===item.transferCorrect?'A második ellenőrzés helyes.':'A második ellenőrzés hibás.'} {item.why}</p>
+    <p>{transfer!==item.transferCorrect?'Ajánlott a célzott ismétlés.':
+     first===item.correct?'Következő a saját feladat, más számadatokkal.':'Segítséggel sikerült, később önálló újrapróba ajánlott.'}</p>
+    <button type="button" className="rounded border px-3 py-2" onClick={()=>restartAttempt(null)}>Újrapróbálom</button>
+   </div>}
+  </section>}
+  <p className="text-sm">{item.next}</p>
+  {topic==='transport'?<button type="button" data-testid="or-exam-to-transport" className="rounded border px-3 py-2 text-sm" onClick={onTransportPractice}>Kötelező szállítási gyakorló megnyitása</button>:
+   topic==='indexed'?<button type="button" data-testid="or-exam-to-indexed" className="rounded border px-3 py-2 text-sm" onClick={onIndexedPractice}>Általános indexelt GMPL-gyakorló megnyitása</button>:
+   topic==='simplex'?<button type="button" data-testid="or-exam-to-simplex" className="rounded border px-3 py-2 text-sm" onClick={onSimplexPractice}>Kézi szimplex gyakorló megnyitása</button>:
+   topic==='graphical'?<button type="button" data-testid="or-exam-to-graphical" className="rounded border px-3 py-2 text-sm" onClick={onGraphicalPractice}>Grafikus LP gyakorló megnyitása</button>:
+   <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>}
+  <aside data-testid="or-exam-adaptive-next" className="space-y-2 rounded border p-3 text-sm">
+   <p className="font-semibold">Ajánlott folytatás ebben a munkamenetben</p>
+   {allFormativeChecksPassed?<p role="status" data-testid="or-exam-formative-complete">Mind a négy rövid átviteli önellenőrzést segítség nélkül megoldottad. Következő lépés: önálló, új adatokkal készített GUSEK- és kézi vizsgafeladatok. Ez nem bizonyítja a teljes vizsgakészültséget.</p>:<>
+    <p>{results[recommended]==='retry'?'Hibás átviteli feladat ismétlése.':
+     results[recommended]==='supported_transfer'?'Segítség utáni önálló újrapróba.':'Még nem próbált témakör.'}</p>
+    <button type="button" className="rounded border px-3 py-2" onClick={()=>select(recommended)}>{examLessons[recommended].title}</button>
+   </>}
+   <p className="text-xs text-neutral-500">Kézi témaváltás, nincs automatikus grade, új feladatindítás, tartós tanulói nyilvántartás vagy vizsgakészültség-állítás.</p>
+  </aside>
+  <p className="text-xs text-neutral-500">Az első négy mintavizsgatéma szintetikus, kötött szerkezetű, szerveresen ellenőrzött gyakorlót tartalmaz. Nem általános GMPL-, szimplex- vagy rajzértékelő; a tanítóhoz külön AI-modellbeállítás szükséges lehet.</p>
+ </section>;
+}
+
 /** No grading authority on client. No automatic solve, no exam ledger. */
 export function TredvenOrDomain(){
  const [kind,setKind]=useState<Kind>('assignment');const [seed,setSeed]=useState('42');
@@ -85,8 +339,12 @@ export function TredvenOrDomain(){
  }
  return <main className="mx-auto max-w-5xl space-y-5 p-5">
   <Link className="text-sm underline" href="/pilot/gusek">← Vissza a GUSEK Workbenchhez</Link>
+  <ExamStudy onTransportPractice={()=>{invalidate();setKind('transport');setQuizChoice(null);setStage('theory');}}
+   onIndexedPractice={()=>{invalidate();setKind('transport_indexed');setQuizChoice(null);setStage('theory');}}
+   onSimplexPractice={()=>{invalidate();setKind('simplex');setQuizChoice(null);setStage('theory');}}
+   onGraphicalPractice={()=>{invalidate();setKind('graphical');setQuizChoice(null);setStage('theory');}} />
   <header className="space-y-2"><h1 className="text-3xl font-semibold">Operációkutatás – GUSEK szakmai gyakorló</h1>
-   <p className="text-sm text-neutral-500">Két további, szintetikus, paraméterezett feladattípus. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
+   <p className="text-sm text-neutral-500">Szintetikus, paraméterezett szakmai gyakorlók, köztük mind a négy mintavizsgatémához kötött résznyelvű feladat. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
   <nav className="flex flex-wrap gap-2" aria-label="Tanulási sorrend" data-testid="or-study-navigation">
    <button type="button" aria-current={stage==='theory'?'step':undefined} className="rounded border px-3 py-2 text-sm" onClick={()=>{invalidate();setStage('theory');}}>1. Elmélet</button>
    <button type="button" aria-current={stage==='practice'?'step':undefined} className="rounded border px-3 py-2 text-sm" disabled={quizChoice===null} onClick={()=>setStage('practice')}>2. Gyakorlás</button>
@@ -95,7 +353,7 @@ export function TredvenOrDomain(){
    <p className="text-xs text-neutral-500">Forrás: R16.10 saját magyar GUSEK-tanulókártyák. A korábban feltöltött egyetemi PDF-ek és .mod állományok még nincsenek ebbe a nézetbe importálva; ez a jelenleg ellenőrzött, beépített elméleti alap.</p>
    <label className="block text-sm font-semibold">Válassz témát:
     <select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);setQuizChoice(null);reset();}}>
-     <option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
+     <option value="transport">Kötelező szállítási modell</option><option value="transport_indexed">Általános GMPL (set/param/sum)</option><option value="simplex">Kézi szimplex</option><option value="graphical">Grafikus LP</option><option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
     </select>
    </label>
    <h2 className="text-xl font-semibold">{lesson.title}</h2>
@@ -121,11 +379,19 @@ export function TredvenOrDomain(){
   </section>:<>
   <section className="flex flex-wrap items-end gap-3 rounded border p-4">
    <label>Feladattípus<select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);reset();}}>
-    <option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
+    <option value="transport">3×3 szállítás (egész, pontos készlet/igény)</option><option value="transport_indexed">Általános GMPL szállítás (set/param/sum)</option><option value="simplex">Kézi szimplex – két pivot</option><option value="graphical">Grafikus LP – négy csúcspont</option><option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
    <label>Variáns<input className="ml-2 w-32 rounded border bg-background p-2" inputMode="numeric" value={seed} onChange={e=>{setSeed(e.target.value);reset();}}/></label>
    <button type="button" disabled={busy} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50" onClick={()=>void load()}>Feladat betöltése</button>
   </section>
   {task&&<><section className="space-y-3 rounded border p-4"><h2 className="text-xl font-semibold">{task.title}</h2><p>{task.statement}</p>
+   {(task.kind==='transport'||task.kind==='transport_indexed')&&<div data-testid="or-transport-task" className="space-y-2">
+    <p>Az összes készletet el kell szállítani és minden igényt pontosan teljesíteni kell. A táblázat egységköltségeket mutat; a változók nemnegatív egészek.</p>
+    <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th scope="col">Telephely</th>{task.labels?.columns.map(x=><th scope="col" key={x}>{x}</th>)}<th scope="col">Készlet</th></tr></thead>
+    <tbody>{task.costs?.map((row,i)=><tr key={i}><th scope="row">{task.labels?.rows[i]}</th>{row.map((v,j)=><td className="p-2 text-center" key={j}>{v}</td>)}<td className="text-center">{task.supply?.[i]}</td></tr>)}
+    <tr><th scope="row">Pontos igény</th>{task.demand?.map((v,i)=><td className="text-center" key={i}>{v}</td>)}<td className="text-center">Összesen {task.supply?.reduce((s,n)=>s+n,0)}</td></tr></tbody></table></div>
+    <p>A <strong>x12</strong> útvonalon legfeljebb <strong>{task.routeLimit}</strong> egység szállítható. Írj fel három telephelyegyenletet, három bolti keresletegyenletet és az útvonalkorlátot.</p>
+    <p className="text-xs text-neutral-500">Ez a szerver által generált, új számadatú feladat, nem az eredeti mintavizsga megoldása. A szerver csak a támogatott skalár, kanonikus MathProg-modell-egyezőséget tudja bizonyítani; eltérő, de matematikailag helyes alak nem automatikusan hibás.</p>
+   </div>}
    {task.kind==='assignment'&&<><p>A táblázat az egyes munkatársak feladatonkénti szükséges munkaidejét mutatja.</p>
     <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th scope="col">Munkatárs</th>{task.labels?.columns.map(x=><th scope="col" key={x}>{x}</th>)}</tr></thead>
      <tbody>{task.costs?.map((row,i)=><tr key={i}><th scope="row">{task.labels?.rows[i]}</th>{row.map((cost,j)=><td className="p-2 text-center" key={j}>{cost}</td>)}</tr>)}</tbody></table></div>
@@ -134,9 +400,21 @@ export function TredvenOrDomain(){
     <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Termék</th><th>Alapanyag/egység</th><th>Munkaóra/egység</th><th>Nyereség/egység</th></tr></thead>
      <tbody>{task.variableNames.map((name,i)=><tr key={name}><th>{name}</th><td className="text-center">{task.material?.[i]}</td><td className="text-center">{task.hours?.[i]}</td><td className="text-center">{task.profit?.[i]}</td></tr>)}</tbody></table></div>
     <p className="text-sm">Összes alapanyag: legfeljebb {task.materialLimit}; összes munkaóra: legfeljebb {task.hoursLimit}. A darabszámok nemnegatív egészek.</p></>}
+   {(task.kind==='simplex'||task.kind==='graphical')&&<section className="space-y-2" data-testid="or-manual-lp-task">
+    <p>Folytonos változók: x, y ≥ 0. Cél: max {task.profit?.[0]}x + {task.profit?.[1]}y.</p>
+    <p>Korlátok: x+y ≤ {task.rhs?.[0]}; 2x+y ≤ {task.rhs?.[1]}.</p>
+    {task.kind==='simplex'?<><p>Kiinduló táblázat: oszlopok x, y, s1, s2, RHS; sorok célfüggvény, s1, s2.</p>
+     <pre className="overflow-x-auto rounded border p-2 font-mono text-sm">{task.initialTableau?.map(row=>row.join('   ')).join('\n')}</pre>
+     <p>JSON: steps tömb két lépéssel, mindegyik enter, leave és 3×5 tableau mezővel. Csak a megadott legnegatívabb-együtthatós pivotválasztás értékelhető.</p></>:
+     <p>Rajzold fel papíron a tartományt, majd JSON formában add meg a vertices mezőben a négy [x,y] csúcsot. A rajz minőségét a szerver nem ellenőrzi.</p>}
+   </section>}
    <section className="rounded border p-3 text-sm" aria-label="Önellenőrző modellezési kérdések">
     <p className="font-semibold">Önellenőrzés a beadás előtt</p>
-    {task.kind==='assignment'?<ul className="list-disc space-y-1 pl-5">
+    {(task.kind==='simplex'||task.kind==='graphical')?<ul className="list-disc space-y-1 pl-5"><li>Mindkét ≤ és a két nemnegativitási feltételt figyelembe vetted?</li><li>Szimplexnél mindkét pivot utáni teljes táblát, grafikusan mind a négy csúcspontot megadtad?</li><li>A célfüggvénymaximum ugyanazt a pontot adja mindkét módszerrel?</li></ul>:(task.kind==='transport'||task.kind==='transport_indexed')?<ul className="list-disc space-y-1 pl-5">
+     <li>A három sorösszeg pontosan a három telephely készlete?</li>
+     <li>A három oszlopösszeg pontosan a három bolt igénye?</li>
+     <li>Az x12 útvonalkorlát és mind a kilenc fuvarköltség helyes?</li>
+    </ul>:task.kind==='assignment'?<ul className="list-disc space-y-1 pl-5">
       <li>Minden párosítási döntés pontosan 0 vagy 1 lehet?</li>
       <li>Minden munkatárs és minden feladat pontosan egyszer szerepel?</li>
       <li>A célfüggvény minden időadatot a megfelelő változóhoz párosít?</li>
@@ -146,19 +424,21 @@ export function TredvenOrDomain(){
       <li>A fajlagos nyereséget a megfelelő termékmennyiséggel szoroztad?</li>
     </ul>}
    </section>
-   <p className="text-xs text-neutral-500">Töltsd ki magad a TODO részeket. A kezdőmodell nem tartalmazza a célfüggvény együtthatóit és a teljes kész modellt.</p></section>
-   <section className="space-y-3 rounded border p-4"><label className="block font-semibold" htmlFor="or-model">MathProg-modell (.mod)</label>
+   <p className="text-xs text-neutral-500">A MathProg-gyakorlóknál töltsd ki a TODO részeket; a kézi LP-gyakorlóknál a JSON-lépéseket vagy csúcspontokat. A megoldásokat nem tartalmazza a kezdőmező.</p></section>
+   <section className="space-y-3 rounded border p-4"><label className="block font-semibold" htmlFor="or-model">{task.kind==="simplex"?"Két szimplex-pivot nyomvonala (JSON)":task.kind==="graphical"?"Négy csúcspont (JSON)":"MathProg-modell (.mod)"}</label>
+    {task.kind==='transport_indexed'&&<p className="text-sm" data-testid="or-indexed-practice-notice">A mintavizsga 2. feladata: ugyanaz a szállítás halmazokkal, paraméterekkel és sum-okkal, a data szakasszal egy fájlban. Az előre kitöltött adatokat NE a feladatmegoldásnak tekintsd: a négy TODO-képletet neked kell önállóan megírni. Az automatikus ellenőrzés csak a megadott kanonikus I/J, supply/demand/cost/routeLimit szerkezetet bizonyítja; eltérő, akár helyes általános MathProg-alak NEM ÉRTÉKELHETŐ lehet. Az eredeti egyetemi mintavizsga értékei nincsenek itt.</p>}
     <textarea id="or-model" data-testid="or-model" spellCheck={false} className="min-h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={model} onChange={e=>{invalidate();setModel(e.target.value);}}/>
     <label className="block font-semibold" htmlFor="or-values">Változóértékek (JSON)</label>
     <textarea id="or-values" data-testid="or-values" spellCheck={false} className="min-h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} onChange={e=>{invalidate();setValues(e.target.value);}}/>
     <label className="block font-semibold" htmlFor="or-obj">Számított {task.objectiveSense==='min'?'minimum':'maximum'}</label>
     <input id="or-obj" className="w-full rounded border bg-transparent p-2" inputMode="decimal" value={objective} onChange={e=>{invalidate();setObjective(e.target.value);}}/>
     <label className="flex items-center gap-2"><input type="checkbox" checked={hints} onChange={e=>{invalidate();setHints(e.target.checked);}}/> Használtam segítséget</label>
-    <button type="button" disabled={busy} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Matematikai modell és optimum ellenőrzése</button>
+    <button type="button" disabled={busy} onClick={()=>void check()} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">Megoldás szerveres ellenőrzése</button>
    </section>
    {grade&&<section role="status" data-testid="or-grade" className="space-y-2 rounded border p-4"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`}</h2>
     {grade.errors.map(code=><p key={code}>{explainOrError(code)}</p>)}
-    <p className="text-xs text-neutral-500">GUSEK/MILP diagnosztika; a pontszámot kizárólag a szerver adja. Nem felügyelt gyakorlás.</p>
+    <p className="text-xs text-neutral-500">GUSEK/LP diagnosztika; a pontszámot kizárólag a szerver adja. Nem felügyelt gyakorlás.</p>
+    {grade.points===0&&<button type="button" className="rounded border px-3 py-2" onClick={()=>{setStage("theory");setQuizChoice(null);}}>Elmélet újratanulása a szerveres hibajelzés után</button>}
     <button type="button" className="rounded border px-3 py-2" onClick={()=>setGrade(null)}>Javítom és újra beadom</button></section>}</>}
   {error&&<p role="alert" className="rounded border border-red-500 p-3 text-red-600">{error}</p>}
   </>}

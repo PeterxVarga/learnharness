@@ -1,6 +1,14 @@
 /** R16.10: public Hungarian domain feedback, no oracle/source/answer access. */
 const DIAGNOSTICS=Object.freeze({
  unsupported_source:'A modell nem a támogatott skalár MathProg-résznyelvben szerepel. Ettől még nem bizonyítottan hibás.',
+ indexed_canonical_proof_not_available:'A jelenlegi indexelt ellenőrző nem tudta bizonyítani a modellt. Ez nem bizonyít matematikai hibát. A támogatott kanonikus set I/J, param supply/demand/cost/routeLimit és sum mintát használd; további GMPL-alakok teljes értékelése még nem elérhető.',
+ indexed_data_mismatch:'A modellel együtt beadott adatfájl készlet-, kereslet-, költség- vagy útvonalkorlát-adata nem egyezik a generált feladattal. Nézd meg a forrás- és célindexeket is.',
+ transport_canonical_proof_not_available:'A modell egyezőségét a kilencváltozós kanonikus ellenőrző nem tudta bizonyítani. Ez nem bizonyít matematikai hibát. Írj fel 3 készlet-egyenletet, 3 kereslet-egyenletet és egy x12 felső korlátot.',
+ transport_model_cost:'A költségminimalizáló célfüggvény iránya vagy a fuvarok költsége eltér a feladattól.',
+ transport_supply_not_exact:'Nem minden telephely készletét szállítottad el pontosan.',
+ transport_demand_not_exact:'Nem minden bolt kapta meg pontosan az előírt mennyiséget.',
+ transport_route_limit:'Az első telephely és a második bolt közti útvonal limitjét túllépted.',
+
  wrong_variables:'A változók halmaza nem egyezik az elvárt döntési változókkal.',
  assignment_model_binary_domain:'A kilenc hozzárendelési változó mindegyikének binárisnak (0 vagy 1) kell lennie.',
  assignment_model_total_cost:'A hozzárendelési feladatban a kilenc költség és a megfelelő változó szorzatának összegét kell minimalizálni.',
@@ -33,6 +41,12 @@ const DIAGNOSTICS=Object.freeze({
  assignment_job_3_not_once:'A harmadik feladat nincs pontosan egy munkatárshoz rendelve.',
  production_material_capacity:'A termékmennyiségek túllépik az alapanyag-kapacitást.',
  production_labor_capacity:'A termékmennyiségek túllépik a munkaidő-kapacitást.',
+ manual_trace_unassessable:'A beadott nyomvonal nem a támogatott JSON-formátumban van. Más levezetési alak ettől még lehet helyes; az ellenőrző csak a megadott struktúrát fogadja.',
+ simplex_entering_column:'A megadott szabály szerint a célfüggvénysor legnegatívabb oszlopát kell bevinned.',
+ simplex_leaving_row:'Csak pozitív pivot-oszlopelem és a legkisebb megengedett jobb oldal / pivotelem hányados alapján léptethetsz ki.',
+ simplex_pivot_arithmetic:'Az átalakított szimplextábla valamelyik sorában aritmetikai eltérés van.',
+ graphical_vertices_incorrect:'Nem egyezik a megengedett sokszög mind a négy csúcspontja. Ellenőrizd a tengelyek és két egyenes metszését.',
+ graphical_point_infeasible:'Az optimálisnak megadott pont nem teljesíti az összes korlátot.',
  objective_mismatch:'A beírt célfüggvényérték nem egyezik a megadott változók alapján számolttal.',
  not_optimal:'A terv megengedett, de nem optimális. Próbálj más megengedett kombinációt.',
  independence_not_demonstrated:'Segítséghasználat mellett a beadás nem igazolja az önálló feladatmegoldást.'

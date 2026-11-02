@@ -29,6 +29,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: GUSEK exam study staged source check
+        run: node integrations/gusek-r16/tests/r1621-exam-adaptive-contract.mjs
       - run: npm test
       - run: npm run lint
 

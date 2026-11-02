@@ -42,13 +42,14 @@ WORKBENCH_OVERLAY_PATHS = {'app/pilot/gusek/page.tsx', 'src/tredven/gusek/attemp
     'learning/teaching-handoff-r168.mjs', 'learning/teaching-handoff-r168.test.mjs',
     'learning/public-task-context-r169.mjs', 'learning/public-task-context-r169.test.mjs',
     'domain/or-domain-r1610.mjs', 'domain/or-domain-r1610.test.mjs', 'domain/or-diagnostics-r1610.mjs',
+    'domain/or-indexed-transport-r1627.mjs', 'domain/or-manual-lp-r1628.mjs', 'domain/or-manual-lp-r1628.test.mjs', 'domain/or-manual-lp-r1628.test.mjs', 'domain/or-manual-lp-r1628.test.mjs',
     'domain/or-assignment-equivalence-r1611.mjs', 'domain/or-assignment-equivalence-r1611.test.mjs',
     'domain/or-production-equivalence-r1612.mjs', 'domain/or-production-equivalence-r1612.test.mjs',
     'components/tredven-or-domain.tsx',
     'app/pilot/gusek/szakmai/page.tsx', 'app/api/pilot/gusek/szakmai/route.ts'}
 LEGACY_WORKBENCH_OVERLAY_PATHS = WORKBENCH_OVERLAY_PATHS - {
     'domain/or-domain-r1610.mjs', 'domain/or-domain-r1610.test.mjs',
-    'domain/or-diagnostics-r1610.mjs', 'domain/or-assignment-equivalence-r1611.mjs', 'domain/or-assignment-equivalence-r1611.test.mjs',
+    'domain/or-diagnostics-r1610.mjs', 'domain/or-indexed-transport-r1627.mjs', 'domain/or-manual-lp-r1628.mjs', 'domain/or-manual-lp-r1628.test.mjs', 'domain/or-manual-lp-r1628.test.mjs', 'domain/or-manual-lp-r1628.test.mjs', 'domain/or-assignment-equivalence-r1611.mjs', 'domain/or-assignment-equivalence-r1611.test.mjs',
     'domain/or-production-equivalence-r1612.mjs', 'domain/or-production-equivalence-r1612.test.mjs',
     'components/tredven-or-domain.tsx',
     'app/pilot/gusek/szakmai/page.tsx', 'app/api/pilot/gusek/szakmai/route.ts'
