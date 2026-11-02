@@ -120,11 +120,21 @@ function ExamStudy(){
  const [results,setResults]=useState<Partial<Record<ExamKind,ExamOutcome>>>({});
  const item=examLessons[topic];
  const select=(kind:ExamKind)=>{setTopic(kind);setFirst(null);setTransfer(null);};
+ // A changed concept answer or explicit retry invalidates the last completed
+ // transfer observation. Never recommend from an abandoned attempt.
+ const restartAttempt=(answer:number|null)=>{
+  setFirst(answer);setTransfer(null);
+  setResults(previous=>{
+   if(!(topic in previous))return previous;
+   const next={...previous};delete next[topic];return next;
+  });
+ };
  const answerTransfer=(i:number)=>{
   setTransfer(i);
   setResults(prev=>({...prev,[topic]:i!==item.transferCorrect?'retry':
    first===item.correct?'independent_transfer':'supported_transfer'}));
  };
+ const allFormativeChecksPassed=examOrder.every(k=>results[k]==='independent_transfer');
  const recommended=examOrder.find(k=>results[k]==='retry')??
   examOrder.find(k=>results[k]===undefined)??
   examOrder.find(k=>results[k]==='supported_transfer')??'transport';
@@ -140,7 +150,7 @@ function ExamStudy(){
   <fieldset className="space-y-2 rounded border p-3" data-testid="or-exam-diagnostic">
    <legend className="font-semibold">1. Fogalmi ellenőrzés</legend><p>{item.question}</p>
    {item.options.map((answer,i)=><label className="flex items-start gap-2" key={answer}>
-    <input type="radio" name="or-exam-first" checked={first===i} onChange={()=>{setFirst(i);setTransfer(null);}}/><span>{answer}</span>
+    <input type="radio" name="or-exam-first" checked={first===i} onChange={()=>restartAttempt(i)}/><span>{answer}</span>
    </label>)}
   </fieldset>
   {first!==null&&<section className="space-y-3 rounded border p-3" data-testid="or-exam-branch">
@@ -155,16 +165,18 @@ function ExamStudy(){
     <p>{transfer===item.transferCorrect?'A második ellenőrzés helyes.':'A második ellenőrzés hibás.'} {item.why}</p>
     <p>{transfer!==item.transferCorrect?'Ajánlott a célzott ismétlés.':
      first===item.correct?'Következő a saját feladat, más számadatokkal.':'Segítséggel sikerült, később önálló újrapróba ajánlott.'}</p>
-    <button type="button" className="rounded border px-3 py-2" onClick={()=>{setFirst(null);setTransfer(null);}}>Újrapróbálom</button>
+    <button type="button" className="rounded border px-3 py-2" onClick={()=>restartAttempt(null)}>Újrapróbálom</button>
    </div>}
   </section>}
   <p className="text-sm">{item.next}</p>
   <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>
   <aside data-testid="or-exam-adaptive-next" className="space-y-2 rounded border p-3 text-sm">
    <p className="font-semibold">Ajánlott folytatás ebben a munkamenetben</p>
-   <p>{results[recommended]==='retry'?'Hibás átviteli feladat ismétlése.':
+   {allFormativeChecksPassed?<p role="status" data-testid="or-exam-formative-complete">Mind a négy rövid átviteli önellenőrzést segítség nélkül megoldottad. Következő lépés: önálló, új adatokkal készített GUSEK- és kézi vizsgafeladatok. Ez nem bizonyítja a teljes vizsgakészültséget.</p>:<>
+    <p>{results[recommended]==='retry'?'Hibás átviteli feladat ismétlése.':
      results[recommended]==='supported_transfer'?'Segítség utáni önálló újrapróba.':'Még nem próbált témakör.'}</p>
-   <button type="button" className="rounded border px-3 py-2" onClick={()=>select(recommended)}>{examLessons[recommended].title}</button>
+    <button type="button" className="rounded border px-3 py-2" onClick={()=>select(recommended)}>{examLessons[recommended].title}</button>
+   </>}
    <p className="text-xs text-neutral-500">Kézi témaváltás, nincs automatikus grade, új feladatindítás, tartós tanulói nyilvántartás vagy vizsgakészültség-állítás.</p>
   </aside>
   <p className="text-xs text-neutral-500">Az indexelt modell, a szimplex és a grafikus feladat teljes értékelése még nincs automatizálva. A tanítóhoz külön AI-modellbeállítás szükséges lehet.</p>

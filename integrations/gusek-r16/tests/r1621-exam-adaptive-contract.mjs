@@ -18,6 +18,14 @@ for(const fragment of ['transport:{','indexed:{','simplex:{','graphical:{',
  "type ExamOutcome='retry'|'supported_transfer'|'independent_transfer'",
  "results[k]==='retry'","method:'POST'",'Elmélet újratanulása a szerveres hibajelzés után'])
  assert.ok(source.includes(fragment),'Missing study contract: '+fragment);
+for(const fragment of [
+ 'const restartAttempt=(answer:number|null)=>{',
+ 'delete next[topic];return next;',
+ 'onChange={()=>restartAttempt(i)}',
+ 'onClick={()=>restartAttempt(null)}',
+ "const allFormativeChecksPassed=examOrder.every(k=>results[k]==='independent_transfer')",
+ 'data-testid="or-exam-formative-complete"',
+])assert.ok(source.includes(fragment),'Attempt invalidation regression: '+fragment);
 assert.ok(!source.includes('localStorage')&&!source.includes('sessionStorage'));
 const manifest=new Map(readFileSync(resolve(root,'SHA256SUMS'),'utf8').trimEnd().split('\n').map(line=>{
  const i=line.indexOf('  ');assert.ok(i>0);return [line.slice(i+2),line.slice(0,i)];
