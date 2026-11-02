@@ -43,6 +43,134 @@ const lessons={
   why:'A darabszám 0, 1, 2… lehet; sem törtdarabot, sem negatív mennyiséget nem gyárthatunk.'
  }
 } as const;
+// R16.21 – original micro-lessons, never raw or full course materials.
+const examLessons={
+ transport:{
+  title:'Szállítási modell (1. feladattípus)',
+  theory:['A döntési változó x[i,j] egy adott forrásból adott célhoz szállított mennyiség.',
+   'A költségminimalizálás a költség és a szállított mennyiség szorzatösszege.',
+   'A pontos kereslet és kötelező szállítás egyenlőség, az útvonal limitje felső korlát.'],
+  question:'Egy bolt pontosan 70 egységet vár. Melyik helyes?',
+  options:['A beérkező mennyiségek összege = 70.','A beérkező mennyiségek összege <= 70.','Minden forrásból külön 70.'],
+  correct:0,
+  remedy:'A pontosan előírt igény egyenlőség. A legfeljebb feltétel engedné a hiányt.',
+  transfer:'Új helyzet: egyetlen útvonalon legfeljebb 9 egység vihető. Melyik korlát helyes?',
+  transferOptions:['Az érintett x[i,j] = 9.','Az érintett x[i,j] <= 9.','Minden bolt teljes igénye <= 9.'],
+  transferCorrect:1,
+  why:'Az útvonalkorlát csak egy forrás–cél pár mennyiségének felső korlátja.',
+  next:'Gyakorolj eltérő adatokkal egy 3×3 szállítási feladatot a GUSEK Workbenchben.',
+  href:'/pilot/gusek'
+ },
+ indexed:{
+  title:'Általános GMPL-modell (2. feladattípus)',
+  theory:['A set halmazok az indexeket, a param paraméterek a konkrét értékeket adják.',
+   'A var x{i in I,j in J} minden forrás–cél párhoz döntési változót rendel.',
+   'A sum{j in J} x[i,j] rögzített i esetén az összes célhoz menő mennyiséget adja.'],
+  question:'Mit számol a sum{j in J} x[i,j] rögzített i mellett?',
+  options:['Minden forrás összes mennyiségét.','Az i forrásból minden célhoz küldött mennyiséget.','Csak az első cél mennyiségét.'],
+  correct:1,
+  remedy:'Az i rögzített, a j végigfut az összes célon; ezért keletkezik egy forrásonkénti összeg.',
+  transfer:'Ha új bolt nyílik, mit változtatsz elsődlegesen az általános modellben?',
+  transferOptions:['A halmazt és a hozzá tartozó adatokat.','Minden képletet kézzel megduplázol.','Minden változót binárissá teszel.'],
+  transferCorrect:0,
+  why:'A halmazos modell méretfüggetlen; a városok számának változása az adatokat érinti.',
+  next:'Készíts külön modell- és adatrészt egy 2×3 szállítási példához. A teljes indexelt GMPL automatikus pontozása még nem bizonyított.',
+  href:'/pilot/gusek'
+ },
+ simplex:{
+  title:'Kézi szimplex (3. feladattípus)',
+  theory:['A <= típusú lineáris korláthoz nemnegatív hiányváltozót adunk.',
+   'A pivot egy változót bevisz a bázisba és egy másikat kivesz.',
+   'A kilépő sor kiválasztása pozitív pivot-oszlopelemek mellett a legkisebb megengedett hányadost használja.'],
+  question:'Miért kell elvégezni a hányadostesztet?',
+  options:['A megengedettség megőrzéséhez.','Az egészértékűség bizonyításához.','A célfüggvény elhagyásához.'],
+  correct:0,
+  remedy:'A sorválasztás nem önkényes: az új bázismegoldásnak is teljesítenie kell a korlátokat.',
+  transfer:'Két pozitív pivotelem 2 és 5, a jobb oldalak 12 és 20. Melyik sor lép ki?',
+  transferOptions:['Az első, mert 12/2 = 6.','A második, mert 20/5 = 4.','Egyik sem.'],
+  transferCorrect:1,
+  why:'A két hányados 6 és 4. A kisebb, 4-es hányados jelöli a kilépő sort.',
+  next:'Oldj meg kézzel egy szimplextáblát. Ez nem GLPK-s automatikus pontozó.',
+  href:'/chat/new?mode=teach'
+ },
+ graphical:{
+  title:'Grafikus LP (4. feladattípus)',
+  theory:['Minden kétváltozós lineáris egyenlőtlenség egy félsíkot jelöl.',
+   'A megengedett tartomány a félsíkok közös metszete, ami lehet üres.',
+   'Ha van nem üres korlátos sokszög, egy lineáris célfüggvény szélsőértéke csúcspontban is felvehető.'],
+  question:'Ha x+y <= 2 és x+y >= 3, mi igaz?',
+  options:['Az origó az optimális.','Nincs megengedett megoldás.','A maximum biztosan korlátlan.'],
+  correct:1,
+  remedy:'E két félsíknak nincs közös pontja. A megengedettséget mindig az optimum keresése előtt ellenőrizd.',
+  transfer:'Új feltételek: 3x+3y <= 15 és x+y >= 6. Mi igaz?',
+  transferOptions:['Egyetlen megoldás van.','A tartomány biztosan nem üres.','A korlátok ellentmondásosak.'],
+  transferCorrect:2,
+  why:'Az első feltétel x+y <= 5, a második x+y >= 6, tehát nincs közös pont.',
+  next:'Rajzold meg papíron a két félsíkot. Nincs hitelesített grafikus feladatpontozó.',
+  href:'/chat/new?mode=teach'
+ }
+} as const;
+type ExamKind=keyof typeof examLessons;
+type ExamOutcome='retry'|'supported_transfer'|'independent_transfer';
+const examOrder:ExamKind[]=['transport','indexed','simplex','graphical'];
+function ExamStudy(){
+ const [topic,setTopic]=useState<ExamKind>('transport');
+ const [first,setFirst]=useState<number|null>(null);
+ const [transfer,setTransfer]=useState<number|null>(null);
+ const [results,setResults]=useState<Partial<Record<ExamKind,ExamOutcome>>>({});
+ const item=examLessons[topic];
+ const select=(kind:ExamKind)=>{setTopic(kind);setFirst(null);setTransfer(null);};
+ const answerTransfer=(i:number)=>{
+  setTransfer(i);
+  setResults(prev=>({...prev,[topic]:i!==item.transferCorrect?'retry':
+   first===item.correct?'independent_transfer':'supported_transfer'}));
+ };
+ const recommended=examOrder.find(k=>results[k]==='retry')??
+  examOrder.find(k=>results[k]===undefined)??
+  examOrder.find(k=>results[k]==='supported_transfer')??'transport';
+ return <section className="space-y-4 rounded border p-4" data-testid="or-exam-study">
+  <h2 className="text-xl font-semibold">Mintavizsgára felkészítő: előbb elmélet, utána alkalmazás</h2>
+  <p className="text-xs text-neutral-500">A négy témához írt saját magyarázatok, nem az eredeti egyetemi PDF-ek és .mod fájlok másolatai. A kérdések nem vizsgapontok. Nincs tartósan mért tudásszint.</p>
+  <label className="block font-semibold">Vizsgatéma:
+   <select aria-label="Mintavizsga témája" data-testid="or-exam-topic" className="ml-2 rounded border bg-background p-2" value={topic} onChange={e=>select(e.target.value as ExamKind)}>
+    {examOrder.map(k=><option value={k} key={k}>{examLessons[k].title}</option>)}
+   </select>
+  </label>
+  <ol className="list-decimal space-y-2 pl-5 text-sm">{item.theory.map(s=><li key={s}>{s}</li>)}</ol>
+  <fieldset className="space-y-2 rounded border p-3" data-testid="or-exam-diagnostic">
+   <legend className="font-semibold">1. Fogalmi ellenőrzés</legend><p>{item.question}</p>
+   {item.options.map((answer,i)=><label className="flex items-start gap-2" key={answer}>
+    <input type="radio" name="or-exam-first" checked={first===i} onChange={()=>{setFirst(i);setTransfer(null);}}/><span>{answer}</span>
+   </label>)}
+  </fieldset>
+  {first!==null&&<section className="space-y-3 rounded border p-3" data-testid="or-exam-branch">
+   <p role="status">{first===item.correct?'Helyes. Próbáld átvinni egy új helyzetre.':'Célzott újramagyarázás: '+item.remedy}</p>
+   <fieldset className="space-y-2" data-testid="or-exam-transfer">
+    <legend className="font-semibold">2. Új helyzet (átvitel)</legend><p>{item.transfer}</p>
+    {item.transferOptions.map((answer,i)=><label className="flex items-start gap-2" key={answer}>
+     <input type="radio" name="or-exam-transfer-answer" checked={transfer===i} onChange={()=>answerTransfer(i)}/><span>{answer}</span>
+    </label>)}
+   </fieldset>
+   {transfer!==null&&<div role="status" className="space-y-2" data-testid="or-exam-feedback">
+    <p>{transfer===item.transferCorrect?'A második ellenőrzés helyes.':'A második ellenőrzés hibás.'} {item.why}</p>
+    <p>{transfer!==item.transferCorrect?'Ajánlott a célzott ismétlés.':
+     first===item.correct?'Következő a saját feladat, más számadatokkal.':'Segítséggel sikerült, később önálló újrapróba ajánlott.'}</p>
+    <button type="button" className="rounded border px-3 py-2" onClick={()=>{setFirst(null);setTransfer(null);}}>Újrapróbálom</button>
+   </div>}
+  </section>}
+  <p className="text-sm">{item.next}</p>
+  <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>
+  <aside data-testid="or-exam-adaptive-next" className="space-y-2 rounded border p-3 text-sm">
+   <p className="font-semibold">Ajánlott folytatás ebben a munkamenetben</p>
+   <p>{results[recommended]==='retry'?'Hibás átviteli feladat ismétlése.':
+     results[recommended]==='supported_transfer'?'Segítség utáni önálló újrapróba.':'Még nem próbált témakör.'}</p>
+   <button type="button" className="rounded border px-3 py-2" onClick={()=>select(recommended)}>{examLessons[recommended].title}</button>
+   <p className="text-xs text-neutral-500">Kézi témaváltás, nincs automatikus grade, új feladatindítás, tartós tanulói nyilvántartás vagy vizsgakészültség-állítás.</p>
+  </aside>
+  <p className="text-xs text-neutral-500">Az indexelt modell, a szimplex és a grafikus feladat teljes értékelése még nincs automatizálva. A tanítóhoz külön AI-modellbeállítás szükséges lehet.</p>
+ </section>;
+}
+
 /** No grading authority on client. No automatic solve, no exam ledger. */
 export function TredvenOrDomain(){
  const [kind,setKind]=useState<Kind>('assignment');const [seed,setSeed]=useState('42');
@@ -85,6 +213,7 @@ export function TredvenOrDomain(){
  }
  return <main className="mx-auto max-w-5xl space-y-5 p-5">
   <Link className="text-sm underline" href="/pilot/gusek">← Vissza a GUSEK Workbenchhez</Link>
+  <ExamStudy />
   <header className="space-y-2"><h1 className="text-3xl font-semibold">Operációkutatás – GUSEK szakmai gyakorló</h1>
    <p className="text-sm text-neutral-500">Két további, szintetikus, paraméterezett feladattípus. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
   <nav className="flex flex-wrap gap-2" aria-label="Tanulási sorrend" data-testid="or-study-navigation">
@@ -159,6 +288,7 @@ export function TredvenOrDomain(){
    {grade&&<section role="status" data-testid="or-grade" className="space-y-2 rounded border p-4"><h2 className="text-xl font-semibold">{grade.points===null?'NEM ÉRTÉKELHETŐ':`${grade.points}/1`}</h2>
     {grade.errors.map(code=><p key={code}>{explainOrError(code)}</p>)}
     <p className="text-xs text-neutral-500">GUSEK/MILP diagnosztika; a pontszámot kizárólag a szerver adja. Nem felügyelt gyakorlás.</p>
+    {grade.points===0&&<button type="button" className="rounded border px-3 py-2" onClick={()=>{setStage("theory");setQuizChoice(null);}}>Elmélet újratanulása a szerveres hibajelzés után</button>}
     <button type="button" className="rounded border px-3 py-2" onClick={()=>setGrade(null)}>Javítom és újra beadom</button></section>}</>}
   {error&&<p role="alert" className="rounded border border-red-500 p-3 text-red-600">{error}</p>}
   </>}
