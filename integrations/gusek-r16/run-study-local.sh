@@ -38,6 +38,36 @@ assert receipt["core_files_overwritten"]==0
 assert receipt["native_glpk_enabled_by_r16"] is False
 PY
 
+# R16.23: reject a stale assembled Workbench even if it uses the same pinned
+# upstream source. No access grant, network call or launch occurs in this check.
+python3 - "$BUNDLE" "$APP" <<'PY'
+from pathlib import Path
+import hashlib
+import sys
+
+bundle, app = Path(sys.argv[1]), Path(sys.argv[2])
+relative = "overlay-workbench/components/tredven-or-domain.tsx"
+expected = None
+for line in (bundle / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+    digest, separator, filename = line.partition("  ")
+    if separator and filename == relative:
+        expected = digest
+        break
+if not expected or len(expected) != 64:
+    raise SystemExit("BLOCKED_STUDY_SOURCE_MANIFEST_MISSING")
+paths = (
+    bundle / relative,
+    app / "tredven/addons/components/tredven-or-domain.tsx",
+)
+for path in paths:
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit("BLOCKED_STUDY_SOURCE_MISMATCH")
+source = paths[0].read_text(encoding="utf-8")
+if "const restartAttempt=(answer:number|null)=>{" not in source or "allFormativeChecksPassed" not in source:
+    raise SystemExit("BLOCKED_STUDY_R1622_MISSING")
+print("R1622_STUDY_SOURCE_PIN=PASS")
+PY
+
 STATE="$HOME/.local/state/learnharness-gusek-study"
 if [[ -v XDG_STATE_HOME ]]; then STATE="$XDG_STATE_HOME/learnharness-gusek-study"; fi
 mkdir -p -- "$STATE"
@@ -47,10 +77,10 @@ export LH_AUTH_FILE="$STATE/auth.json"
 export LH_GLPK_ENABLE_LOCAL=0
 unset LH_GLPK_IMAGE_ID LH_GLPK_RUN_TOKEN
 export NEXT_TELEMETRY_DISABLED=1
-echo "R1620_LOCAL_STUDY_SOURCE=PASS"
+echo "R1623_LOCAL_STUDY_SOURCE=PASS"
 echo "LOCAL_URL=http://127.0.0.1:$PORT/pilot/gusek/szakmai"
 echo "DATA_SCOPE=isolated local study directory"
-echo "SOURCE_SCOPE=R16.10 internal primers; earlier PDF lecture notes not imported"
+echo "SOURCE_SCOPE=R16.10 internal primers + R16.21 exam micro-lessons; original university PDFs not imported"
 echo "Stop with Ctrl+C. No model is configured automatically."
 cd -- "$APP"
 exec node "$APP/node_modules/next/dist/bin/next" start --hostname 127.0.0.1 --port "$PORT"

@@ -7,6 +7,14 @@ const root=resolve('integrations/gusek-r16');
 const ui='overlay-workbench/components/tredven-or-domain.tsx';
 const doc='docs/R16.21-EXAM-ADAPTIVE-STUDY.md';
 const me='tests/r1621-exam-adaptive-contract.mjs';
+const localLauncher='run-study-local.sh';
+const launcher=readFileSync(resolve(root,localLauncher),'utf8');
+for(const token of ['LH_OWNER_APPROVED_LOCAL_PILOT','BLOCKED_OWNER_PILOT_APPROVAL',
+ 'BLOCKED_STUDY_SOURCE_MANIFEST_MISSING','BLOCKED_STUDY_SOURCE_MISMATCH',
+ 'BLOCKED_STUDY_R1622_MISSING','R1622_STUDY_SOURCE_PIN=PASS',
+ '127.0.0.1','LH_GLPK_ENABLE_LOCAL=0']){
+ assert.ok(launcher.includes(token),'Launcher safety boundary missing: '+token);
+}
 const source=readFileSync(resolve(root,ui),'utf8');
 const t=ts.transpileModule(source,{fileName:ui,reportDiagnostics:true,
  compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
@@ -30,7 +38,7 @@ assert.ok(!source.includes('localStorage')&&!source.includes('sessionStorage'));
 const manifest=new Map(readFileSync(resolve(root,'SHA256SUMS'),'utf8').trimEnd().split('\n').map(line=>{
  const i=line.indexOf('  ');assert.ok(i>0);return [line.slice(i+2),line.slice(0,i)];
 }));
-for(const path of [ui,doc,me]){
+for(const path of [ui,doc,me,localLauncher]){
  const expected=manifest.get(path);assert.ok(expected,'Manifest missing '+path);
  assert.equal(createHash('sha256').update(readFileSync(resolve(root,path))).digest('hex'),expected);
 }
