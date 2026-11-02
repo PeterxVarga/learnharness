@@ -34,6 +34,11 @@ for(const fragment of [
  "const allFormativeChecksPassed=examOrder.every(k=>results[k]==='independent_transfer')",
  'data-testid="or-exam-formative-complete"',
  'data-testid="or-exam-source-guide"',
+ 'data-testid="or-transport-task"',
+ "type Kind='assignment'|'production'|'transport'",
+ 'Kötelező szállítási gyakorló megnyitása',
+ 'setKind(\'transport\')',
+
  'const examReadingRoute={',
  'Mogya_MINTA_VIZSGA.pdf',
  'LPfeladatok.pdf',

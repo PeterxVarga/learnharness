@@ -1,6 +1,12 @@
 /** R16.10: public Hungarian domain feedback, no oracle/source/answer access. */
 const DIAGNOSTICS=Object.freeze({
  unsupported_source:'A modell nem a támogatott skalár MathProg-résznyelvben szerepel. Ettől még nem bizonyítottan hibás.',
+ transport_canonical_proof_not_available:'A modell egyezőségét a kilencváltozós kanonikus ellenőrző nem tudta bizonyítani. Ez nem bizonyít matematikai hibát. Írj fel 3 készlet-egyenletet, 3 kereslet-egyenletet és egy x12 felső korlátot.',
+ transport_model_cost:'A költségminimalizáló célfüggvény iránya vagy a fuvarok költsége eltér a feladattól.',
+ transport_supply_not_exact:'Nem minden telephely készletét szállítottad el pontosan.',
+ transport_demand_not_exact:'Nem minden bolt kapta meg pontosan az előírt mennyiséget.',
+ transport_route_limit:'Az első telephely és a második bolt közti útvonal limitjét túllépted.',
+
  wrong_variables:'A változók halmaza nem egyezik az elvárt döntési változókkal.',
  assignment_model_binary_domain:'A kilenc hozzárendelési változó mindegyikének binárisnak (0 vagy 1) kell lennie.',
  assignment_model_total_cost:'A hozzárendelési feladatban a kilenc költség és a megfelelő változó szorzatának összegét kell minimalizálni.',

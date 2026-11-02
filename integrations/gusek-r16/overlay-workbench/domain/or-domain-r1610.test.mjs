@@ -61,7 +61,7 @@ test('integer production oracle independently crosschecked with full 0..20 enume
  }
 });
 test('rejects invalid kind/seed',()=>{
- for(const kind of ['other','transport','__proto__',null])assert.throws(()=>makeOrTask(kind,42));
+ for(const kind of ['other','unsupported_transport','__proto__',null])assert.throws(()=>makeOrTask(kind,42));
  for(const seed of [-1,3.5,4294967296,NaN,Infinity,'42'])assert.throws(()=>makeOrTask('assignment',seed));
 });
 test('correct trusted witness scores 1/1 under source-matching mock only',()=>{
@@ -178,6 +178,93 @@ test('REAL R15 parser + R16.12 production proof preserves redundant labor and re
   mathprog:canonical.replace(/^s\.t\. alapanyag:.*\n/m,'')}).points,0);
  assert.equal(real.gradeOrTask('production',0,{...ans,
   mathprog:canonical.replace(/^s\.t\. (?:alapanyag|munkaido):.*\n/gm,'')}).points,null);
+});
+
+// R16.26 canonical 3×3 transport: user model is parsed, NEVER run.
+function canonicalTransport(t){
+ const n=(i,j)=>'x'+(i+1)+(j+1);
+ return [...t.variableNames.map(name=>'var '+name+' >= 0, integer;'),
+ ...[0,1,2].map(i=>'s.t. supply_'+i+': '+[0,1,2].map(j=>n(i,j)).join(' + ')+' = '+t.supply[i]+';'),
+ ...[0,1,2].map(j=>'s.t. demand_'+j+': '+[0,1,2].map(i=>n(i,j)).join(' + ')+' = '+t.demand[j]+';'),
+ 's.t. route: x12 <= '+t.routeLimit+';',
+ 'minimize cost: '+t.variableNames.map((n,i)=>t.costs[Math.floor(i/3)][i%3]+'*'+n).join(' + ')+';',
+ 'solve;','end;'].join('\n');
+}
+test('transport synthetic 3x3: seed-stable finite feasible optimum and canonical full grade',
+ {skip:!real?'requires pinned R15 parser':false},()=>{
+ for(const seed of [0,1,2,3,7,17,42,99,65535,4294967295]){
+  const t=real.makeOrTask('transport',seed),reference=real.orReference(t);
+  assert.equal(t.kind,'transport');
+  assert.equal(t.variableNames.length,9);
+  assert.equal(t.supply.reduce((a,b)=>a+b,0),t.demand.reduce((a,b)=>a+b,0));
+  assert.ok(reference.checked>0 && reference.checked<10000);
+  assert.ok(reference.exemplar[1]<=t.routeLimit);
+  assert.deepEqual(real.makeOrTask('transport',seed),t);
+  const ans={mathprog:canonicalTransport(t),
+   values:Object.fromEntries(t.variableNames.map((n,i)=>[n,reference.exemplar[i]])),
+   reportedObjective:reference.objective,hintsUsed:false};
+  assert.equal(real.gradeOrTask('transport',seed,ans).points,1,'seed '+seed);
+  assert.equal(real.gradeOrTask('transport',seed,{...ans,hintsUsed:true}).points,0);
+  assert.equal(real.gradeOrTask('transport',seed,{...ans,reportedObjective:reference.objective+1}).points,0);
+  assert.equal(real.gradeOrTask('transport',seed,{...ans,mathprog:ans.mathprog.replace('minimize cost:','maximize cost:')}).points,0);
+  const missingRoute=ans.mathprog.replace(/^s\.t\. route:.*\n/m,'');
+  const undecided=real.gradeOrTask('transport',seed,{...ans,mathprog:missingRoute});
+  assert.equal(undecided.points,null,'noncanonical/unsupported should not be falsely wrong');
+  const missingModel=real.gradeOrTask('transport',seed,{...ans,mathprog:'set I; param supply{I};'});
+  assert.equal(missingModel.points,null,'indexed grammar not yet supported');
+ }
+});
+test('transport: invalid supplies, route overflow and wrong demand are not accepted',
+ {skip:!real?'requires pinned R15 parser':false},()=>{
+ const t=real.makeOrTask('transport',42),ref=real.orReference(t);
+ const base={mathprog:canonicalTransport(t),values:Object.fromEntries(t.variableNames.map((n,i)=>[n,ref.exemplar[i]])),
+  reportedObjective:ref.objective,hintsUsed:false};
+ const off={...base.values,x11:base.values.x11+1};
+ assert.equal(real.gradeOrTask('transport',42,{...base,values:off}).points,0);
+ const excess={...base.values,x12:t.routeLimit+1};
+ assert.equal(real.gradeOrTask('transport',42,{...base,values:excess}).points,0);
+ const broken={...base.values,x22:-1};
+ assert.equal(real.gradeOrTask('transport',42,{...base,values:broken}).points,0);
+ assert.match(real.orStarter(t),/TODO: x12/);
+ assert.doesNotMatch(real.orStarter(t),/minimize cost:|minimize szallitasi_koltseg:/);
+});
+
+// Independent row-composition enumeration: not using production transportOracle.
+test('transport oracle falsification: independent exhaustive 3x3 row-flow search',
+ {skip:!real?'requires pinned R15 parser':false},()=>{
+ const rows=n=>{
+  const combos=[];
+  for(let a=0;a<=n;a++)for(let b=0;b<=n-a;b++)combos.push([a,b,n-a-b]);
+  return combos;
+ };
+ for(const seed of [0,1,2,3,5,7,11,17,42,99]){
+  const task=real.makeOrTask('transport',seed);
+  const rowSets=task.supply.map(rows);
+  let min=Infinity,nonopt=null,nfeasible=0;
+  for(const ra of rowSets[0])for(const rb of rowSets[1])for(const rc of rowSets[2]){
+   const v=[...ra,...rb,...rc];
+   if(v[1]>task.routeLimit||[0,1,2].some(j=>ra[j]+rb[j]+rc[j]!==task.demand[j]))continue;
+   nfeasible++;
+   const cost=v.reduce((a,x,i)=>a+x*task.costs[Math.floor(i/3)][i%3],0);
+   if(cost<min)min=cost;
+  }
+  const reference=real.orReference(task);
+  assert.ok(nfeasible>1);
+  assert.equal(reference.objective,min,'Oracle disagreeing with independent row enumerator: '+seed);
+  for(const ra of rowSets[0])for(const rb of rowSets[1])for(const rc of rowSets[2]){
+   const v=[...ra,...rb,...rc];
+   if(v[1]>task.routeLimit||[0,1,2].some(j=>ra[j]+rb[j]+rc[j]!==task.demand[j]))continue;
+   const cost=v.reduce((a,x,i)=>a+x*task.costs[Math.floor(i/3)][i%3],0);
+   if(cost>min){nonopt={v,cost};break;}
+  }
+  if(nonopt){
+   const a={mathprog:canonicalTransport(task),values:Object.fromEntries(task.variableNames.map((name,i)=>[name,nonopt.v[i]])),
+    reportedObjective:nonopt.cost,hintsUsed:false};
+   const result=real.gradeOrTask('transport',seed,a);
+   assert.equal(result.points,0,'Feasible nonoptimal transport accepted: '+seed);
+   assert.deepEqual(result.errors,['not_optimal']);
+  }
+ }
 });
 
 // Public diagnostic module is separately importable without the grading oracle.

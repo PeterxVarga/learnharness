@@ -3,15 +3,32 @@ import {useRef,useState} from 'react';
 import Link from 'next/link';
 import {explainOrError} from '../domain/or-diagnostics-r1610.mjs';
 
-type Kind='assignment'|'production';
+type Kind='assignment'|'production'|'transport';
 type Task={id:string;kind:Kind;seed:number;title:string;statement:string;variableNames:string[];
  objectiveSense:'min'|'max';costs?:number[][];labels?:{rows:string[];columns:string[]};
- material?:number[];hours?:number[];profit?:number[];materialLimit?:number;hoursLimit?:number};
+ material?:number[];hours?:number[];profit?:number[];materialLimit?:number;hoursLimit?:number;
+ supply?:number[];demand?:number[];routeLimit?:number};
 type Grade={taskId:string;points:0|1|null;errors:string[];status:string};
 const endpoint='/api/pilot/gusek/szakmai';
 // R16.20: bounded, offline study primers sourced from the checked-in R16.10
 // Hungarian learning cards. These are NOT the student's earlier uploaded PDFs.
 const lessons={
+ transport:{
+  title:'Kötelező szállítási modell – pontos készlet és kereslet',
+  objective:'Miért kell hat egyenlőség és külön útvonalkorlát egy 3×3 szállítási feladathoz?',
+  steps:[
+   'Kilenc döntési változó: x11, x12, ..., x33. Mindegyik adott telephelyből adott boltba szállított mennyiség.',
+   'Minden telephely teljes készletét el kell szállítani: a sorösszeg = készlet.',
+   'Minden bolt pontos igényét ki kell elégíteni: az oszlopösszeg = kereslet.',
+   'Az x12 útvonal legfeljebb az adott maximumig használható, ettől nem változik a többi egyenlet.',
+   'A cél a kilenc egységköltség és szállított mennyiség szorzatának minimalizálása.'
+  ],
+  syntax:'var x11 >= 0, integer;\nvar x12 >= 0, integer;\n# EGYENLET: x11+x12+x13 = elso telephely keszlete',
+  question:'Egy bolt pontosan 4 darabot igényel. Milyen a három beérkező szállítás összege?',
+  choices:['Legfeljebb 4.','Pontosan 4.','Mindegyik telephelynek külön 4.'],
+  correct:1,
+  why:'A pontos igény egyenlőség, nem felső korlát. Ellenőrizd a sorok és oszlopok összegét külön is.'
+ },
  assignment:{
   title:'Hozzárendelés – a modell felépítése',
   objective:'Mikor használunk bináris változót, és hogyan lesz minden párosítás pontosan egyszeri?',
@@ -156,7 +173,7 @@ const examReadingRoute={
 type ExamKind=keyof typeof examLessons;
 type ExamOutcome='retry'|'supported_transfer'|'independent_transfer';
 const examOrder:ExamKind[]=['transport','indexed','simplex','graphical'];
-function ExamStudy(){
+function ExamStudy({onTransportPractice}:{onTransportPractice:()=>void}){
  const [topic,setTopic]=useState<ExamKind>('transport');
  const [first,setFirst]=useState<number|null>(null);
  const [transfer,setTransfer]=useState<number|null>(null);
@@ -221,7 +238,8 @@ function ExamStudy(){
    </div>}
   </section>}
   <p className="text-sm">{item.next}</p>
-  <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>
+  {topic==='transport'?<button type="button" data-testid="or-exam-to-transport" className="rounded border px-3 py-2 text-sm" onClick={onTransportPractice}>Kötelező szállítási gyakorló megnyitása</button>:
+   <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>}
   <aside data-testid="or-exam-adaptive-next" className="space-y-2 rounded border p-3 text-sm">
    <p className="font-semibold">Ajánlott folytatás ebben a munkamenetben</p>
    {allFormativeChecksPassed?<p role="status" data-testid="or-exam-formative-complete">Mind a négy rövid átviteli önellenőrzést segítség nélkül megoldottad. Következő lépés: önálló, új adatokkal készített GUSEK- és kézi vizsgafeladatok. Ez nem bizonyítja a teljes vizsgakészültséget.</p>:<>
@@ -277,9 +295,9 @@ export function TredvenOrDomain(){
  }
  return <main className="mx-auto max-w-5xl space-y-5 p-5">
   <Link className="text-sm underline" href="/pilot/gusek">← Vissza a GUSEK Workbenchhez</Link>
-  <ExamStudy />
+  <ExamStudy onTransportPractice={()=>{invalidate();setKind('transport');setQuizChoice(null);setStage('theory');}} />
   <header className="space-y-2"><h1 className="text-3xl font-semibold">Operációkutatás – GUSEK szakmai gyakorló</h1>
-   <p className="text-sm text-neutral-500">Két további, szintetikus, paraméterezett feladattípus. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
+   <p className="text-sm text-neutral-500">Három szintetikus, paraméterezett feladattípus, köztük a kötelező szállítási modell gyakorlója. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
   <nav className="flex flex-wrap gap-2" aria-label="Tanulási sorrend" data-testid="or-study-navigation">
    <button type="button" aria-current={stage==='theory'?'step':undefined} className="rounded border px-3 py-2 text-sm" onClick={()=>{invalidate();setStage('theory');}}>1. Elmélet</button>
    <button type="button" aria-current={stage==='practice'?'step':undefined} className="rounded border px-3 py-2 text-sm" disabled={quizChoice===null} onClick={()=>setStage('practice')}>2. Gyakorlás</button>
@@ -288,7 +306,7 @@ export function TredvenOrDomain(){
    <p className="text-xs text-neutral-500">Forrás: R16.10 saját magyar GUSEK-tanulókártyák. A korábban feltöltött egyetemi PDF-ek és .mod állományok még nincsenek ebbe a nézetbe importálva; ez a jelenleg ellenőrzött, beépített elméleti alap.</p>
    <label className="block text-sm font-semibold">Válassz témát:
     <select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);setQuizChoice(null);reset();}}>
-     <option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
+     <option value="transport">Kötelező szállítási modell</option><option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
     </select>
    </label>
    <h2 className="text-xl font-semibold">{lesson.title}</h2>
@@ -314,11 +332,19 @@ export function TredvenOrDomain(){
   </section>:<>
   <section className="flex flex-wrap items-end gap-3 rounded border p-4">
    <label>Feladattípus<select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);reset();}}>
-    <option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
+    <option value="transport">3×3 szállítás (egész, pontos készlet/igény)</option><option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
    <label>Variáns<input className="ml-2 w-32 rounded border bg-background p-2" inputMode="numeric" value={seed} onChange={e=>{setSeed(e.target.value);reset();}}/></label>
    <button type="button" disabled={busy} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50" onClick={()=>void load()}>Feladat betöltése</button>
   </section>
   {task&&<><section className="space-y-3 rounded border p-4"><h2 className="text-xl font-semibold">{task.title}</h2><p>{task.statement}</p>
+   {task.kind==='transport'&&<div data-testid="or-transport-task" className="space-y-2">
+    <p>Az összes készletet el kell szállítani és minden igényt pontosan teljesíteni kell. A táblázat egységköltségeket mutat; a változók nemnegatív egészek.</p>
+    <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th scope="col">Telephely</th>{task.labels?.columns.map(x=><th scope="col" key={x}>{x}</th>)}<th scope="col">Készlet</th></tr></thead>
+    <tbody>{task.costs?.map((row,i)=><tr key={i}><th scope="row">{task.labels?.rows[i]}</th>{row.map((v,j)=><td className="p-2 text-center" key={j}>{v}</td>)}<td className="text-center">{task.supply?.[i]}</td></tr>)}
+    <tr><th scope="row">Pontos igény</th>{task.demand?.map((v,i)=><td className="text-center" key={i}>{v}</td>)}<td className="text-center">Összesen {task.supply?.reduce((s,n)=>s+n,0)}</td></tr></tbody></table></div>
+    <p>A <strong>x12</strong> útvonalon legfeljebb <strong>{task.routeLimit}</strong> egység szállítható. Írj fel három telephelyegyenletet, három bolti keresletegyenletet és az útvonalkorlátot.</p>
+    <p className="text-xs text-neutral-500">Ez a szerver által generált, új számadatú feladat, nem az eredeti mintavizsga megoldása. A szerver csak a támogatott skalár, kanonikus MathProg-modell-egyezőséget tudja bizonyítani; eltérő, de matematikailag helyes alak nem automatikusan hibás.</p>
+   </div>}
    {task.kind==='assignment'&&<><p>A táblázat az egyes munkatársak feladatonkénti szükséges munkaidejét mutatja.</p>
     <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th scope="col">Munkatárs</th>{task.labels?.columns.map(x=><th scope="col" key={x}>{x}</th>)}</tr></thead>
      <tbody>{task.costs?.map((row,i)=><tr key={i}><th scope="row">{task.labels?.rows[i]}</th>{row.map((cost,j)=><td className="p-2 text-center" key={j}>{cost}</td>)}</tr>)}</tbody></table></div>
@@ -329,7 +355,11 @@ export function TredvenOrDomain(){
     <p className="text-sm">Összes alapanyag: legfeljebb {task.materialLimit}; összes munkaóra: legfeljebb {task.hoursLimit}. A darabszámok nemnegatív egészek.</p></>}
    <section className="rounded border p-3 text-sm" aria-label="Önellenőrző modellezési kérdések">
     <p className="font-semibold">Önellenőrzés a beadás előtt</p>
-    {task.kind==='assignment'?<ul className="list-disc space-y-1 pl-5">
+    {task.kind==='transport'?<ul className="list-disc space-y-1 pl-5">
+     <li>A három sorösszeg pontosan a három telephely készlete?</li>
+     <li>A három oszlopösszeg pontosan a három bolt igénye?</li>
+     <li>Az x12 útvonalkorlát és mind a kilenc fuvarköltség helyes?</li>
+    </ul>:task.kind==='assignment'?<ul className="list-disc space-y-1 pl-5">
       <li>Minden párosítási döntés pontosan 0 vagy 1 lehet?</li>
       <li>Minden munkatárs és minden feladat pontosan egyszer szerepel?</li>
       <li>A célfüggvény minden időadatot a megfelelő változóhoz párosít?</li>
