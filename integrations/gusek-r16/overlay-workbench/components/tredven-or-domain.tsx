@@ -3,7 +3,7 @@ import {useRef,useState} from 'react';
 import Link from 'next/link';
 import {explainOrError} from '../domain/or-diagnostics-r1610.mjs';
 
-type Kind='assignment'|'production'|'transport';
+type Kind='assignment'|'production'|'transport'|'transport_indexed';
 type Task={id:string;kind:Kind;seed:number;title:string;statement:string;variableNames:string[];
  objectiveSense:'min'|'max';costs?:number[][];labels?:{rows:string[];columns:string[]};
  material?:number[];hours?:number[];profit?:number[];materialLimit?:number;hoursLimit?:number;
@@ -28,6 +28,23 @@ const lessons={
   choices:['Legfeljebb 4.','Pontosan 4.','Mindegyik telephelynek külön 4.'],
   correct:1,
   why:'A pontos igény egyenlőség, nem felső korlát. Ellenőrizd a sorok és oszlopok összegét külön is.'
+ },
+ transport_indexed:{
+  title:'Általános GMPL – set, param, sum és külön adatok',
+  objective:'Hogyan alakítod át az első, kilencváltozós szállítási feladatot általános modellé úgy, hogy csak az adatokat kelljen módosítani?',
+  steps:[
+   'set I az indulási, set J az érkezési helyek halmaza. A data szakaszban 1, 2 és 3 az index.',
+   'param supply{I}, demand{J}, cost{I,J} és routeLimit hordozza a konkrét feladatadatokat.',
+   'var x{i in I,j in J} >= 0, integer; így egyetlen deklaráció írja le a kilenc fuvar döntési változóját.',
+   's.t. keszlet{i in I}: sum{j in J} x[i,j] = supply[i]; minden forrásnak egy saját egyenletet generál.',
+   's.t. igeny{j in J}: sum{i in I} x[i,j] = demand[j]; minden boltnak egy saját egyenletet generál.',
+   'Az x[1,2] <= routeLimit külön útvonal-feltétel. A költségminimalizálás kettős sum összegzés.'
+  ],
+  syntax:'set I; set J;\nparam supply{I}; param demand{J};\nvar x{i in I,j in J} >= 0, integer;\n# sum{j in J} x[i,j] = supply[i];',
+  question:'Miért nem kell kilenc külön var-deklaráció a 3×3-as szállításnál?',
+  choices:['Mert az adatfájl kijavítja a hibás változókat.','A var x{i in I,j in J} minden indexpárra változót generál.','Mert az útvonalkorlát eltűnik.'],
+  correct:1,
+  why:'A változódeklarációt a set I és set J mérete határozza meg; a modellképletek változatlanok.'
  },
  assignment:{
   title:'Hozzárendelés – a modell felépítése',
@@ -173,7 +190,7 @@ const examReadingRoute={
 type ExamKind=keyof typeof examLessons;
 type ExamOutcome='retry'|'supported_transfer'|'independent_transfer';
 const examOrder:ExamKind[]=['transport','indexed','simplex','graphical'];
-function ExamStudy({onTransportPractice}:{onTransportPractice:()=>void}){
+function ExamStudy({onTransportPractice,onIndexedPractice}:{onTransportPractice:()=>void;onIndexedPractice:()=>void}){
  const [topic,setTopic]=useState<ExamKind>('transport');
  const [first,setFirst]=useState<number|null>(null);
  const [transfer,setTransfer]=useState<number|null>(null);
@@ -239,6 +256,7 @@ function ExamStudy({onTransportPractice}:{onTransportPractice:()=>void}){
   </section>}
   <p className="text-sm">{item.next}</p>
   {topic==='transport'?<button type="button" data-testid="or-exam-to-transport" className="rounded border px-3 py-2 text-sm" onClick={onTransportPractice}>Kötelező szállítási gyakorló megnyitása</button>:
+   topic==='indexed'?<button type="button" data-testid="or-exam-to-indexed" className="rounded border px-3 py-2 text-sm" onClick={onIndexedPractice}>Általános indexelt GMPL-gyakorló megnyitása</button>:
    <Link href={item.href} className="inline-block rounded border px-3 py-2 text-sm">Gyakorló / tanító megnyitása</Link>}
   <aside data-testid="or-exam-adaptive-next" className="space-y-2 rounded border p-3 text-sm">
    <p className="font-semibold">Ajánlott folytatás ebben a munkamenetben</p>
@@ -295,9 +313,10 @@ export function TredvenOrDomain(){
  }
  return <main className="mx-auto max-w-5xl space-y-5 p-5">
   <Link className="text-sm underline" href="/pilot/gusek">← Vissza a GUSEK Workbenchhez</Link>
-  <ExamStudy onTransportPractice={()=>{invalidate();setKind('transport');setQuizChoice(null);setStage('theory');}} />
+  <ExamStudy onTransportPractice={()=>{invalidate();setKind('transport');setQuizChoice(null);setStage('theory');}}
+   onIndexedPractice={()=>{invalidate();setKind('transport_indexed');setQuizChoice(null);setStage('theory');}} />
   <header className="space-y-2"><h1 className="text-3xl font-semibold">Operációkutatás – GUSEK szakmai gyakorló</h1>
-   <p className="text-sm text-neutral-500">Három szintetikus, paraméterezett feladattípus, köztük a kötelező szállítási modell gyakorlója. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
+   <p className="text-sm text-neutral-500">Négy szintetikus, paraméterezett gyakorlóútvonal, köztük a kötelező szállítási modell gyakorlója. A feladatod: MathProg-modell, döntési változók és célfüggvényérték. Az ellenőrző nem futtatja a beadott kódot, és nincs részpont.</p></header>
   <nav className="flex flex-wrap gap-2" aria-label="Tanulási sorrend" data-testid="or-study-navigation">
    <button type="button" aria-current={stage==='theory'?'step':undefined} className="rounded border px-3 py-2 text-sm" onClick={()=>{invalidate();setStage('theory');}}>1. Elmélet</button>
    <button type="button" aria-current={stage==='practice'?'step':undefined} className="rounded border px-3 py-2 text-sm" disabled={quizChoice===null} onClick={()=>setStage('practice')}>2. Gyakorlás</button>
@@ -306,7 +325,7 @@ export function TredvenOrDomain(){
    <p className="text-xs text-neutral-500">Forrás: R16.10 saját magyar GUSEK-tanulókártyák. A korábban feltöltött egyetemi PDF-ek és .mod állományok még nincsenek ebbe a nézetbe importálva; ez a jelenleg ellenőrzött, beépített elméleti alap.</p>
    <label className="block text-sm font-semibold">Válassz témát:
     <select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);setQuizChoice(null);reset();}}>
-     <option value="transport">Kötelező szállítási modell</option><option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
+     <option value="transport">Kötelező szállítási modell</option><option value="transport_indexed">Általános GMPL (set/param/sum)</option><option value="assignment">Hozzárendelés</option><option value="production">Termeléstervezés</option>
     </select>
    </label>
    <h2 className="text-xl font-semibold">{lesson.title}</h2>
@@ -332,12 +351,12 @@ export function TredvenOrDomain(){
   </section>:<>
   <section className="flex flex-wrap items-end gap-3 rounded border p-4">
    <label>Feladattípus<select className="ml-2 rounded border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as Kind);reset();}}>
-    <option value="transport">3×3 szállítás (egész, pontos készlet/igény)</option><option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
+    <option value="transport">3×3 szállítás (egész, pontos készlet/igény)</option><option value="transport_indexed">Általános GMPL szállítás (set/param/sum)</option><option value="assignment">3×3 hozzárendelés (bináris)</option><option value="production">Termeléstervezés (egész)</option></select></label>
    <label>Variáns<input className="ml-2 w-32 rounded border bg-background p-2" inputMode="numeric" value={seed} onChange={e=>{setSeed(e.target.value);reset();}}/></label>
    <button type="button" disabled={busy} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50" onClick={()=>void load()}>Feladat betöltése</button>
   </section>
   {task&&<><section className="space-y-3 rounded border p-4"><h2 className="text-xl font-semibold">{task.title}</h2><p>{task.statement}</p>
-   {task.kind==='transport'&&<div data-testid="or-transport-task" className="space-y-2">
+   {(task.kind==='transport'||task.kind==='transport_indexed')&&<div data-testid="or-transport-task" className="space-y-2">
     <p>Az összes készletet el kell szállítani és minden igényt pontosan teljesíteni kell. A táblázat egységköltségeket mutat; a változók nemnegatív egészek.</p>
     <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th scope="col">Telephely</th>{task.labels?.columns.map(x=><th scope="col" key={x}>{x}</th>)}<th scope="col">Készlet</th></tr></thead>
     <tbody>{task.costs?.map((row,i)=><tr key={i}><th scope="row">{task.labels?.rows[i]}</th>{row.map((v,j)=><td className="p-2 text-center" key={j}>{v}</td>)}<td className="text-center">{task.supply?.[i]}</td></tr>)}
@@ -355,7 +374,7 @@ export function TredvenOrDomain(){
     <p className="text-sm">Összes alapanyag: legfeljebb {task.materialLimit}; összes munkaóra: legfeljebb {task.hoursLimit}. A darabszámok nemnegatív egészek.</p></>}
    <section className="rounded border p-3 text-sm" aria-label="Önellenőrző modellezési kérdések">
     <p className="font-semibold">Önellenőrzés a beadás előtt</p>
-    {task.kind==='transport'?<ul className="list-disc space-y-1 pl-5">
+    {(task.kind==='transport'||task.kind==='transport_indexed')?<ul className="list-disc space-y-1 pl-5">
      <li>A három sorösszeg pontosan a három telephely készlete?</li>
      <li>A három oszlopösszeg pontosan a három bolt igénye?</li>
      <li>Az x12 útvonalkorlát és mind a kilenc fuvarköltség helyes?</li>
@@ -371,6 +390,7 @@ export function TredvenOrDomain(){
    </section>
    <p className="text-xs text-neutral-500">Töltsd ki magad a TODO részeket. A kezdőmodell nem tartalmazza a célfüggvény együtthatóit és a teljes kész modellt.</p></section>
    <section className="space-y-3 rounded border p-4"><label className="block font-semibold" htmlFor="or-model">MathProg-modell (.mod)</label>
+    {task.kind==='transport_indexed'&&<p className="text-sm" data-testid="or-indexed-practice-notice">A mintavizsga 2. feladata: ugyanaz a szállítás halmazokkal, paraméterekkel és sum-okkal, a data szakasszal egy fájlban. Az előre kitöltött adatokat NE a feladatmegoldásnak tekintsd: a négy TODO-képletet neked kell önállóan megírni. Az automatikus ellenőrzés csak a megadott kanonikus I/J, supply/demand/cost/routeLimit szerkezetet bizonyítja; eltérő, akár helyes általános MathProg-alak NEM ÉRTÉKELHETŐ lehet. Az eredeti egyetemi mintavizsga értékei nincsenek itt.</p>}
     <textarea id="or-model" data-testid="or-model" spellCheck={false} className="min-h-72 w-full rounded border bg-transparent p-3 font-mono text-sm" value={model} onChange={e=>{invalidate();setModel(e.target.value);}}/>
     <label className="block font-semibold" htmlFor="or-values">Változóértékek (JSON)</label>
     <textarea id="or-values" data-testid="or-values" spellCheck={false} className="min-h-32 w-full rounded border bg-transparent p-3 font-mono text-sm" value={values} onChange={e=>{invalidate();setValues(e.target.value);}}/>

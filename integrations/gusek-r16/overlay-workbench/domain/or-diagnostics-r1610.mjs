@@ -1,6 +1,8 @@
 /** R16.10: public Hungarian domain feedback, no oracle/source/answer access. */
 const DIAGNOSTICS=Object.freeze({
  unsupported_source:'A modell nem a támogatott skalár MathProg-résznyelvben szerepel. Ettől még nem bizonyítottan hibás.',
+ indexed_canonical_proof_not_available:'A jelenlegi indexelt ellenőrző nem tudta bizonyítani a modellt. Ez nem bizonyít matematikai hibát. A támogatott kanonikus set I/J, param supply/demand/cost/routeLimit és sum mintát használd; további GMPL-alakok teljes értékelése még nem elérhető.',
+ indexed_data_mismatch:'A modellel együtt beadott adatfájl készlet-, kereslet-, költség- vagy útvonalkorlát-adata nem egyezik a generált feladattal. Nézd meg a forrás- és célindexeket is.',
  transport_canonical_proof_not_available:'A modell egyezőségét a kilencváltozós kanonikus ellenőrző nem tudta bizonyítani. Ez nem bizonyít matematikai hibát. Írj fel 3 készlet-egyenletet, 3 kereslet-egyenletet és egy x12 felső korlátot.',
  transport_model_cost:'A költségminimalizáló célfüggvény iránya vagy a fuvarok költsége eltér a feladattól.',
  transport_supply_not_exact:'Nem minden telephely készletét szállítottad el pontosan.',

@@ -35,8 +35,11 @@ for(const fragment of [
  'data-testid="or-exam-formative-complete"',
  'data-testid="or-exam-source-guide"',
  'data-testid="or-transport-task"',
- "type Kind='assignment'|'production'|'transport'",
+ "type Kind='assignment'|'production'|'transport'|'transport_indexed'",
  'Kötelező szállítási gyakorló megnyitása',
+ 'Általános indexelt GMPL-gyakorló megnyitása',
+ 'data-testid="or-indexed-practice-notice"',
+ 'setKind(\'transport_indexed\')',
  'setKind(\'transport\')',
 
  'const examReadingRoute={',
@@ -51,7 +54,14 @@ assert.ok(!source.includes('localStorage')&&!source.includes('sessionStorage'));
 const manifest=new Map(readFileSync(resolve(root,'SHA256SUMS'),'utf8').trimEnd().split('\n').map(line=>{
  const i=line.indexOf('  ');assert.ok(i>0);return [line.slice(i+2),line.slice(0,i)];
 }));
-for(const path of [ui,doc,me,localLauncher]){
+const rootlessLauncher='run-study-local-bwrap.sh';
+const rootless=readFileSync(resolve(root,rootlessLauncher),'utf8');
+for(const token of ['BLOCKED_OWNER_PILOT_APPROVAL','BLOCKED_MOUNTPOINT_NOT_EMPTY',
+ 'BLOCKED_LOCKFILE_DRIFT','--ro-bind','--chdir','run-study-local.sh',
+ 'LH_OWNER_APPROVED_LOCAL_PILOT','cmp -s']){
+ assert.ok(rootless.includes(token),'Rootless dependency reuse guard missing: '+token);
+}
+for(const path of [ui,doc,me,localLauncher,rootlessLauncher]){
  const expected=manifest.get(path);assert.ok(expected,'Manifest missing '+path);
  assert.equal(createHash('sha256').update(readFileSync(resolve(root,path))).digest('hex'),expected);
 }

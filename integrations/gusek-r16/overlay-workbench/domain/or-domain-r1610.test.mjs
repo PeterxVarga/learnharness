@@ -2,12 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
+import {verifyIndexedTransport,indexedTransportStarter} from './or-indexed-transport-r1627.mjs';
 
 const url=new URL('./or-domain-r1610.mjs',import.meta.url);
 const source=readFileSync(url,'utf8');
 assert.match(source,/from '\.\.\/pilots\/operations-research\/gusek-model-r13\.mjs'/);
 assert.doesNotMatch(source,/from '\.\.\/pilots\/operations-research\/gusek-equivalence-r14\.mjs'/);
-const stripped=source.replace(/^import \{.*\} from '(?:\.\.\/pilots\/operations-research|\.\/or-diagnostics-r1610|\.\/or-assignment-equivalence-r1611|\.\/or-production-equivalence-r1612)[^'\n]*';\n/gm,'');
+const stripped=source.replace(/^import \{.*\} from '(?:\.\.\/pilots\/operations-research|\.\/or-diagnostics-r1610|\.\/or-assignment-equivalence-r1611|\.\/or-production-equivalence-r1612|\.\/or-indexed-transport-r1627)[^'\n]*';\n/gm,'');
 // These mocks isolate mathematics and validation. They do NOT establish that
 // R15's real parser accepts the submitted MathProg source (separate E2E gate).
 const doubles=`const knownOrError=(code)=>['wrong_objective','wrong_constraint','production_model_profit'].includes(code);
@@ -17,6 +18,8 @@ const parseGusekModel=(source)=>source==='INVALID' ? {ok:false,code:'unsupported
 const proveEquivalentScalarModel=()=>({status:'MATCH',code:null}); // Deliberately unsafe fallback mock must never grant points.
 const proveAssignmentByEnumeration=model=>['WRONG','UNCERTAIN'].includes(model.__source)?{status:'UNASSESSABLE',code:'unsupported_numeric_form'}:{status:'MATCH',code:null};
 const proveProductionByEnumeration=model=>model.__source==='WRONG'?{status:'ZERO_CREDIT',code:'production_model_profit'}:model.__source==='UNCERTAIN'?{status:'UNASSESSABLE',code:'production_lattice_proof_not_available'}:{status:'MATCH',code:null};
+const indexedTransportStarter=()=>'';
+const verifyIndexedTransport=()=>({status:'UNASSESSABLE',code:'indexed_canonical_proof_not_available'});
 const verifyGusekModel=(model,expected)=>model.__source==='WRONG' ?
   ({status:'ZERO_CREDIT',code:'wrong_objective'}):({status:'MATCH',code:null});\n`;
 const mod=await import('data:text/javascript;base64,'+Buffer.from(doubles+stripped).toString('base64'));
@@ -264,6 +267,64 @@ test('transport oracle falsification: independent exhaustive 3x3 row-flow search
    assert.equal(result.points,0,'Feasible nonoptimal transport accepted: '+seed);
    assert.deepEqual(result.errors,['not_optimal']);
   }
+ }
+});
+
+// R16.27 two-part university exam: same first-task data; now indexed model+data.
+function canonicalIndexed(t){
+ const starter=indexedTransportStarter(t);
+ assert.match(starter,/set I;/);
+ assert.match(starter,/param cost : 1 2 3 :=/);
+ assert.match(starter,/# TODO:/);
+ assert.doesNotMatch(starter,/^s\.t\. keszlet\{/m);
+ return starter
+ .replace('# TODO: s.t. keszlet{i in I}: sum{j in J} x[i,j] = supply[i];',
+  's.t. keszlet{i in I}: sum{j in J} x[i,j] = supply[i];')
+ .replace('# TODO: s.t. igeny{j in J}: sum{i in I} x[i,j] = demand[j];',
+  's.t. igeny{j in J}: sum{i in I} x[i,j] = demand[j];')
+ .replace('# TODO: s.t. utvonal: x[1,2] <= routeLimit;',
+  's.t. utvonal: x[1,2] <= routeLimit;')
+ .replace('# TODO: minimize osszkoltseg: sum{i in I,j in J} cost[i,j]*x[i,j];',
+  'minimize osszkoltseg: sum{i in I,j in J} cost[i,j]*x[i,j];');
+}
+test('indexed transport canonical model + data passes same bounded transport oracle',
+ {skip:!real?'requires pinned R15 parser':false},()=>{
+ for(const seed of [0,1,2,7,42,99,65535]){
+  const t=real.makeOrTask('transport_indexed',seed);
+  const model=canonicalIndexed(t);
+  assert.deepEqual(verifyIndexedTransport(t,model),{status:'MATCH',code:null});
+  const scalar=real.makeOrTask('transport',seed);
+  assert.deepEqual(t.costs,scalar.costs);
+  const reference=real.orReference(scalar);
+  const values=Object.fromEntries(t.variableNames.map((n,i)=>[n,reference.exemplar[i]]));
+  const a={mathprog:model,values,reportedObjective:reference.objective,hintsUsed:false};
+  assert.equal(real.gradeOrTask('transport_indexed',seed,a).points,1,'full '+seed);
+  assert.equal(real.gradeOrTask('transport_indexed',seed,{...a,hintsUsed:true}).points,0);
+  assert.equal(real.gradeOrTask('transport_indexed',seed,{...a,reportedObjective:reference.objective+1}).points,0);
+  const mismatch=model.replace('param routeLimit := 2;','param routeLimit := 3;');
+  const gradeWrong=real.gradeOrTask('transport_indexed',seed,{...a,mathprog:mismatch});
+  assert.equal(gradeWrong.points,0,'wrong data '+seed);
+  assert.deepEqual(gradeWrong.errors,['indexed_data_mismatch']);
+ }
+});
+test('indexed canonical verifier fails closed for unsupported, malicious, ambiguous or case-mismatched forms',
+ {skip:!real?'requires pinned R15 parser':false},()=>{
+ const t=real.makeOrTask('transport_indexed',42),model=canonicalIndexed(t);
+ const scalar=real.makeOrTask('transport',42),ref=real.orReference(scalar);
+ const a={mathprog:model,values:Object.fromEntries(t.variableNames.map((n,i)=>[n,ref.exemplar[i]])),
+  reportedObjective:ref.objective,hintsUsed:false};
+ for(const mutated of [
+  model.replace('s.t. utvonal: x[1,2] <= routeLimit;',''),
+  model.replace('param supply{I};','param Supply{I};'),
+  model.replace('minimize osszkoltseg:','maximize osszkoltseg:'),
+  model.replace('sum{j in J} x[i,j]','sum{i in I} x[i,j]'),
+  model+'\nexecute "curl example.org";',
+  model.replace('var x{i in I,j in J} >= 0, integer;','var x{i in I,j in J} binary;'),
+  indexedTransportStarter(t)
+ ]){
+  const grade=real.gradeOrTask('transport_indexed',42,{...a,mathprog:mutated});
+  assert.equal(grade.points,null,mutated.slice(0,100));
+  assert.deepEqual(grade.errors,['indexed_canonical_proof_not_available']);
  }
 });
 

@@ -4,11 +4,12 @@
  * No LLM, network, filesystem, glpsol, global scores or storage.
  */
 import {parseGusekModel,verifyGusekModel} from '../pilots/operations-research/gusek-model-r13.mjs';
+import {indexedTransportStarter,verifyIndexedTransport} from './or-indexed-transport-r1627.mjs';
 
 const UINT32=4294967295;
 const int=(n,a=0,b=UINT32)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
-const KINDS=Object.freeze(['assignment','production','transport']);
-const NAMES=Object.freeze({assignment:'Munkatárs–feladat hozzárendelés',production:'Egészértékű termeléstervezés',transport:'Szállítási modell (3×3)'});
+const KINDS=Object.freeze(['assignment','production','transport','transport_indexed']);
+const NAMES=Object.freeze({assignment:'Munkatárs–feladat hozzárendelés',production:'Egészértékű termeléstervezés',transport:'Szállítási modell (3×3)',transport_indexed:'Általános szállítási modell (set/param/sum)'});
 const err=(points,code,scope='domain')=>({points,maxPoints:1,correct:points===null?null:points===1,
  status:points===null?'UNASSESSABLE':points===1?'FULL_CREDIT':'ZERO_CREDIT',errors:points===1?[]:[code],
  verifiedBy:'r1610_static_model_and_exact_enumeration',diagnosticScope:scope});
@@ -46,6 +47,11 @@ function makeTransport(seed){
 }
 export function makeOrTask(kind,seed){
  if(!KINDS.includes(kind)||!int(seed))throw Error('invalid_or_task');
+ if(kind==='transport_indexed'){
+  const base=makeTransport(seed);
+  return {...base,schema:'tredven.or.transport-indexed.v1',kind:'transport_indexed',
+   id:'or-transport_indexed-'+seed,title:NAMES.transport_indexed};
+ }
  return kind==='assignment'?makeAssignment(seed):kind==='transport'?makeTransport(seed):makeProduction(seed);
 }
 function trustedSource(task){
@@ -84,6 +90,7 @@ function expectedModel(task){
 /** Public starter does not expose constraints, objective coefficients, or optimum. */
 export function orStarter(task){
  const kind=task?.kind;
+ if(kind==='transport_indexed')return indexedTransportStarter(task);
  if(kind==='assignment')return [
   '# GUSEK / MathProg: hozzárendelés (bináris 3x3 modell)',
   ...task.variableNames.map(n=>`var ${n} binary;`),
@@ -218,6 +225,17 @@ import {proveProductionByEnumeration} from './or-production-equivalence-r1612.mj
 export function gradeOrTask(kind,seed,answer){
  const task=makeOrTask(kind,seed);
  if(kind==='transport')return gradeTransport(task,answer);
+ if(kind==='transport_indexed'){
+  if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
+  const verify=verifyIndexedTransport(task,answer.mathprog);
+  if(verify.status==='UNASSESSABLE')return err(null,verify.code,'model');
+  if(verify.status==='MISMATCH')return err(0,verify.code,'model');
+  // Equivalence of this strict canonical indexed model + task-matching data
+  // to the scalar model is guaranteed by the verified expansion. Reuse the
+  // proven server-only solution/optimum checker; never execute source.
+  const scalar={...task,kind:'transport'};
+  return gradeTransport(scalar,{...answer,mathprog:trustedSource(scalar)});
+ }
  if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
  if(typeof answer.mathprog!=='string')return err(null,'unsupported_source','grammar');
  const model=parseGusekModel(answer.mathprog);
