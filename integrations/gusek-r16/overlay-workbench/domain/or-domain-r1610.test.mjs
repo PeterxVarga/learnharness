@@ -8,7 +8,7 @@ const url=new URL('./or-domain-r1610.mjs',import.meta.url);
 const source=readFileSync(url,'utf8');
 assert.match(source,/from '\.\.\/pilots\/operations-research\/gusek-model-r13\.mjs'/);
 assert.doesNotMatch(source,/from '\.\.\/pilots\/operations-research\/gusek-equivalence-r14\.mjs'/);
-const stripped=source.replace(/^import \{.*\} from '(?:\.\.\/pilots\/operations-research|\.\/or-diagnostics-r1610|\.\/or-assignment-equivalence-r1611|\.\/or-production-equivalence-r1612|\.\/or-indexed-transport-r1627)[^'\n]*';\n/gm,'');
+const stripped=source.replace(/^import \{.*\} from '(?:\.\.\/pilots\/operations-research|\.\/or-diagnostics-r1610|\.\/or-assignment-equivalence-r1611|\.\/or-production-equivalence-r1612|\.\/or-indexed-transport-r1627|\.\/or-manual-lp-r1628)[^'\n]*';\n/gm,'');
 // These mocks isolate mathematics and validation. They do NOT establish that
 // R15's real parser accepts the submitted MathProg source (separate E2E gate).
 const doubles=`const knownOrError=(code)=>['wrong_objective','wrong_constraint','production_model_profit'].includes(code);

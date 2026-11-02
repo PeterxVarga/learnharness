@@ -35,10 +35,11 @@ for(const fragment of [
  'data-testid="or-exam-formative-complete"',
  'data-testid="or-exam-source-guide"',
  'data-testid="or-transport-task"',
- "type Kind='assignment'|'production'|'transport'|'transport_indexed'",
+ "type Kind='assignment'|'production'|'transport'|'transport_indexed'|'simplex'|'graphical'",
  'Kötelező szállítási gyakorló megnyitása',
  'Általános indexelt GMPL-gyakorló megnyitása',
  'data-testid="or-indexed-practice-notice"',
+ 'data-testid="or-exam-to-simplex"', 'data-testid="or-exam-to-graphical"',
  'setKind(\'transport_indexed\')',
  'setKind(\'transport\')',
 

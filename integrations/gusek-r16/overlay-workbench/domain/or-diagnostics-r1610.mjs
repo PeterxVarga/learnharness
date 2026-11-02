@@ -41,6 +41,12 @@ const DIAGNOSTICS=Object.freeze({
  assignment_job_3_not_once:'A harmadik feladat nincs pontosan egy munkatárshoz rendelve.',
  production_material_capacity:'A termékmennyiségek túllépik az alapanyag-kapacitást.',
  production_labor_capacity:'A termékmennyiségek túllépik a munkaidő-kapacitást.',
+ manual_trace_unassessable:'A beadott nyomvonal nem a támogatott JSON-formátumban van. Más levezetési alak ettől még lehet helyes; az ellenőrző csak a megadott struktúrát fogadja.',
+ simplex_entering_column:'A megadott szabály szerint a célfüggvénysor legnegatívabb oszlopát kell bevinned.',
+ simplex_leaving_row:'Csak pozitív pivot-oszlopelem és a legkisebb megengedett jobb oldal / pivotelem hányados alapján léptethetsz ki.',
+ simplex_pivot_arithmetic:'Az átalakított szimplextábla valamelyik sorában aritmetikai eltérés van.',
+ graphical_vertices_incorrect:'Nem egyezik a megengedett sokszög mind a négy csúcspontja. Ellenőrizd a tengelyek és két egyenes metszését.',
+ graphical_point_infeasible:'Az optimálisnak megadott pont nem teljesíti az összes korlátot.',
  objective_mismatch:'A beírt célfüggvényérték nem egyezik a megadott változók alapján számolttal.',
  not_optimal:'A terv megengedett, de nem optimális. Próbálj más megengedett kombinációt.',
  independence_not_demonstrated:'Segítséghasználat mellett a beadás nem igazolja az önálló feladatmegoldást.'

@@ -5,10 +5,11 @@
  */
 import {parseGusekModel,verifyGusekModel} from '../pilots/operations-research/gusek-model-r13.mjs';
 import {indexedTransportStarter,verifyIndexedTransport} from './or-indexed-transport-r1627.mjs';
+import {manualTask,manualStarter,manualReference,gradeManual} from './or-manual-lp-r1628.mjs';
 
 const UINT32=4294967295;
 const int=(n,a=0,b=UINT32)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
-const KINDS=Object.freeze(['assignment','production','transport','transport_indexed']);
+const KINDS=Object.freeze(['assignment','production','transport','transport_indexed','simplex','graphical']);
 const NAMES=Object.freeze({assignment:'Munkatárs–feladat hozzárendelés',production:'Egészértékű termeléstervezés',transport:'Szállítási modell (3×3)',transport_indexed:'Általános szállítási modell (set/param/sum)'});
 const err=(points,code,scope='domain')=>({points,maxPoints:1,correct:points===null?null:points===1,
  status:points===null?'UNASSESSABLE':points===1?'FULL_CREDIT':'ZERO_CREDIT',errors:points===1?[]:[code],
@@ -47,6 +48,7 @@ function makeTransport(seed){
 }
 export function makeOrTask(kind,seed){
  if(!KINDS.includes(kind)||!int(seed))throw Error('invalid_or_task');
+ if(kind==='simplex'||kind==='graphical')return manualTask(kind,seed);
  if(kind==='transport_indexed'){
   const base=makeTransport(seed);
   return {...base,schema:'tredven.or.transport-indexed.v1',kind:'transport_indexed',
@@ -90,6 +92,7 @@ function expectedModel(task){
 /** Public starter does not expose constraints, objective coefficients, or optimum. */
 export function orStarter(task){
  const kind=task?.kind;
+ if(kind==='simplex'||kind==='graphical')return manualStarter(task);
  if(kind==='transport_indexed')return indexedTransportStarter(task);
  if(kind==='assignment')return [
   '# GUSEK / MathProg: hozzárendelés (bináris 3x3 modell)',
@@ -191,6 +194,7 @@ export function orReference(task){
  // Intentionally not exported by the HTTP route; only local test/server side.
  if(task?.kind==='assignment')return assignmentOracle(task);
  if(task?.kind==='production')return productionOracle(task);
+ if(task?.kind==='simplex'||task?.kind==='graphical')return manualReference(task);
  if(task?.kind==='transport')return transportOracle(task);
  throw Error('invalid_task');
 }
@@ -224,6 +228,7 @@ import {proveProductionByEnumeration} from './or-production-equivalence-r1612.mj
  */
 export function gradeOrTask(kind,seed,answer){
  const task=makeOrTask(kind,seed);
+ if(kind==='simplex'||kind==='graphical')return gradeManual(task,answer);
  if(kind==='transport')return gradeTransport(task,answer);
  if(kind==='transport_indexed'){
   if(!answer||typeof answer!=='object'||Array.isArray(answer))return err(0,'invalid_answer');
