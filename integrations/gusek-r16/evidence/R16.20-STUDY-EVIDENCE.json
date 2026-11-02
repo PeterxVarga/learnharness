@@ -1,0 +1,55 @@
+{
+  "schema": "learnharness.r16.20.study-preparation.v1",
+  "changeBase": "38a34e66e79493e418065a753f4dbd82220321a0",
+  "sourcePinned": {
+    "securityUpstream": "80f225d1fe16483b8e018b51dbfef4465262156e",
+    "gusekR15": "9b7f374f4003276e67a96feb070124c244447aec",
+    "sourceInventory": {
+      "upstream": 712,
+      "addons": 55,
+      "total": 767,
+      "result": "PASS"
+    }
+  },
+  "qualification": {
+    "portablePack": "PASS_167_SOURCE_FILES",
+    "sourceAssembly": "PASS_767",
+    "typescript": "PASS",
+    "nextProductionBuild": "PASS",
+    "postBuildIntegrity": "PASS_767",
+    "targetedUnitTests": {
+      "pass": 5,
+      "fail": 0
+    },
+    "chromiumTheoryFirst": {
+      "assignmentTheory": "PASS",
+      "assignmentPracticeLoad": "PASS",
+      "productionTheory": "PASS",
+      "productionPracticeLoad": "PASS",
+      "logSHA256": "2583ea66397f3c0bbbb9bbb5d38127b043a4a3225e2b592e668f0828cea04634",
+      "logPublic": false
+    },
+    "dependencyInstall": "REUSED_EXACT_MATCH_LOCKFILE_AND_REFLINK_DEPS_NO_NEW_NPM_CI",
+    "localLauncherFailClosedWithoutOwnerApproval": "PASS"
+  },
+  "sourceCoverage": {
+    "internalHungarianR1610Lessons": 2,
+    "originalUploadedLecturePDFsImported": false,
+    "originalModExamplesImported": false,
+    "fullCourseCoverageProven": false
+  },
+  "authority": {
+    "humanReviewApproved": false,
+    "ownerLocalPilotRiskAccepted": false,
+    "mergeApproved": false,
+    "releaseApproved": false,
+    "publicWebAllowed": false,
+    "nativeGlpkEnabled": false
+  },
+  "notes": [
+    "Client theory self-check is not a server grade.",
+    "Previous R16.15 grading endpoint and business logic unchanged.",
+    "The earlier uploaded course sources require a separate private recovery, page-level evidence and owner-controlled import.",
+    "No application server was left running."
+  ]
+}
