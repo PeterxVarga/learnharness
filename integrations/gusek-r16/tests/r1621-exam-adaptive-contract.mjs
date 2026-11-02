@@ -33,6 +33,14 @@ for(const fragment of [
  'onClick={()=>restartAttempt(null)}',
  "const allFormativeChecksPassed=examOrder.every(k=>results[k]==='independent_transfer')",
  'data-testid="or-exam-formative-complete"',
+ 'data-testid="or-exam-source-guide"',
+ 'const examReadingRoute={',
+ 'Mogya_MINTA_VIZSGA.pdf',
+ 'LPfeladatok.pdf',
+ 'Komaromi_Eva_Linearis_programozas.pdf',
+ 'Ferenczi_Zoltan_Operaciokutatas.pdf',
+ 'A források a saját Fedora gépen',
+
 ])assert.ok(source.includes(fragment),'Attempt invalidation regression: '+fragment);
 assert.ok(!source.includes('localStorage')&&!source.includes('sessionStorage'));
 const manifest=new Map(readFileSync(resolve(root,'SHA256SUMS'),'utf8').trimEnd().split('\n').map(line=>{

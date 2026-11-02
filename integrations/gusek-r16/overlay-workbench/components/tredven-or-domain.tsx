@@ -110,6 +110,49 @@ const examLessons={
   href:'/chat/new?mode=teach'
  }
 } as const;
+// R16.25: verified *references*, not copied university lecture/source content.
+// Local 19-source corpus stays private; this is a human-readable reading route.
+// Physical PDF pages are backed by the original 2026-11-02 source manifest.
+const examReadingRoute={
+ transport:{
+  priority:'Elsődleges: a mintavizsga szerint a többi feladat értékelésének feltétele az első feladat helyes megoldása.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 1. fizikai oldal: kötelező szállítási feladat',
+   'Ferenczi_Zoltan_Operaciokutatas.pdf – 92–96. fizikai oldal: szállítási modellek'
+  ],
+  focus:'Először döntsd el, mi a változó, mely feltételek egyenlőségek, és mely útvonalakra vonatkozik külön felső korlát.',
+  deliverable:'Saját MathProg .mod modell; a beépített Workbench csak külön generált gyakorlófeladatot pontoz.'
+ },
+ indexed:{
+  priority:'Ráépül az első feladatra: ugyanazt a modellt halmazokkal, paraméterekkel és indexelt összegekkel kell általánosítani.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 2. fizikai oldal: modell- és adatfájl',
+   'Froccsok_halmazok.mod és Autokereskedes_halmazokkal.mod – eredeti, ellenőrizendő GMPL-minták'
+  ],
+  focus:'Tudd megkülönböztetni a forrás- és célhalmazt, az egyes párok költségadatait, illetve a forrásonkénti és célonkénti összegzést.',
+  deliverable:'Általános modell és külön adatok (vagy egy együtt beadott fájl); nincs igazolt teljes automatikus értékelés.'
+ },
+ simplex:{
+  priority:'A mintavizsgán külön, kézzel megoldandó pluszfeladat: GLPK nem használható.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 3. fizikai oldal: szimplexfeladat',
+   'LPfeladatok.pdf – 1–10. fizikai oldal: standard alak, pivot, kétfázisú példák',
+   'Komaromi_Eva_Linearis_programozas.pdf – 31–36. fizikai oldal: szimplex és kiinduló bázis'
+  ],
+  focus:'Előbb alakítsd át a feltételeket és jelöld a bázist, utána indokold a belépő oszlopot és a pozitív hányadosok közül a kilépő sort.',
+  deliverable:'Kézi szimplextáblák és levezetés; a tanító chat csak külön modellkonfigurációval használható.'
+ },
+ graphical:{
+  priority:'A mintavizsgán papíron beadandó pluszfeladat; az optimális pont keresése előtt a megengedett tartományt vizsgáld.',
+  sources:[
+   'Mogya_MINTA_VIZSGA.pdf – 4. fizikai oldal: grafikus LP-feladat',
+   'Ferenczi_Zoltan_Operaciokutatas.pdf – 12–16. fizikai oldal: grafikus modellek'
+  ],
+  focus:'Rajzold fel a feltételekhez tartozó félsíkokat, keresd a közös metszetet; ha üres, nincs optimum, amit számolni lehetne.',
+  deliverable:'Papírra rajzolt félsíkok és szöveges következtetés; nincs automatikus grafikus vizsgapontozás.'
+ }
+} as const;
+
 type ExamKind=keyof typeof examLessons;
 type ExamOutcome='retry'|'supported_transfer'|'independent_transfer';
 const examOrder:ExamKind[]=['transport','indexed','simplex','graphical'];
@@ -119,6 +162,7 @@ function ExamStudy(){
  const [transfer,setTransfer]=useState<number|null>(null);
  const [results,setResults]=useState<Partial<Record<ExamKind,ExamOutcome>>>({});
  const item=examLessons[topic];
+ const reading=examReadingRoute[topic];
  const select=(kind:ExamKind)=>{setTopic(kind);setFirst(null);setTransfer(null);};
  // A changed concept answer or explicit retry invalidates the last completed
  // transfer observation. Never recommend from an abandoned attempt.
@@ -146,6 +190,14 @@ function ExamStudy(){
     {examOrder.map(k=><option value={k} key={k}>{examLessons[k].title}</option>)}
    </select>
   </label>
+  <section className="space-y-2 rounded border p-3 text-sm" data-testid="or-exam-source-guide">
+   <h3 className="font-semibold">Eredeti források szerinti tanulási útvonal</h3>
+   <p className="font-medium">{reading.priority}</p>
+   <p className="text-xs text-neutral-500">A források a saját Fedora gépen, privát könyvtárban vannak előkészítve. Ez a felület még nem olvassa automatikusan a PDF-eket, és nem használ belőlük AI-alapú kivonatolást.</p>
+   <ul className="list-disc space-y-1 pl-5">{reading.sources.map(s=><li key={s}>{s}</li>)}</ul>
+   <p><strong>Mit érts meg?</strong> {reading.focus}</p>
+   <p><strong>Mit gyakorolj / adj be?</strong> {reading.deliverable}</p>
+  </section>
   <ol className="list-decimal space-y-2 pl-5 text-sm">{item.theory.map(s=><li key={s}>{s}</li>)}</ol>
   <fieldset className="space-y-2 rounded border p-3" data-testid="or-exam-diagnostic">
    <legend className="font-semibold">1. Fogalmi ellenőrzés</legend><p>{item.question}</p>
