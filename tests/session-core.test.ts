@@ -24,8 +24,9 @@ import { afterEach, describe, it } from "node:test";
 import { absorbed, pendingCallTool, SessionModel } from "../components/session-core.ts";
 import type { ChatInput } from "../src/core/input-events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
-import { newUserMessage, newAnswerResult, newThinkingMessage, needsContinuation, endsInDismissal } from "../src/core/native-messages.ts";
-import { newCompactionMarker, newPlanBlockMessage, projectView } from "../src/core/index.ts";
+import { newUserMessage, newAnswerResult, newThinkingMessage, needsContinuation, endsInDismissal, pendingQuestionOf } from "../src/core/native-messages.ts";
+import { endsInFailedTurn, newCompactionMarker, newPlanBlockMessage, projectView } from "../src/core/index.ts";
+import { buildProbeHandoffSteer, buildSubagentSteer } from "../src/core/contracts/jobs.ts";
 import { dismissedAnswer } from "../src/core/question-core.ts";
 import { buildAnswer, type QuestionData } from "../src/core/question-core.ts";
 
@@ -483,7 +484,7 @@ it("Wave C: markers injected mid-run (custom role, follow-up delivery) append to
 	});
 });
 
-// ─── provider failures: one final-entry rule for live and saved records ──────
+// ─── provider failures: one marker-aware rule for live and saved records ────
 
 describe("provider-error banner (live and saved)", () => {
 	function failed(id = "failed", errorMessage: string | undefined = "Google 500: fixture failure"): LhMessage {
@@ -512,7 +513,7 @@ describe("provider-error banner (live and saved)", () => {
 		assert.equal(model().getState().error, null);
 	});
 
-	it("any later entry supersedes the failure, including plan/compaction markers and aborts", () => {
+	it("substantive later input/output supersedes the failure, including aborts", () => {
 		const failure = failed();
 		const later: LhMessage[] = [
 			newUserMessage("retry"),
@@ -520,8 +521,6 @@ describe("provider-error banner (live and saved)", () => {
 			{ ...assistantMsg("aborted", ""), stopReason: "aborted", errorMessage: "Aborted" } as LhMessage,
 			newThinkingMessage("problem", "my attempt"),
 			resultMsg("call"),
-			newPlanBlockMessage("plan", { kind: "full", nodes: [], edges: [], current: null }),
-			newCompactionMarker("summary", { firstKeptMessageId: failure.id, tokensBefore: 100, model: "fixture", at: "2026-01-01T00:00:00Z" }),
 		];
 		for (const entry of later) {
 			const m = model({ initialMessages: [failure] });
@@ -530,6 +529,31 @@ describe("provider-error banner (live and saved)", () => {
 			m.setMessages([failure, entry]);
 			assert.equal(m.getState().error, null, `live banner superseded by ${entry.role}`);
 			assert.equal(model({ initialMessages: [failure, entry] }).getState().error, null, "reopened view agrees");
+		}
+	});
+
+	it("plan and compaction markers preserve the banner on sync, adoption and reopen", async () => {
+		const failure = failed();
+		const record = [newUserMessage("topic"), failure];
+		const markers = [
+			newPlanBlockMessage("plan", { kind: "full", nodes: [], edges: [], current: null }),
+			newCompactionMarker("summary", { firstKeptMessageId: failure.id, tokensBefore: 100, model: "fixture", at: "2026-01-01T00:00:00Z" }),
+		];
+		for (const marker of markers) {
+			const saved = [...record, marker];
+			let posts = 0;
+			const m = model({ initialMessages: record, fetch: async () => { posts++; throw new Error("unexpected request"); } });
+			m.setMessages(saved);
+			assert.equal(m.getState().error?.message, failure.role === "assistant" ? failure.errorMessage : undefined);
+			assert.equal(model({ initialMessages: saved }).getState().error?.message, m.getState().error?.message);
+			const adopted = model({ initialMessages: record });
+			adopted.adoptRecord(saved);
+			assert.equal(adopted.getState().error?.message, m.getState().error?.message);
+			assert.equal(endsInFailedTurn(saved), marker.customType === "plan-block", "later compaction removes Retry eligibility, not the error notice");
+			await m.continueIfOwed(saved);
+			assert.equal(posts, 0, "restoring the banner is never an automatic retry");
+			m.setMessages([...saved, newUserMessage("continue from here")]);
+			assert.equal(m.getState().error, null, "new learner input supersedes the notice");
 		}
 	});
 
@@ -554,7 +578,7 @@ describe("provider-error banner (live and saved)", () => {
 		assert.equal(m.getState().error?.message, "Google 500: fixture failure");
 	});
 
-	for (const input of [{ type: "text", text: "retry" }, { type: "continue" }] as const) {
+	for (const input of [{ type: "text", text: "retry" }, { type: "continue" }, { type: "retry" }] as const) {
 		it(`hides the old failure during the optimistic ${input.type} wait, then shows a new live failure`, async () => {
 			let acknowledge!: (response: Response) => void;
 			const ack = new Promise<Response>((resolve) => { acknowledge = resolve; });
@@ -861,7 +885,7 @@ describe("automatic continuation after recovery failure", () => {
 describe("answer submission recovery", () => {
 	const question = {
 		...assistantMsg("question", "Q?"),
-		content: [{ type: "toolCall", id: "q1", name: "quiz", arguments: { question: "Q?" } }],
+		content: [{ type: "toolCall", id: "q1", name: "quiz", arguments: { question: "Q?", options: [{ label: "A" }, { label: "B" }], correctAnswer: "A", explanation: "A is correct." } }],
 	} as LhMessage;
 	const answer = buildAnswer({ id: "q1", kind: "quiz", question: "Q?", mode: "single-select", options: [], createdAt: "fixture" }, { dontKnow: true, thinking: "keep my reasoning" });
 
@@ -996,6 +1020,108 @@ describe("answer submission recovery", () => {
 			assert.equal(m.status, "ready");
 		});
 	}
+
+	it("accepts immediate/recovery submissions and dismissals while a live question placeholder is in the tail", async () => {
+		for (const dismiss of [false, true]) {
+			let posts = 0;
+			const m = model({ initialMessages: [question], fetch: async (url) => {
+				if (String(url) === "/api/chat" || String(url).endsWith("/dismiss")) {
+					posts++;
+					return new Response("refused", { status: 500 });
+				}
+				return Response.json({ messages: [question], turnInFlight: false });
+			} });
+			m.applyWireEvent({ type: "turn_end", message: question, toolResults: [{ role: "toolResult", toolCallId: "q1", toolName: "quiz",
+				content: [{ type: "text", text: "Question posed" }], details: null, isError: false, timestamp: 1 }] });
+			const key = pendingQuestionOf([question])!.key;
+			if (dismiss) await m.dismissQuestion("q1", answer, key);
+			else {
+				await m.submitAnswer("quiz", "q1", answer, key);
+				await m.submitAnswer("quiz", "q1", answer, key);
+			}
+			assert.equal(posts, dismiss ? 1 : 2, "placeholder must not reject the render's question identity");
+		}
+	});
+
+	it("does not mistake an old same-id answer for resolution of the current question during recovery", async () => {
+		let posts = 0;
+		const newer = { ...question, id: "new-question" } as LhMessage;
+		const record = [question, newAnswerResult("q1", "quiz", answer), newer];
+		const m = model({ initialMessages: record, fetch: async (url) => {
+			if (String(url) === "/api/chat") { posts++; return new Response("refused", { status: 500 }); }
+			return Response.json({ messages: record, turnInFlight: false });
+		} });
+		const key = pendingQuestionOf(record)!.key;
+		m.saveQuestionDraft(key, { readingThinking: "NEW reasoning" });
+		await m.submitAnswer("quiz", "q1", answer, key);
+		await m.submitAnswer("quiz", "q1", answer, key);
+		assert.equal(posts, 2, "an older occurrence's result does not forbid retrying this one");
+		assert.equal(m.questionDraft(key)?.readingThinking, "NEW reasoning");
+		m.setMessages([...record, newAnswerResult("q1", "quiz", answer)]);
+		assert.equal(m.questionDraft(key), undefined);
+	});
+
+	it("adopts a newer same-id occurrence instead of reposting an older question's answer", async () => {
+		let posts = 0;
+		const newer = { ...question, id: "new-question" } as LhMessage;
+		const m = model({ initialMessages: [question], fetch: async (url) => {
+			if (String(url) === "/api/chat") { posts++; throw new TypeError("offline"); }
+			return Response.json({ messages: [question, newer], turnInFlight: false });
+		} });
+		const key = pendingQuestionOf([question])!.key;
+		await m.submitAnswer("quiz", "q1", answer, key);
+		await m.submitAnswer("quiz", "q1", answer, key);
+		assert.equal(posts, 1);
+		assert.equal(m.status, "ready");
+		assert.equal(pendingQuestionOf(m.getState().nativeMessages)?.messageId, "new-question");
+	});
+
+	it("rejects stale render callbacks locally, including same-id silent dismissals", async () => {
+		let requests = 0;
+		const m = model({ initialMessages: [question], fetch: async () => { requests++; return Response.json({ ok: true }); } });
+		const oldKey = pendingQuestionOf([question])!.key;
+		const newer = { ...question, id: "new-question" } as LhMessage;
+		m.setMessages([question, newer]);
+		await m.submitAnswer("quiz", "q1", answer, oldKey);
+		await m.dismissQuestion("q1", answer, oldKey);
+		assert.equal(requests, 0);
+		assert.equal(m.getState().nativeMessages.length, 2, "no optimistic answer targets the newer question");
+	});
+
+	it("uses the newest occurrence's tool for optimistic answers and dismissals", async () => {
+		const older = { ...question, id: "old-ask", content: [{ type: "toolCall", id: "q1", name: "ask_user_question", arguments: {} }] } as LhMessage;
+		for (const dismiss of [false, true]) {
+			const m = model({ initialMessages: [older, question], fetch: async () => { throw new TypeError("offline"); } });
+			const key = pendingQuestionOf([older, question])!.key;
+			let optimisticTool: string | undefined;
+			m.onChange = () => {
+				const result = m.getState().nativeMessages.find(m => m.role === "toolResult");
+				if (result?.role === "toolResult") optimisticTool = result.toolName;
+			};
+			if (dismiss) await m.dismissQuestion("q1", answer, key);
+			else await m.submitAnswer("quiz", "q1", answer, key);
+			assert.equal(optimisticTool, "quiz");
+		}
+	});
+
+	it("does not leak drafts between same-id questions, and preserves unique-id live handover", () => {
+		const m = model({ initialMessages: [question] });
+		const oldKey = pendingQuestionOf([question])!.key;
+		m.saveQuestionDraft(oldKey, { readingThinking: "old reasoning" });
+		const newer = { ...question, id: "new-question" } as LhMessage;
+		m.setMessages([question, newer]);
+		const newKey = pendingQuestionOf([question, newer])!.key;
+		assert.notEqual(oldKey, newKey);
+		assert.equal(m.questionDraft(newKey), undefined);
+		assert.equal(m.questionDraft(oldKey), undefined);
+
+		const live = { ...question, id: "c_live" };
+		m.setMessages([live]);
+		const liveKey = pendingQuestionOf([live])!.key;
+		m.saveQuestionDraft(liveKey, { readingThinking: "live reasoning" });
+		m.setMessages([question]);
+		assert.equal(m.questionDraft(pendingQuestionOf([question])!.key)?.readingThinking, "live reasoning");
+	});
 
 	it("adopts a changed pending question instead of sending the stale answer", async () => {
 		let posts = 0;
@@ -1322,6 +1448,108 @@ describe("adoptRecord — append-only adoption", () => {
 		assert.deepEqual(ids.slice(0, 2), ["u1", "steer_1"], "the steer shows NOW");
 		assert.match(ids[2] ?? "", /^c_/, "the live streaming tail stays last (client slot id)");
 	});
+
+	it("drops a staged steer from the live tail when adoption returns the same server id", () => {
+		const m = model({ initialMessages: [userText("u1", "topic")] });
+		const steer = userText("steer_probe_chat_1", "plan the next step");
+		m.applyWireEvent({ type: "message_start", message: steer });
+		m.applyWireEvent({ type: "message_end", message: steer });
+		m.applyWireEvent({ type: "message_start", message: { role: "assistant", content: [{ type: "text", text: "planning" }] } });
+
+		m.adoptRecord([userText("u1", "topic"), steer]);
+
+		const ids = m.getState().nativeMessages.map((x) => x.id);
+		assert.deepEqual(ids.slice(0, 2), ["u1", "steer_probe_chat_1"], "the server-stamped steer appears exactly once");
+		assert.match(ids[2] ?? "", /^c_/, "the unrelated live assistant tail stays last");
+		assert.equal(ids.length, 3);
+	});
+
+	const wakeMarkers = [
+		{ name: "probe", marker: buildProbeHandoffSteer("chat_x"), part: "data-probe-handoff" },
+		{
+			name: "job",
+			marker: buildSubagentSteer(
+				{ id: "job_x", kind: "research", toolCallId: "research_x" },
+				{ brief: "A synthetic research result.", sources: [] },
+			),
+			part: "data-subagent-artifact",
+		},
+	];
+
+	for (const { name, marker, part } of wakeMarkers) {
+		for (const order of ["wire-first", "record-first", "record-between-events"] as const) {
+			it(`reconciles a ${name} wake ${order}, including repeated events and adoption`, () => {
+				const initial = [userText("u1", "topic")];
+				const record = [...initial, marker];
+				const m = model({ initialMessages: initial });
+				const wire = (type: "message_start" | "message_end") => m.applyWireEvent({ type, message: marker });
+				if (order === "record-first") m.adoptRecord(record);
+				wire("message_start");
+				if (order === "record-between-events") m.adoptRecord(record);
+				wire("message_end");
+				m.applyWireEvent({ type: "message_start", message: { role: "assistant", content: [] } });
+				const assistantId = m.getState().nativeMessages.at(-1)!.id;
+				if (order === "wire-first") m.adoptRecord(record);
+
+				const assertReconciled = () => {
+					assert.deepEqual(m.getState().nativeMessages.map((message) => message.id), ["u1", marker.id, assistantId]);
+					assert.equal(m.getState().messages.filter((message) => message.id === marker.id).length, 1);
+					assert.equal(m.getState().messages.flatMap((message) => message.parts).filter((p) => p.type === part).length, 1);
+					assert.strictEqual(m.getState().nativeMessages[1], marker, "the canonical marker is retained");
+				};
+				assertReconciled();
+				for (let repeat = 0; repeat < 2; repeat++) {
+					wire("message_start");
+					assertReconciled();
+					wire("message_end");
+					assertReconciled();
+					m.adoptRecord(record);
+					assertReconciled();
+				}
+				m.applyWireEvent(partial([{ type: "text", text: "still planning" }]));
+				assertReconciled();
+				assert.deepEqual(m.getState().nativeMessages.at(-1)!.content, [{ type: "text", text: "still planning" }]);
+				m.applyWireEvent({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "finished planning" }], stopReason: "stop" } });
+				assertReconciled();
+				assert.deepEqual(m.getState().nativeMessages.at(-1)!.content, [{ type: "text", text: "finished planning" }]);
+			});
+		}
+
+		for (const refetchRecordFirst of [true, false]) {
+			it(`reattaches a ${name} wake already in ${refetchRecordFirst ? "refetched" : "seeded"} history without duplicating its replay`, async () => {
+				const initial = [userText("u1", "topic")];
+				const record = [...initial, marker];
+				const requests: string[] = [];
+				const m = model({
+					initialMessages: refetchRecordFirst ? initial : record,
+					fetch: async (input) => {
+						const url = String(input);
+						requests.push(url);
+						if (url === "/api/chats/chat_x") return Response.json({ messages: record });
+						if (url === "/api/chats/chat_x/stream") return sseResponse(
+							{ type: "message_start", message: marker },
+							{ type: "message_end", message: marker },
+							{ type: "message_start", message: { role: "assistant", content: [] } },
+							partial([{ type: "text", text: "planning" }]),
+							{ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "planned" }], stopReason: "stop" } },
+							"[DONE]",
+						);
+						throw new Error(`unexpected fetch: ${url}`);
+					},
+				});
+				await m.resumeStream(refetchRecordFirst);
+				assert.deepEqual(requests, refetchRecordFirst ? ["/api/chats/chat_x", "/api/chats/chat_x/stream"] : ["/api/chats/chat_x/stream"]);
+				const state = m.getState();
+				assert.equal(state.status, "ready");
+				assert.equal(state.error, null);
+				assert.deepEqual(state.nativeMessages.slice(0, 2), record);
+				assert.equal(state.nativeMessages.length, 3);
+				assert.equal(state.messages.flatMap((message) => message.parts).filter((p) => p.type === part).length, 1);
+				assert.match(state.nativeMessages[2]!.id, /^c_/);
+				assert.deepEqual(state.nativeMessages[2]!.content, [{ type: "text", text: "planned" }]);
+			});
+		}
+	}
 
 	it("a missing base id (record rewrite) bails — the idle full sync is the net", () => {
 		const m = model({ initialMessages: [userText("u1", "a"), userText("u2", "b")] });
