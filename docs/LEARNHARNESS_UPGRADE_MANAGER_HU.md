@@ -1,6 +1,12 @@
-# LearnHarness GUSEK — tartós, biztonságos helyi verziókezelő (v1.0)
+# LearnHarness GUSEK — tartós, biztonságos helyi verziókezelő (v1.0.1)
 
 **Cél:** a következő LearnHarness + GUSEK frissítéskor ne kelljen újra felkutatni vagy kézzel átmásolni a beszélgetéseket, forrásokat és beállításokat. A jelenleg működő R10 `37419`-es példányhoz az eszköz **nem nyúl**. A `37420`-as külön példányt csak sikeres ellenőrzés után hozza létre.
+
+## v1.0.1 — Next.js folyamatcím és megszakadt bootstrap javítása
+
+A v1.0.0 a `/proc/<pid>/cmdline` mezőben kereste a `server.js` szöveget. A Next.js induláskor `next-server (v...)` névre írja át a folyamatcímet, ezért a korábbi `BLOCKED_SERVER_PROCESS_DIED` tévesen jelentkezhetett. A v1.0.1 a saját Node-folyamatot külön PID, véletlen környezeti token, végrehajtható fájl és /proc indulási azonosító alapján követi.
+
+Ha az első bootstrap egy saját, még élő `37420`-as szervert hagyott maga után, a v1.0.1 csak az egyértelműen azonosított, **változatlan adatállapotú** példányt állítja le, mielőtt megismétli az elkülönített indítást. Ismeretlen folyamatot és módosult adatállományt érintetlenül hagy. Az előző próbálkozás állapotkönyvtárait nem törli. A pontosan ismert v1.0.0 kezelő másolatát megőrzi, mielőtt a binárisát lecseréli.
 
 ## Egyszeri bekötés
 
