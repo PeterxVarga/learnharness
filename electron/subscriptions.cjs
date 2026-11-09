@@ -1,7 +1,7 @@
 "use strict";
 const { randomUUID } = require("node:crypto");
 const path = require("node:path");
-const { createRequire, registerHooks } = require("node:module");
+const { registerHooks } = require("node:module");
 const { pathToFileURL } = require("node:url");
 const { PROVIDERS, fileStore, validateCredential, safeHttps, failure } = require("./subscription-store.cjs");
 
@@ -21,20 +21,30 @@ const MESSAGES = {
 function publicError(error) { return MESSAGES[error?.code] ?? MESSAGES.unavailable; }
 /** Resolve the SAME SDK installation as the standalone server, through public exports. */
 async function loadSubscriptionSDK(baseDirectory) {
-	const resolve = createRequire(path.join(baseDirectory, "package.json"));
-	const load = (id) => {
-		// Pi exports are import-only. Resolve the public export with ESM
-		// conditions, then remove this synchronous, exact-specifier hook
-		// BEFORE evaluation; no private package path or global hook remains.
-		const hook = registerHooks({ resolve(specifier, context, next) {
-			return next(specifier, specifier === id ? { ...context, conditions: [...context.conditions, "import"] } : context);
-		} });
-		let file;
-		try { file = resolve.resolve(id); } finally { hook.deregister(); }
-		return import(pathToFileURL(file).href);
-	};
-	const [sdk, copilot, xai] = await Promise.all([load("@earendil-works/pi-ai"), load("@earendil-works/pi-ai/providers/github-copilot"), load("@earendil-works/pi-ai/providers/xai")]);
-	return { ...sdk, ...copilot, ...xai };
+	// Pi exposes ESM import-only exports; createRequire.resolve() is a CJS
+	// resolution even when a hook adds "import" to its conditions. That fails
+	// under native Node and under tsx (ERR_PACKAGE_PATH_NOT_EXPORTED).
+	// Reparent only these three PUBLIC ESM imports to the packaged server root.
+	const parentURL = pathToFileURL(path.join(path.resolve(baseDirectory), "package.json")).href;
+	const callerURL = pathToFileURL(__filename).href;
+	const ids = [
+		"@earendil-works/pi-ai",
+		"@earendil-works/pi-ai/providers/github-copilot",
+		"@earendil-works/pi-ai/providers/xai",
+	];
+	const allowed = new Set(ids);
+	const hook = registerHooks({ resolve(specifier, context, next) {
+		if (allowed.has(specifier) && context.parentURL === callerURL && context.conditions.includes("import")) {
+			return next(specifier, { ...context, parentURL });
+		}
+		return next(specifier, context);
+	} });
+	try {
+		const [sdk, copilot, xai] = await Promise.all(ids.map((id) => import(id)));
+		return { ...sdk, ...copilot, ...xai };
+	} finally {
+		hook.deregister();
+	}
 }
 function validEndpoint(providerId, auth, credential) {
 	if (!auth || (!(typeof auth.apiKey === "string" && auth.apiKey.length > 0) && !Object.entries(auth.headers ?? {}).some(([key, value]) => ["authorization", "x-api-key", "api-key"].includes(key.toLowerCase()) && typeof value === "string" && value.trim().length > 0))) return false;
