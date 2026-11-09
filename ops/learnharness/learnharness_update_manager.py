@@ -35,7 +35,7 @@ BASE_APP = WORK / 'assembly-r6' / 'assembled'
 ACTIVE_PORT = 37420
 PROBE_PORT = 37421
 MIN_HEADROOM = 512 * 1024 * 1024
-MANAGER_VERSION = '1.0.0'
+MANAGER_VERSION = '1.0.1'
 PIN_GUSEK = '0ffd4cf5026105ba6df402120341b9da7a533fe7'
 PIN_INTEGRATION = '96c684029c2116ad5117168951598a2fd57fcd2b'
 
@@ -267,18 +267,104 @@ def port_free(port):
         except OSError: fail('PORT_BUSY_' + str(port))
 
 
+def process_info(pid: int):
+    """Read kernel-owned identity independent of mutable Next.js process.title."""
+    try:
+        proc = Path('/proc') / str(pid)
+        if proc.stat().st_uid != os.getuid():
+            return None
+        fields = (proc / 'stat').read_text('utf8').rsplit(')', 1)[1].split()
+        if len(fields) < 20 or fields[0] in ('Z', 'X', 'x'):
+            return None
+        start_ticks = int(fields[19])
+        raw = (proc / 'environ').read_bytes().split(b'\0')
+        env = {}
+        for entry in raw:
+            key, sep, val = entry.partition(b'=')
+            if sep and key in (b'LH_MANAGER_TOKEN', b'LH_DATA_DIR', b'LH_AUTH_FILE', b'PORT', b'HOSTNAME'):
+                env[key.decode('ascii')] = val.decode('utf8', 'strict')
+        exe = Path(os.readlink(proc / 'exe')).resolve(strict=True)
+        return {'pid': pid, 'ticks': start_ticks, 'env': env, 'exe': str(exe)}
+    except (OSError, ValueError, UnicodeError, IndexError):
+        return None
+
+
 def running(session):
     if not isinstance(session, dict): return False
     pid, token = session.get('pid'), session.get('token')
-    if not isinstance(pid, int) or not isinstance(token, str): return False
-    try:
-        env = Path(f'/proc/{pid}/environ').read_bytes().split(b'\x00')
-        cmd = Path(f'/proc/{pid}/cmdline').read_bytes()
-        status = Path(f'/proc/{pid}/stat').read_text('utf8')
-        return (b'LH_MANAGER_TOKEN=' + token.encode() in env
-                and b'server.js' in cmd and status.rsplit(')', 1)[1].split()[0] != 'Z')
-    except (OSError, ValueError): return False
+    if not isinstance(pid, int) or not isinstance(token, str) or not re.fullmatch(r'[a-f0-9]{32}', token):
+        return False
+    info = process_info(pid)
+    if not info or info['env'].get('LH_MANAGER_TOKEN') != token:
+        return False
+    if session.get('ticks') is not None and info['ticks'] != session['ticks']:
+        return False
+    if session.get('exe') is not None and info['exe'] != session['exe']:
+        return False
+    if session.get('exe') is None:
+        node = shutil.which('node')
+        if not node or info['exe'] != str(Path(node).resolve()):
+            return False
+    if info['env'].get('PORT') != str(session.get('port')) or info['env'].get('HOSTNAME') != '127.0.0.1':
+        return False
+    data = session.get('data')
+    if data is not None and info['env'].get('LH_DATA_DIR') != data:
+        return False
+    return True
 
+
+def reconcile_interrupted_bootstrap(source: Path):
+    """Safely reconcile only an unchanged v1.0.0 failed-bootstrap orphan."""
+    with socket.socket() as test:
+        try:
+            test.bind(('127.0.0.1', ACTIVE_PORT))
+            return 'NO_ORPHAN'
+        except OSError:
+            pass
+    matches = []
+    expected_node = shutil.which('node')
+    if not expected_node:
+        fail('NODE_MISSING')
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdecimal(): continue
+        info = process_info(int(entry.name))
+        if not info: continue
+        env = info['env']
+        token = env.get('LH_MANAGER_TOKEN', '')
+        if (info['exe'] == str(Path(expected_node).resolve())
+            and re.fullmatch(r'[a-f0-9]{32}', token)
+            and env.get('PORT') == str(ACTIVE_PORT)
+            and env.get('HOSTNAME') == '127.0.0.1'
+            and env.get('LH_AUTH_FILE') == str(ROOT / 'runtime' / 'secrets' / 'auth.json')):
+            data = Path(env.get('LH_DATA_DIR', ''))
+            if (data.parent.parent == ROOT / 'generations'
+                and data.name == 'data' and data.parent.name.startswith('g-')):
+                matches.append((info, data))
+    if len(matches) != 1:
+        fail('PORT_37420_BUSY_NO_UNAMBIGUOUS_MANAGED_ORPHAN')
+    info, data = matches[0]
+    expected, source_ids, source_messages = inventory(source)
+    copied, copied_ids, copied_messages = inventory(data)
+    if (expected != copied or source_ids != copied_ids or source_messages != copied_messages):
+        fail('ORPHAN_HAS_DIFFERENT_LEARNER_STATE_PRESERVED')
+    try:
+        with urlopen(f'http://127.0.0.1:{ACTIVE_PORT}/api/chats', timeout=3) as response:
+            got = json.loads(response.read(4_000_000))
+        if {c['id']: c['messageCount'] for c in got['chats']} != source_ids:
+            fail('ORPHAN_API_STATE_MISMATCH_PRESERVED')
+    except RuntimeError:
+        raise
+    except Exception:
+        fail('ORPHAN_API_UNAVAILABLE_PRESERVED')
+    session = {'pid': info['pid'], 'token': info['env']['LH_MANAGER_TOKEN'],
+               'port': ACTIVE_PORT, 'ticks': info['ticks'], 'exe': info['exe'],
+               'data': str(data)}
+    if not running(session):
+        fail('ORPHAN_IDENTITY_CHANGED_PRESERVED')
+    if inventory(data)[0] != copied:
+        fail('ORPHAN_DATA_CHANGED_PRESERVED')
+    stop(session)
+    return 'OLD_MANAGED_ORPHAN_STOPPED_WITH_DATA_PRESERVED'
 
 def start(app: Path, data: Path, port: int, managed_keys: bool):
     port_free(port)
@@ -315,11 +401,16 @@ def start(app: Path, data: Path, port: int, managed_keys: bool):
                                 cwd=app, env=env, stdin=subprocess.DEVNULL,
                                 stdout=output, stderr=subprocess.STDOUT,
                                 start_new_session=True)
-    session = {'pid': proc.pid, 'token': token, 'port': port, 'log': str(logfile)}
+    session = {'pid': proc.pid, 'token': token, 'port': port, 'log': str(logfile),
+               'exe': str(Path(exe).resolve())}
     # /proc/<pid>/environ can be unreadable until execve completes. Never
     # mistake that startup race for a dead process or abandon an orphan.
     for _ in range(100):
-        if running(session): return session
+        if running(session):
+            info = process_info(proc.pid)
+            if info is not None:
+                session['ticks'] = info['ticks']
+                return session
         if proc.poll() is not None:
             fail('SERVER_EXITED_EARLY_LOG_' + str(logfile))
         time.sleep(.05)
@@ -407,13 +498,29 @@ def install_self():
     dest_dir = safe_dir(HOME / '.local' / 'bin', create=True)
     dest = dest_dir / 'learnharness-update'
     this = Path(__file__).resolve()
-    if dest.exists() and file_sha(dest) != file_sha(this):
+    if dest.is_symlink(): fail('INSTALLED_MANAGER_SYMLINK')
+    old_sha = '8417b0c645658fedb33350fb11db0f4d6fead077202c0f5e085f2fce57f000e1'
+    if dest.exists() and file_sha(dest) not in (file_sha(this), old_sha):
         fail('DIFFERENT_MANAGER_ALREADY_INSTALLED')
-    if not dest.exists():
-        shutil.copyfile(this, dest)
-    dest.chmod(0o700)
+    if not dest.exists() or file_sha(dest) != file_sha(this):
+        if dest.exists():
+            preserved = dest_dir / 'learnharness-update-v1.0.0-backup'
+            if preserved.exists() or preserved.is_symlink():
+                if not preserved.is_file() or file_sha(preserved) != old_sha:
+                    fail('UNKNOWN_OLD_MANAGER_BACKUP')
+            else:
+                shutil.copy2(dest, preserved)
+                preserved.chmod(0o600)
+        fd, name = tempfile.mkstemp(prefix='.manager-update-', dir=dest_dir)
+        try:
+            with os.fdopen(fd, 'wb') as stream, this.open('rb') as src:
+                shutil.copyfileobj(src, stream)
+                stream.flush(); os.fsync(stream.fileno())
+            os.chmod(name, 0o700)
+            os.replace(name, dest)
+        finally:
+            if os.path.exists(name): os.unlink(name)
     return dest
-
 
 def bootstrap(args):
     if (ROOT / 'state.json').exists(): fail('ALREADY_BOOTSTRAPPED')
@@ -426,6 +533,8 @@ def bootstrap(args):
     source = safe_dir(snap / 'preview' / 'data')
     app = app_ok(BASE_APP)
     receipt = expect_receipt('v0.5.0-gusek-r8', WORK / 'R8_FINAL_STATUS.txt', base=True)
+    orphan = reconcile_interrupted_bootstrap(source)
+    print('PREVIOUS_BOOTSTRAP=' + orphan, flush=True)
     # Stage a new data copy. Never point the manager at the original live R10 files.
     gen, slot = new_generation()
     proof = snapshot(source, slot / 'data')
